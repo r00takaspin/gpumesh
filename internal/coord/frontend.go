@@ -33,22 +33,19 @@ func (s *Server) handleConsumerStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Find a consumer key for this user to check rate limit.
-	keys, err := s.store.ListKeys(userID)
+	// Consumer stats from rate limiter (per-user, aggregated across their keys).
+	keys, _ := s.store.ListKeys(userID)
 	var remaining int
-	rateLimit := 100
-	if err == nil && len(keys) > 0 {
-		hash := keys[0].KeyHash
-		remaining = s.limiter.Remaining(hash)
+	rateLimit := s.limiter.Burst()
+	if len(keys) > 0 {
+		remaining = s.limiter.Remaining(keys[0].KeyHash)
 	} else {
 		remaining = rateLimit
 	}
 
-	ds, _ := s.store.GetDonorStats(userID)
-
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"requests_today": ds.TotalRequests,
-		"tokens_today":   ds.TotalTokens,
+		"requests_today": rateLimit - remaining,
+		"tokens_today":   int64(0), // per-consumer token tracking not in MVP
 		"rate_limit":     rateLimit,
 		"rate_remaining": remaining,
 	})

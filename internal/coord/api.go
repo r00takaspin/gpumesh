@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/gpumesh/gpumesh/internal/proto"
@@ -18,7 +19,18 @@ import (
 // --- GET /v1/models ---
 
 func (s *Server) handleAPIModels(w http.ResponseWriter, r *http.Request) {
-	// Authenticate (best-effort: rate limit check only; models list is public).
+	// Rate limit check (auth already done by requireAPIKey middleware).
+	keyHash, _ := r.Context().Value(ctxKeyAPIKeyHash).(string)
+	if keyHash != "" {
+		allowed, remaining := s.limiter.Allow(keyHash)
+		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
+		if !allowed {
+			w.Header().Set("Retry-After", "3600")
+			writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
+			return
+		}
+	}
+
 	snap := s.registry.Snapshot()
 
 	resp := proto.ModelListResponse{
@@ -36,7 +48,6 @@ func (s *Server) handleAPIModels(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Sort by name.
 	sort.Slice(resp.Data, func(i, j int) bool {
 		return resp.Data[i].ID < resp.Data[j].ID
 	})
@@ -44,29 +55,11 @@ func (s *Server) handleAPIModels(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// --- POST /v1/chat/completions ---
-
 func (s *Server) handleAPIChatCompletions(w http.ResponseWriter, r *http.Request) {
-	// 1. Authenticate.
-	authHeader := r.Header.Get("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		writeError(w, http.StatusUnauthorized, "missing Authorization header")
-		return
-	}
-	token := strings.TrimPrefix(authHeader, "Bearer ")
-	keyHash := hashKey(token)
-	key, err := s.store.FindKeyByHash(keyHash)
-	if err != nil {
-		log.Printf("chat: key lookup error: %v", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
-	}
-	if key == nil {
-		writeError(w, http.StatusUnauthorized, "invalid API key")
-		return
-	}
+	// Auth already done by requireAPIKey middleware; key hash is in context.
+	keyHash, _ := r.Context().Value(ctxKeyAPIKeyHash).(string)
 
-	// 2. Rate limit.
+	// Rate limit.
 	allowed, remaining := s.limiter.Allow(keyHash)
 	w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
 	if !allowed {
@@ -75,7 +68,7 @@ func (s *Server) handleAPIChatCompletions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 3. Parse request body.
+	// Parse request body.
 	var req proto.ChatCompletionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -86,10 +79,12 @@ func (s *Server) handleAPIChatCompletions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 4. Find donors for the model.
+	// Increment global daily counter.
+	atomic.AddInt64(&s.requestsToday, 1)
+
+	// Find donors for the model.
 	donors := s.registry.FindDonorsForModel(req.Model)
 	if len(donors) == 0 {
-		// List available models for error message.
 		snap := s.registry.Snapshot()
 		models := make([]string, 0, len(snap.Models))
 		for m := range snap.Models {
@@ -103,14 +98,14 @@ func (s *Server) handleAPIChatCompletions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 5. Sort by load and select.
+	// Sort by load and select.
 	sort.Slice(donors, func(i, j int) bool {
 		li := float64(donors[i].CurrentLoad) / float64(donors[i].MaxConcurrent)
 		lj := float64(donors[j].CurrentLoad) / float64(donors[j].MaxConcurrent)
 		return li < lj
 	})
 
-	// 6. Select donor with capacity.
+	// Select donor with capacity.
 	var selected *Donor
 	for _, d := range donors {
 		if d.CurrentLoad < d.MaxConcurrent {
@@ -126,7 +121,7 @@ func (s *Server) handleAPIChatCompletions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 7. Generate request_id.
+	// Generate request_id.
 	requestID := generateRequestID()
 
 	if req.Stream {
@@ -135,6 +130,7 @@ func (s *Server) handleAPIChatCompletions(w http.ResponseWriter, r *http.Request
 		s.handleNonStreamingCompletion(w, r, selected, &req, requestID)
 	}
 }
+
 
 // handleStreamingCompletion handles a streaming chat completion request.
 func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Request, donor *Donor, req *proto.ChatCompletionRequest, requestID string) {
@@ -155,7 +151,7 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 	donor.RegisterChunkChannel(requestID, ch)
 	defer donor.UnregisterChunkChannel(requestID)
 
-	// Increment load.
+	// Increment load (decremented on all exit paths below).
 	if !s.registry.IncrementLoad(donor.ProviderID) {
 		donor.UnregisterChunkChannel(requestID)
 		fmt.Fprintf(w, "data: {\"error\":\"donor overloaded\"}\n\n")
@@ -200,12 +196,33 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 		case <-totalCtx.Done():
 			// Send cancel to donor.
 			donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
+			if firstTokenReceived {
+				// SPEC §3.7: return generated tokens with finish_reason "length".
+				finalChunk := map[string]interface{}{
+					"id":      "chatcmpl-" + requestID,
+					"object":  "chat.completion.chunk",
+					"created": created,
+					"model":   req.Model,
+					"choices": []map[string]interface{}{
+						{
+							"index":         0,
+							"delta":         map[string]string{},
+							"finish_reason": "length",
+						},
+					},
+				}
+				data, _ := json.Marshal(finalChunk)
+				fmt.Fprintf(w, "data: %s\n\n", data)
+				flusher.Flush()
+			}
 			s.sendSSEDone(w, flusher)
+			s.registry.DecrementLoad(donor.ProviderID)
 			return
 
 		case <-r.Context().Done():
 			// Consumer disconnected.
 			donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
+			s.registry.DecrementLoad(donor.ProviderID)
 			return
 
 		case <-ttftTimer.C:
@@ -213,6 +230,7 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 			donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
 			fmt.Fprintf(w, "data: {\"error\":\"timeout waiting for first token\"}\n\n")
 			flusher.Flush()
+			s.registry.DecrementLoad(donor.ProviderID)
 			return
 
 		case <-interTokenTimer.C:
@@ -220,6 +238,7 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 			donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
 			fmt.Fprintf(w, "data: {\"error\":\"inter-token timeout\"}\n\n")
 			flusher.Flush()
+			s.registry.DecrementLoad(donor.ProviderID)
 			return
 
 		case cr, ok := <-ch:
@@ -227,25 +246,30 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 				// Channel closed (donor disconnected).
 				fmt.Fprintf(w, "data: {\"error\":\"donor disconnected\"}\n\n")
 				flusher.Flush()
+				s.registry.DecrementLoad(donor.ProviderID)
 				return
 			}
 			if cr.Err != "" {
 				fmt.Fprintf(w, "data: {\"error\":%q}\n\n", cr.Err)
 				flusher.Flush()
+				s.registry.DecrementLoad(donor.ProviderID)
 				return
 			}
 			if !firstTokenReceived {
 				firstTokenReceived = true
 				ttftTimer.Stop()
-			}
-			// Reset inter-token timer.
-			if !interTokenTimer.Stop() {
-				select {
-				case <-interTokenTimer.C:
-				default:
+				// Start inter-token timer now that we have the first token.
+				interTokenTimer.Reset(proto.InterTokenTimeout)
+			} else {
+				// Reset inter-token timer.
+				if !interTokenTimer.Stop() {
+					select {
+					case <-interTokenTimer.C:
+					default:
+					}
 				}
+				interTokenTimer.Reset(proto.InterTokenTimeout)
 			}
-			interTokenTimer.Reset(proto.InterTokenTimeout)
 
 			// Write SSE chunk in OpenAI format.
 			chunk := map[string]interface{}{
@@ -271,6 +295,7 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 			if cr.Done {
 				fmt.Fprintf(w, "data: [DONE]\n\n")
 				flusher.Flush()
+				s.registry.DecrementLoad(donor.ProviderID)
 				return
 			}
 		}
@@ -419,4 +444,59 @@ func generateRequestID() string {
 	b := make([]byte, 12)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// requireAPIKey is middleware that validates an API key from Authorization: Bearer header.
+// It stores the key hash in the request context for downstream use.
+func (s *Server) requireAPIKey(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if !strings.HasPrefix(authHeader, "Bearer ") {
+			writeError(w, http.StatusUnauthorized, "missing Authorization header")
+			return
+		}
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+		keyHash := hashKey(token)
+		key, err := s.store.FindKeyByHash(keyHash)
+		if err != nil {
+			log.Printf("api key lookup error: %v", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		if key == nil {
+			writeError(w, http.StatusUnauthorized, "invalid API key")
+			return
+		}
+		// Store the key hash for rate limiting.
+		ctx := context.WithValue(r.Context(), ctxKeyAPIKeyHash, keyHash)
+		ctx = context.WithValue(ctx, ctxKeyUserID, key.UserID)
+		next(w, r.WithContext(ctx))
+	}
+}
+
+// handleReport accepts an abuse report for a donor response (§5.1 SPEC).
+func (s *Server) handleReport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var report struct {
+		RequestID string `json:"request_id"`
+		Reason    string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if report.RequestID == "" {
+		writeError(w, http.StatusBadRequest, "request_id is required")
+		return
+	}
+
+	// For MVP, log the report. Future: store in DB, auto-flag donors.
+	userID := getUserID(r)
+	log.Printf("report: user_id=%d request_id=%s reason=%s", userID, report.RequestID, report.Reason)
+
+	writeJSON(w, http.StatusAccepted, map[string]string{"status": "ok"})
 }

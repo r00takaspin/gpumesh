@@ -6,21 +6,21 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
 	"github.com/gpumesh/gpumesh/internal/provider"
 )
-
 func main() {
 	var cfg provider.Config
 
-	flag.StringVar(&cfg.CoordinatorURL, "coordinator", envOrDefault("MESH_COORDINATOR", "ws://localhost:8080/ws/provider"), "coordinator WebSocket URL")
+	flag.StringVar(&cfg.CoordinatorURL, "coordinator", envOrDefault("MESH_COORDINATOR", "wss://gpumesh.io/ws/provider"), "coordinator WebSocket URL")
 	flag.StringVar(&cfg.Token, "token", os.Getenv("MESH_TOKEN"), "donor authentication token")
 	flag.StringVar(&cfg.OllamaURL, "ollama-url", envOrDefault("MESH_OLLAMA_URL", "http://localhost:11434"), "Ollama base URL")
 	flag.String("models", os.Getenv("MESH_MODELS"), "comma-separated model whitelist")
 	flag.StringVar(&cfg.Description, "description", envOrDefault("MESH_DESCRIPTION", hostname()), "public donor description")
-	flag.IntVar(&cfg.MaxConcurrent, "max-concurrent", 1, "max concurrent requests")
+	flag.IntVar(&cfg.MaxConcurrent, "max-concurrent", envOrDefaultInt("MESH_MAX_CONCURRENT", 1), "max concurrent requests")
 
 	flag.Parse()
 
@@ -60,6 +60,15 @@ func main() {
 func envOrDefault(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+func envOrDefaultInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return def
 }

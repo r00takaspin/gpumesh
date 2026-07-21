@@ -125,7 +125,7 @@ func (s *Store) CreateKey(userID int64, scope string) (rawKey string, keyID int6
 	}
 
 	hash := hashKey(raw)
-	prefix := raw[:12] // "inf_" + 8 hex chars
+	prefix := raw[:8] // first 8 chars per §5.6 SPEC
 
 	res, err := s.db.Exec(
 		`INSERT INTO api_keys (user_id, key_hash, key_prefix, scope) VALUES (?, ?, ?, ?)`,

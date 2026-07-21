@@ -2,6 +2,7 @@ package provider
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -42,6 +43,8 @@ type Agent struct {
 
 	providerID string
 	done       chan struct{}
+
+	httpClient *http.Client
 }
 
 // NewAgent creates a new provider agent.
@@ -63,9 +66,10 @@ func NewAgent(cfg Config) *Agent {
 		cfg.Description = host
 	}
 	return &Agent{
-		cfg:      cfg,
-		requests: make(map[string]context.CancelFunc),
-		done:     make(chan struct{}),
+		cfg:        cfg,
+		requests:   make(map[string]context.CancelFunc),
+		done:       make(chan struct{}),
+		httpClient: &http.Client{Timeout: proto.TotalRequestTimeout},
 	}
 }
 
@@ -442,22 +446,13 @@ func (a *Agent) sendToOllama(ctx context.Context, msg proto.RequestMsg) (*http.R
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST",
-		a.cfg.OllamaURL+"/api/chat", nil)
+		a.cfg.OllamaURL+"/api/chat", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	// Use pipe for body that supports io.NopCloser.
-	pr, pw := io.Pipe()
-	go func() {
-		pw.Write(body)
-		pw.Close()
-	}()
-	httpReq.Body = pr
-
-	client := &http.Client{Timeout: proto.TotalRequestTimeout}
-	return client.Do(httpReq)
+	return a.httpClient.Do(httpReq)
 }
 
 // discoverModels fetches available models from Ollama.

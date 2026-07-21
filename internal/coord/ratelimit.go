@@ -63,6 +63,11 @@ func (rl *RateLimiter) Allow(key string) (bool, int) {
 	return true, int(math.Floor(b.tokens))
 }
 
+// Burst returns the maximum bucket size (full hourly rate).
+func (rl *RateLimiter) Burst() int {
+	return int(rl.burst)
+}
+
 // Remaining returns the number of remaining tokens for a key without consuming.
 func (rl *RateLimiter) Remaining(key string) int {
 	rl.mu.Lock()

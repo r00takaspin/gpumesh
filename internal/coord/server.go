@@ -76,18 +76,19 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /auth/github/callback", s.handleGitHubCallback)
 
 	// OpenAI-compatible API.
-	mux.HandleFunc("GET /v1/models", s.corsMiddleware(s.handleAPIModels))
-	mux.HandleFunc("POST /v1/chat/completions", s.corsMiddleware(s.handleAPIChatCompletions))
-	mux.HandleFunc("OPTIONS /v1/", s.handleCORS)
+	mux.HandleFunc("GET /v1/models", s.corsMiddleware(s.requireAPIKey(s.handleAPIModels)))
+	mux.HandleFunc("POST /v1/chat/completions", s.corsMiddleware(s.requireAPIKey(s.handleAPIChatCompletions)))
 
 	// WebSocket for providers.
 	mux.HandleFunc("GET /ws/provider", s.handleWSProvider)
-
 	// API key management (auth required).
 	mux.HandleFunc("POST /api/keys", s.requireAuth(s.handleCreateKey))
 	mux.HandleFunc("GET /api/keys", s.requireAuth(s.handleListKeys))
 	mux.HandleFunc("DELETE /api/keys/{id}", s.requireAuth(s.handleRevokeKey))
 	mux.HandleFunc("POST /api/keys/{id}/regenerate", s.requireAuth(s.handleRegenerateKey))
+
+	// Abuse reporting (API key auth).
+	mux.HandleFunc("POST /api/report", s.requireAPIKey(s.handleReport))
 
 	// Frontend data API.
 	mux.HandleFunc("GET /api/status", s.corsMiddleware(s.handleAPIStatus))

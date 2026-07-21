@@ -153,7 +153,10 @@ func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
 
 type contextKey string
 
-const ctxKeyUserID contextKey = "userID"
+const (
+	ctxKeyUserID    contextKey = "userID"
+	ctxKeyAPIKeyHash contextKey = "apiKeyHash"
+)
 
 func getUserID(r *http.Request) int64 {
 	v := r.Context().Value(ctxKeyUserID)

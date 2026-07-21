@@ -214,7 +214,6 @@ func (s *Server) relayChunk(providerID string, msg proto.ChunkMsg) {
 		// Consumer disconnected or channel full; drop chunk.
 	}
 	if msg.Done {
-		s.registry.DecrementLoad(providerID)
 		donor.UnregisterChunkChannel(msg.RequestID)
 	}
 }
@@ -234,7 +233,7 @@ func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
 		}
 		donor.UnregisterChunkChannel(msg.RequestID)
 	}
-	s.registry.DecrementLoad(providerID)
+
 }
 
 func (s *Server) relayError(providerID string, msg proto.ErrorMsg) {
@@ -252,7 +251,7 @@ func (s *Server) relayError(providerID string, msg proto.ErrorMsg) {
 		}
 		donor.UnregisterChunkChannel(msg.RequestID)
 	}
-	s.registry.DecrementLoad(providerID)
+
 }
 
 func generateProviderID() string {
