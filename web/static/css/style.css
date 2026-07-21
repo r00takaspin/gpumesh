@@ -518,7 +518,7 @@ tr.current-user td:first-child::before {
 
 .hero .ascii-logo {
   font-family: var(--font-mono);
-  font-size: 0.55rem;
+  font-size: 0.75rem;
   line-height: 1.2;
   color: var(--accent);
   white-space: pre;
@@ -994,7 +994,7 @@ input[type="search"]:focus {
 
 .login-ascii {
   font-family: var(--font-mono);
-  font-size: 0.48rem;
+  font-size: 0.65rem;
   line-height: 1.15;
   color: var(--accent);
   white-space: pre;
@@ -1108,7 +1108,7 @@ input[type="search"]:focus {
   }
 
   .hero .ascii-logo {
-    font-size: 0.35rem;
+    font-size: 0.45rem;
   }
 
   .steps {
