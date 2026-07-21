@@ -74,8 +74,7 @@ func NewServer(cfg Config) (*Server, error) {
 	// OpenAI-compatible API.
 	mux.HandleFunc("GET /v1/models", s.corsMiddleware(s.requireAPIKey(s.handleAPIModels)))
 	mux.HandleFunc("POST /v1/chat/completions", s.corsMiddleware(s.requireAPIKey(s.handleAPIChatCompletions)))
-
-	// WebSocket for providers.
+	mux.HandleFunc("OPTIONS /v1/", s.handleCORS)
 	mux.HandleFunc("GET /ws/provider", s.handleWSProvider)
 	// API key management (auth required).
 	mux.HandleFunc("POST /api/keys", s.requireAuth(s.handleCreateKey))
