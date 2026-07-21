@@ -45,36 +45,19 @@
         Use any OpenAI-compatible tool. Zero cost. No credit card.
       </p>
 
-      <div class="hero-cli">
-        <div class="cli-input-wrapper">
-          <span class="cli-prompt">[user@mesh]:~$ </span>
-          <input type="text" id="hero-cmd" class="cli-input" placeholder="type a command..."
-                 autocomplete="off" autofocus>
-          <span class="cli-cursor blink"></span>
-        </div>
-        <div class="cli-suggestions" id="cli-suggestions">
-          <span class="cli-hint">Available: get-api-key, donate, status, models, leaderboard, help</span>
-        </div>
+      <div class="hero-cta">
+        <a href="/login.html" class="btn btn--hero">Get API Key <span class="arrow">&rarr;</span></a>
+        <a href="#donor-section" class="btn btn--hero btn--secondary">Become a Donor <span class="arrow">&rarr;</span></a>
       </div>
     </section>
 
     <!-- What is this -->
     <section class="section about-section">
       <div class="card about-card">
-        <div class="about-block">
-          <div class="about-label mono text-accent">$ whatis gpumesh</div>
-          <p>GPU Mesh is a peer-to-peer network for <strong>free</strong> LLM inference. Thousands of enthusiasts worldwide share their idle GPUs, and the coordinator routes requests to available compute — no cloud bills, no rate limits.</p>
-        </div>
-        <div class="about-block">
-          <div class="about-label mono text-accent">$ whois gpumesh --audience</div>
-          <p>For the person downloading models from HuggingFace at 3 AM. For the Raspberry Pi owner with a GPU strapped to the balcony. For anyone who values <strong>"free" over "enterprise-grade"</strong>. Enthusiasts. Community. Hobby projects.</p>
-        </div>
-        <div class="about-block">
-          <div class="about-label mono text-accent">$ cat HOW_IT_WORKS.txt | head -3</div>
-          <p><strong>1.</strong> Volunteers run <code>gpumesh-provider</code> — a lightweight agent that registers their GPU with the mesh.<br>
-          <strong>2.</strong> You send a request through any OpenAI-compatible tool (Aider, Cline, Continue.dev, curl, anything).<br>
-          <strong>3.</strong> The coordinator finds a free GPU, proxies your request, streams back the response. No logs. No quotas.</p>
-        </div>
+        <p style="max-width:44rem;margin:0 auto;font-size:0.95rem">
+          <span class="mono text-accent">$ whatis gpumesh</span><br>
+          GPU Mesh is a peer-to-peer network for <strong>free</strong> LLM inference. Community members share idle GPUs; the coordinator matches requests to available compute. No cloud bills, no rate limits, no credit card. For enthusiasts, hobby projects, and anyone who values <strong>free over enterprise-grade</strong>.
+        </p>
       </div>
     </section>
 
@@ -115,6 +98,25 @@
           <div class="step-num">3. USE</div>
           <div class="step-title">Your tools</div>
           <div class="step-desc">just work</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Why GPU Mesh -->
+    <section class="section">
+      <div class="section-title">WHY GPU MESH?</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;max-width:52rem;margin:0 auto">
+        <div class="card" style="text-align:center">
+          <div style="font-size:1.4rem;color:var(--accent);font-weight:700">$0</div>
+          <div class="text-dim" style="margin-top:0.25rem;font-size:0.85rem">Ollama is free locally, but not over the network. OpenRouter charges per token. We don&rsquo;t.</div>
+        </div>
+        <div class="card" style="text-align:center">
+          <div style="font-size:1.4rem;color:var(--accent);font-weight:700">OpenAI API</div>
+          <div class="text-dim" style="margin-top:0.25rem;font-size:0.85rem">Drop-in compatible. No new SDK. Two env vars and your existing tools just work.</div>
+        </div>
+        <div class="card" style="text-align:center">
+          <div style="font-size:1.4rem;color:var(--accent);font-weight:700">P2P</div>
+          <div class="text-dim" style="margin-top:0.25rem;font-size:0.85rem">No data center, no vendor lock-in. Community GPUs, community trust.</div>
         </div>
       </div>
     </section>
@@ -240,9 +242,31 @@ providers:
         <button class="btn" onclick="location.href='/dashboard.html'">./get-api-key.sh</button>
       </p>
 
-      <div class="section-divider"></div>
-      <div class="section-title">FOR GPU OWNERS</div>
-      <!-- Install method tabs -->
+      <div id="donor-section" class="section-divider"></div>
+      <div class="section-title">SHARE YOUR GPU, EARN REPUTATION</div>
+      <p class="text-center mb-2" style="max-width:38rem;margin-inline:auto">
+        Run the agent, climb the leaderboard, earn badges. Every request you serve builds your reputation in the mesh.
+      </p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1. INSTALL</div>
+          <div class="step-title">Ollama</div>
+          <div class="step-desc">ollama.com</div>
+        </div>
+        <div class="step-arrow">──▶</div>
+        <div class="step">
+          <div class="step-num">2. PULL</div>
+          <div class="step-title">a model</div>
+          <div class="step-desc">ollama pull llama3.2:3b</div>
+        </div>
+        <div class="step-arrow">──▶</div>
+        <div class="step">
+          <div class="step-num">3. RUN</div>
+          <div class="step-title">our agent</div>
+          <div class="step-desc">gpumesh-provider</div>
+        </div>
+      </div>
+      <p class="text-center mt-2 mb-1 text-dim" style="font-size:0.82rem">Choose your platform below:</p>
       <div class="tool-tabs">
         <button class="tool-tab-btn active" data-tab-group="install" data-tab="linux-arm64" onclick="switchTab('install','linux-arm64')">Linux arm64</button>
         <button class="tool-tab-btn" data-tab-group="install" data-tab="linux-amd64" onclick="switchTab('install','linux-amd64')">Linux amd64</button>
@@ -324,6 +348,92 @@ $ gpumesh-provider</code></pre>
       </p>
     </section>
 
+    <!-- Community -->
+    <section class="section">
+      <div class="section-title">JOIN THE COMMUNITY</div>
+      <p class="text-center mb-2" style="max-width:36rem;margin-inline:auto">
+        GPU Mesh is in early development. Star the repo, join the discussion, help shape what comes next.
+      </p>
+      <p class="text-center" style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+        <a href="https://github.com/gpumesh/gpumesh" class="btn">&#9733; Star on GitHub</a>
+        <a href="https://discord.gg/gpumesh" class="btn btn--secondary">Join Discord</a>
+        <a href="https://github.com/gpumesh/gpumesh/discussions" class="btn btn--secondary">Discussions</a>
+      </p>
+    </section>
+
+    <!-- Available Models -->
+    <section class="section">
+      <div class="section-title">TOP MODELS RIGHT NOW</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;max-width:52rem;margin:0 auto">
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="mono" style="font-weight:600">llama3.2:3b</div>
+            <div class="text-dim" style="font-size:0.78rem">Meta</div>
+          </div>
+          <div class="text-accent" style="font-size:0.85rem">▶ 42 donors</div>
+        </div>
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="mono" style="font-weight:600">codellama:7b</div>
+            <div class="text-dim" style="font-size:0.78rem">Meta</div>
+          </div>
+          <div class="text-accent" style="font-size:0.85rem">▶ 31 donors</div>
+        </div>
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="mono" style="font-weight:600">qwen2.5:7b</div>
+            <div class="text-dim" style="font-size:0.78rem">Alibaba</div>
+          </div>
+          <div class="text-accent" style="font-size:0.85rem">▶ 28 donors</div>
+        </div>
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="mono" style="font-weight:600">mistral:7b</div>
+            <div class="text-dim" style="font-size:0.78rem">Mistral AI</div>
+          </div>
+          <div class="text-accent" style="font-size:0.85rem">▶ 24 donors</div>
+        </div>
+        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="mono" style="font-weight:600">phi4:14b</div>
+            <div class="text-dim" style="font-size:0.78rem">Microsoft</div>
+          </div>
+          <div class="text-accent" style="font-size:0.85rem">▶ 19 donors</div>
+        </div>
+      </div>
+      <p class="text-center mt-2">
+        <a href="/models.html" class="mono">Browse all models →</a>
+      </p>
+    </section>
+
+    <!-- Leaderboard Preview -->
+    <section class="section">
+      <div class="section-title">TOP DONORS THIS WEEK</div>
+      <div class="podium">
+        <div class="podium-spot first">
+          <div class="medal">🥇</div>
+          <div class="name mono">alexei-k</div>
+          <div class="badge-icon">⚡</div>
+          <div class="tokens">847K tokens</div>
+        </div>
+        <div class="podium-spot second">
+          <div class="medal">🥈</div>
+          <div class="name mono">rtx4090-east</div>
+          <div class="badge-icon">🔋</div>
+          <div class="tokens">612K tokens</div>
+        </div>
+        <div class="podium-spot third">
+          <div class="medal">🥉</div>
+          <div class="name mono">pi-cluster-01</div>
+          <div class="badge-icon">🫐</div>
+          <div class="tokens">489K tokens</div>
+        </div>
+      </div>
+      <p class="text-center mt-2">
+        <a href="/leaderboard.html" class="mono">Full leaderboard →</a>
+      </p>
+    </section>
+
 
     <!-- FAQ -->
     <section class="section">
@@ -343,8 +453,7 @@ $ gpumesh-provider</code></pre>
           <span class="caret">▶</span> Is my data safe?
         </div>
         <div class="accordion-body">
-          Prompts and responses are never stored on our servers. Donors see requests in transit
-          to serve inference — the same as any API provider. No persistent logging.
+          Your prompts are processed by community GPUs to generate responses, the same way they&rsquo;re processed on OpenAI&rsquo;s or Anthropic&rsquo;s servers. We never store prompts or responses. No persistent logging.
         </div>
       </div>
 
