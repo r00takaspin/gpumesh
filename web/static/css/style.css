@@ -217,6 +217,16 @@ footer .footer-row {
   color: var(--bg);
 }
 
+.btn--secondary {
+  background: transparent;
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.btn--secondary:hover {
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
 /* === Prompt Prefix === */
 .prompt {
   font-family: var(--font-mono);
@@ -353,13 +363,6 @@ pre.code-block.flash-copied {
   background: var(--accent-glow);
 }
 
-.tool-tab-panel {
-  display: none;
-}
-
-.tool-tab-panel.active {
-  display: block;
-}
 
 /* === Accordion === */
 .accordion {
@@ -834,100 +837,9 @@ input[type="search"]:focus {
   padding: 1.5rem;
 }
 
-.about-label {
-  font-size: 0.8rem;
-  margin-bottom: 0.5rem;
-  display: block;
-}
 
-.about-block {
-  margin-bottom: 1.25rem;
-}
 
-.about-block:last-child {
-  margin-bottom: 0;
-}
 
-.about-block p {
-  font-size: 0.85rem;
-  color: var(--text-dim);
-  line-height: 1.7;
-}
-
-.about-block p strong {
-  color: var(--text);
-}
-
-.about-block p code {
-  color: var(--accent);
-  background: rgba(63, 185, 80, 0.1);
-  padding: 0.1rem 0.35rem;
-  border-radius: 2px;
-  font-size: 0.8rem;
-}
-
-/* === Quickstart guide steps === */
-.quickstart-step {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.35rem;
-}
-
-.quickstart-step .step-num {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--accent);
-  font-weight: 700;
-  min-width: 1.5rem;
-}
-
-.quickstart-step .step-title {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--text);
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
-/* === Hero about text (merged into hero) === */
-.hero-about {
-  text-align: left;
-  max-width: 640px;
-  margin: 1rem auto 0;
-}
-
-.hero-about-block {
-  margin-bottom: 0.75rem;
-  padding-left: 0.5rem;
-  border-left: 2px solid var(--border);
-}
-
-.hero-about-block span {
-  font-size: 0.78rem;
-  display: block;
-  margin-bottom: 0.2rem;
-}
-
-.hero-about-block p {
-  font-size: 0.82rem;
-  color: var(--text-dim);
-  line-height: 1.6;
-  margin: 0;
-}
-
-.hero-about-block p strong {
-  color: var(--text);
-}
-
-.hero-about-block p code {
-  color: var(--accent);
-  background: rgba(63, 185, 80, 0.1);
-  padding: 0.1rem 0.35rem;
-  border-radius: 2px;
-  font-size: 0.78rem;
-}
 
 /* === Login page === */
 .login-page {
@@ -1056,7 +968,10 @@ input[type="search"]:focus {
   }
 
   .hero .ascii-logo {
-    font-size: 0.45rem;
+    font-size: 0.55rem;
+    overflow-x: auto;
+    display: block;
+    -webkit-text-size-adjust: none;
   }
 
   .steps {

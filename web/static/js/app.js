@@ -79,68 +79,14 @@ function switchTab(tabGroup, tabName) {
  * Toggle an accordion item open/closed.
  */
 function toggleAccordion(el) {
+  var e = window.event;
+  if (e) {
+    var target = e.target || e.srcElement;
+    if (target) {
+      var tag = target.tagName;
+      if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT') return;
+    }
+  }
   el.classList.toggle('open');
 }
 
-// ── Hero Command Line ──
-
-const COMMANDS = {
-  'get-api-key':   { url: '/dashboard.html',  desc: 'Generate an API key for the mesh' },
-  'donate':        { url: '/dashboard.html',  desc: 'Share your GPU with the mesh' },
-  'status':        { url: '/status.html',     desc: 'Check system status' },
-  'models':        { url: '/models.html',     desc: 'Browse available models' },
-  'leaderboard':   { url: '/leaderboard.html',desc: 'View donor leaderboard' },
-  'help':          { url: null,               desc: 'Show this help' },
-  'dashboard':     { url: '/dashboard.html',  desc: 'Open your dashboard' },
-  'home':          { url: '/index.html',      desc: 'Go to landing page' },
-};
-
-document.addEventListener('DOMContentLoaded', function() {
-  const input = document.getElementById('hero-cmd');
-  const suggestions = document.getElementById('cli-suggestions');
-  if (!input || !suggestions) return;
-
-  input.addEventListener('input', function() {
-    const val = this.value.trim().toLowerCase();
-    const matches = Object.keys(COMMANDS).filter(cmd => cmd.startsWith(val));
-
-    if (val === '') {
-      suggestions.innerHTML = '<span class="cli-hint">Available: get-api-key, donate, status, models, leaderboard, help</span>';
-      suggestions.classList.remove('active');
-    } else if (matches.length === 1 && matches[0] === val) {
-      suggestions.innerHTML = `<span class="cli-match">${matches[0]}</span> <span class="cli-desc">— ${COMMANDS[matches[0]].desc}</span>`;
-      suggestions.classList.add('active');
-    } else if (matches.length > 0) {
-      suggestions.innerHTML = matches.map(m =>
-        `<span class="cli-match${m === val ? ' exact' : ''}">${m}</span>`
-      ).join(' ');
-      suggestions.classList.add('active');
-    } else {
-      suggestions.innerHTML = '<span class="cli-hint text-error">command not found: ' + this.value.trim() + '</span>';
-      suggestions.classList.add('active');
-    }
-  });
-
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      const val = this.value.trim().toLowerCase();
-      const cmd = COMMANDS[val];
-      if (cmd && cmd.url) {
-        window.location.href = cmd.url;
-      } else if (val === 'help') {
-        this.value = '';
-        const list = Object.entries(COMMANDS).map(([k,v]) => `${k} — ${v.desc}`).join('<br>');
-        suggestions.innerHTML = `<span class="cli-hint">${list}</span>`;
-        suggestions.classList.add('active');
-      }
-    } else if (e.key === 'Tab') {
-      e.preventDefault();
-      const val = this.value.trim().toLowerCase();
-      const matches = Object.keys(COMMANDS).filter(cmd => cmd.startsWith(val));
-      if (matches.length === 1) {
-        this.value = matches[0];
-        this.dispatchEvent(new Event('input'));
-      }
-    }
-  });
-});
