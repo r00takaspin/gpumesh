@@ -353,24 +353,31 @@ registry = {
 
 | # | Компонент | Описание |
 |---|---|---|
-| 1 | **Hero** | Заголовок: «Free LLM Inference, Powered by Community GPUs». Подзаголовок: «Use any OpenAI-compatible tool. Zero cost. No credit card.». Две кнопки: «Get API Key →» (ведёт на GitHub OAuth) и «Become a Donor →» (якорь к секции для доноров ниже) |
-| 2 | **Live stats bar** | Три числа: `N` models online, `N` donors online, `N` requests today. Данные: `GET /api/status`. HTMX polling каждые 10 секунд |
-| 3 | **How it works** | Три шага с иконками: ① Donors share their GPU → ② Coordinator matches requests → ③ You use any OpenAI-compatible tool. Без цифр, визуально |
-| 4 | **For Developers** | Заголовок: «Plug into your existing tools». Табы с примерами для 8 инструментов (см. §6.1.1 ниже). Каждый таб — готовый блок кода для копирования. Кнопка «Get your API key →» |
-| 5 | **For GPU Owners** | Заголовок: «Share your GPU, earn reputation». Мини-инструкция: ① Install Ollama → ② Pull a model → ③ Run our agent. One-liner команда для копирования. Кнопка «Setup Instructions →» (ведёт на страницу входа, затем в dashboard/donor) |
-| 6 | **FAQ** | Три вопроса: «Is it really free?» / «Is my data safe?» / «What models are available?». Короткие ответы. Ссылка «Read more in docs» |
+| 1 | **Hero** | ASCII-логотип «GPU MESH». Командная строка: `[user@mesh]:~$ free_llm_inference --powered-by community_gpus`. Подзаголовок: «Use any OpenAI-compatible tool. Zero cost. No credit card.». Две CTA-кнопки: «Get API Key →» (ведёт на `/login.html` → GitHub OAuth) и «Become a Donor →» (якорь `#donor-section` к секции для доноров). Кнопки в терминальном стиле: основная (акцентный фон) и вторичная (outline) |
+| 2 | **What is this** | Один абзац в CLI-стиле (`$ whatis gpumesh`): краткое описание P2P-сети, ценность для энтузиастов, отсутствие счетов и лимитов. Компактная альтернатива развёрнутому описанию — не дублирует «How it works» |
+| 3 | **Live stats bar** | Три числа: `▶ N` models online, `▶ N` donors online, `▶ N` req today. Данные: `GET /api/status`. Статика в мокапе, в продакшене — HTMX polling каждые 10 секунд |
+| 4 | **How it works** | Три шага с терминальным разделителем `──▶`: ① SHARE — Donors run gpumesh-provider → ② MATCH — Coordinator routes requests → ③ USE — Your tools just work. Лаконично, без цифр в описании |
+| 5 | **Why GPU Mesh?** | Сравнение с альтернативами в трёх карточках: **$0** (Ollama бесплатен локально, но не по сети; OpenRouter берёт за токены — мы нет), **OpenAI API** (drop-in совместимость, две переменные окружения), **P2P** (нет дата-центров, нет vendor lock-in, комьюнити-доверие) |
+| 6 | **For Developers** | Заголовок: «FOR DEVELOPERS». Табы с примерами для 8 инструментов: Continue.dev, Codex CLI, Aider, Cline, Open WebUI, Python SDK, curl, Oh My Pi (см. §6.1.1). Каждый таб — готовый блок кода с кнопкой `[Copy]`. Кнопка `./get-api-key.sh` ведёт на `/dashboard.html` |
+| 7 | **For GPU Owners** | Заголовок: «SHARE YOUR GPU, EARN REPUTATION». Мотивационный абзац: «Run the agent, climb the leaderboard, earn badges. Every request you serve builds your reputation in the mesh.» Мини-инструкция из трёх шагов: ① INSTALL Ollama → ② PULL a model → ③ RUN our agent. Пять платформенных табов с командами установки: Linux arm64, Linux amd64, macOS, Go install, Docker. Ссылки: `man gpumesh-donor` (→ `/dashboard.html`) и «All releases →» (→ GitHub releases) |
+| 8 | **Join the Community** | Призыв для early adopters: «GPU Mesh is in early development. Star the repo, join the discussion, help shape what comes next.» Три кнопки: «★ Star on GitHub», «Join Discord», «Discussions» |
+| 9 | **Top Models Right Now** | Сетка из 5 карточек: название модели (mono), вендор (Meta/Alibaba/Mistral AI/Microsoft), счётчик доноров (`▶ N donors`). Мокап-данные. Ссылка «Browse all models →» на `/models.html` |
+| 10 | **Top Donors This Week** | Подиум с топ-3 донорами: 🥇🥈🥉, никнейм, значок-бейдж (⚡🔋🫐), количество токенов за неделю. Мокап-данные. Ссылка «Full leaderboard →» на `/leaderboard.html` |
+| 11 | **FAQ** | Аккордеон с тремя вопросами. «Is it really free?» — да, комьюнити, без лимитов. «Is my data safe?» — промпты обрабатываются GPU комьюнити так же, как на серверах OpenAI/Anthropic; промпты и ответы не хранятся. «What models are available?» — все Ollama-совместимые модели доноров, ссылка на `/models.html` |
 
 #### Состояния
 
 | Компонент | Нормальное | Пустое | Ошибка |
 |---|---|---|---|
 | Live stats bar | Числа обновляются | «0» — показывается нормально | Скрыть блок, не показывать ошибку |
-| Model tabs (For Developers) | Названия реальных топ-моделей | Placeholder'ы | Placeholder'ы |
+| Top Models | 5 моделей с донорами | «No models online — check back soon» | Скрыть блок |
+| Top Donors | Подиум с 3 донорами | «No donors this week — be the first!» | Скрыть блок |
 
 #### Действия пользователя
-- Нажатие «Get API Key» → редирект на GitHub OAuth → callback → редирект на `/dashboard`
-- Нажатие «Become a Donor» → скролл к секции For GPU Owners
-- Копирование сниппета → нативная кнопка копирования (без JS: textarea + button)
+- Нажатие «Get API Key» → редирект на `/login.html` → GitHub OAuth → callback → редирект на `/dashboard`
+- Нажатие «Become a Donor» → скролл к секции For GPU Owners (`#donor-section`)
+- Копирование сниппета → нативная кнопка `[Copy]` (textarea + button, обработчик JS)
+- Раскрытие FAQ → аккордеон (onclick `toggleAccordion`, каретка поворачивается на 90°)
 
 #### 6.1.1 Примеры быстрого старта для всех инструментов
 
