@@ -1,0 +1,28 @@
+{
+  "servers": {
+    "gopls": {
+      "command": "/home/voldemar/go/bin/gopls",
+      "fileTypes": [".go"],
+      "rootMarkers": ["go.mod", ".git"]
+    },
+    "typescript-language-server": {
+      "command": "/home/voldemar/gpumesh/node_modules/.bin/typescript-language-server",
+      "args": ["--stdio"],
+      "fileTypes": [".js", ".ts", ".mjs", ".cjs"],
+      "rootMarkers": ["package.json", ".git"]
+    },
+    "vscode-html-language-server": {
+      "command": "/home/voldemar/.npm-global/bin/vscode-html-language-server",
+      "args": ["--stdio"],
+      "fileTypes": [".html"],
+      "rootMarkers": [".git"]
+    },
+    "vscode-css-language-server": {
+      "command": "/home/voldemar/.npm-global/bin/vscode-css-language-server",
+      "args": ["--stdio"],
+      "fileTypes": [".css", ".scss", ".less"],
+      "rootMarkers": [".git"]
+    }
+  },
+  "idleTimeoutMs": 300000
+}
