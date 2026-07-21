@@ -53,7 +53,13 @@
       </p>
 
       <div class="hero-cta">
+        {{if not .LoggedIn}}
         <a href="/login" class="btn btn--hero">Get API Key <span class="arrow">&rarr;</span></a>
+        {{else if not .HasKeys}}
+        <a href="/dashboard?new=1" class="btn btn--hero">Get API Key <span class="arrow">&rarr;</span></a>
+        {{else}}
+        <a href="/dashboard" class="btn btn--hero">Dashboard <span class="arrow">&rarr;</span></a>
+        {{end}}
         <a href="#donor-section" class="btn btn--hero btn--secondary">Become a Donor <span class="arrow">&rarr;</span></a>
       </div>
     </section>
@@ -246,7 +252,7 @@ providers:
 
       <p class="text-center mt-2">
         <span class="prompt" style="display:inline"></span>
-        <button class="btn" onclick="location.href='/dashboard.html'">./get-api-key.sh</button>
+        {{if not .LoggedIn}}<button class="btn" onclick="location.href='/login'">{{else if not .HasKeys}}<button class="btn" onclick="location.href='/dashboard?new=1'">{{else}}<button class="btn" onclick="location.href='/dashboard'">{{end}}./get-api-key.sh</button>
       </p>
 
       <div id="donor-section" class="section-divider"></div>

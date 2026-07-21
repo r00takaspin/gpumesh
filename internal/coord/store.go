@@ -173,6 +173,16 @@ func (s *Store) ListKeys(userID int64) ([]APIKey, error) {
 	return keys, rows.Err()
 }
 
+// CountKeys returns the number of non-revoked API keys for a user.
+func (s *Store) CountKeys(userID int64) (int, error) {
+	var count int
+	err := s.db.QueryRow(
+		`SELECT COUNT(*) FROM api_keys WHERE user_id = ? AND revoked_at IS NULL`,
+		userID,
+	).Scan(&count)
+	return count, err
+}
+
 // RevokeKey marks a key as revoked. Only the owner can revoke.
 func (s *Store) RevokeKey(userID, keyID int64) error {
 	res, err := s.db.Exec(

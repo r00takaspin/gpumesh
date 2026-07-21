@@ -1031,3 +1031,14 @@ input[type="search"]:focus {
     gap: 1rem;
   }
 }
+
+/* === Modal overlay === */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}

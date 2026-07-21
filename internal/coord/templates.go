@@ -15,6 +15,8 @@ type PageData struct {
 	LoggedIn bool
 	Login    string
 	HasOAuth bool
+	HasKeys  bool
+	NewKey   string // full key, shown only once after auto-creation
 }
 
 var (
@@ -60,12 +62,17 @@ func renderTemplate(w http.ResponseWriter, name string, data PageData) {
 func (s *Server) pageData(r *http.Request) PageData {
 	pd := PageData{}
 	cookie, err := r.Cookie("gpumesh_session")
+	var uid int64
 	if err == nil {
-		uid, err := s.store.ValidateSession(cookie.Value)
+		uid, err = s.store.ValidateSession(cookie.Value)
 		if err == nil && uid != 0 {
 			pd.LoggedIn = true
 			pd.Login, _ = s.store.GetUserByID(uid)
 		}
+	}
+	if pd.LoggedIn {
+		n, _ := s.store.CountKeys(uid)
+		pd.HasKeys = n > 0
 	}
 	if oauthConfig == nil {
 		initOAuthConfig(s.baseURL)

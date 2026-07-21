@@ -98,6 +98,13 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 	if redirect == "" {
 		redirect = "/dashboard"
 	}
+	// First login with no keys → auto-create flow.
+	if redirect == "/dashboard" {
+		n, _ := s.store.CountKeys(userID)
+		if n == 0 {
+			redirect = "/dashboard?new=1"
+		}
+	}
 	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
@@ -160,10 +167,24 @@ func (s *Server) getGithubLogin(userID int64) string {
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	login, _ := s.store.GetUserByID(userID)
-	renderTemplate(w, "dashboard.html", PageData{
+
+	pd := PageData{
 		LoggedIn: true,
 		Login:    login,
-	})
+	}
+
+	// Auto-create first key if requested and user has none.
+	if r.URL.Query().Get("new") == "1" {
+		n, _ := s.store.CountKeys(userID)
+		if n == 0 {
+			rawKey, _, err := s.store.CreateKey(userID, "consumer")
+			if err == nil {
+				pd.NewKey = rawKey
+			}
+		}
+	}
+
+	renderTemplate(w, "dashboard.html", pd)
 }
 
 // handleLoginPage renders the login page with a GitHub OAuth button.
