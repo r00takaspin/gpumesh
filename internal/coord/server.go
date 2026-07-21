@@ -70,6 +70,7 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("GET /auth/github", s.handleLoginStart)
 	mux.HandleFunc("GET /auth/github/callback", s.handleGitHubCallback)
+	mux.HandleFunc("GET /logout", s.handleLogout)
 
 	// OpenAI-compatible API.
 	mux.HandleFunc("GET /v1/models", s.corsMiddleware(s.requireAPIKey(s.handleAPIModels)))

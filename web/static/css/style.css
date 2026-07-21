@@ -89,9 +89,11 @@ nav.topbar .nav-links {
 }
 
 nav.topbar .nav-right {
-  width: 170px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   flex-shrink: 0;
-  text-align: right;
+  white-space: nowrap;
 }
 
 
@@ -115,9 +117,23 @@ nav.topbar .nav-login {
   text-decoration: none;
 }
 
-nav.topbar .nav-login:hover {
+nav.topbar .nav-logout {
+  font-size: 0.72rem;
+  padding: 0.25rem 0.75rem;
   text-decoration: none;
 }
+
+nav.topbar .nav-login:hover,
+nav.topbar .nav-logout:hover {
+  text-decoration: none;
+}
+
+nav.topbar .nav-user {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  margin-right: 0.5rem;
+}
+
 
 /* === Main & Container === */
 main {

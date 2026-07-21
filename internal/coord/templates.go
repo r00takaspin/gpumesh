@@ -14,6 +14,7 @@ import (
 type PageData struct {
 	LoggedIn bool
 	Login    string
+	HasOAuth bool
 }
 
 var (
@@ -66,5 +67,9 @@ func (s *Server) pageData(r *http.Request) PageData {
 			pd.Login, _ = s.store.GetUserByID(uid)
 		}
 	}
+	if oauthConfig == nil {
+		initOAuthConfig(s.baseURL)
+	}
+	pd.HasOAuth = oauthConfig.ClientID != ""
 	return pd
 }

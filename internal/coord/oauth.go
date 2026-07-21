@@ -32,13 +32,11 @@ func (s *Server) handleLoginStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "GitHub OAuth not configured", http.StatusServiceUnavailable)
 		return
 	}
-	// Generate state for CSRF protection.
 	state := r.URL.Query().Get("redirect")
 	if state == "" {
 		state = "/dashboard"
 	}
-	url := oauthConfig.AuthCodeURL(state)
-	http.Redirect(w, r, url, http.StatusFound)
+	http.Redirect(w, r, oauthConfig.AuthCodeURL(state), http.StatusFound)
 }
 
 // handleGitHubCallback handles the OAuth callback from GitHub.
@@ -46,21 +44,17 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 	if oauthConfig == nil {
 		initOAuthConfig(s.baseURL)
 	}
-
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		http.Error(w, "missing code", http.StatusBadRequest)
 		return
 	}
-
 	token, err := oauthConfig.Exchange(context.Background(), code)
 	if err != nil {
 		log.Printf("oauth exchange error: %v", err)
 		http.Error(w, "auth failed", http.StatusInternalServerError)
 		return
 	}
-
-	// Get GitHub user info.
 	client := oauthConfig.Client(context.Background(), token)
 	resp, err := client.Get("https://api.github.com/user")
 	if err != nil {
@@ -79,35 +73,27 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to parse user info", http.StatusInternalServerError)
 		return
 	}
-
-	// Upsert user.
 	userID, err := s.store.UpsertUser(ghUser.ID, ghUser.Login)
 	if err != nil {
 		log.Printf("upsert user error: %v", err)
 		http.Error(w, "failed to save user", http.StatusInternalServerError)
 		return
 	}
-
-	// Create session.
 	sessionToken, err := s.store.CreateSession(userID)
 	if err != nil {
 		log.Printf("create session error: %v", err)
 		http.Error(w, "failed to create session", http.StatusInternalServerError)
 		return
 	}
-
-	// Set session cookie.
 	http.SetCookie(w, &http.Cookie{
 		Name:     "gpumesh_session",
 		Value:    sessionToken,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   r.TLS != nil,
-		MaxAge:   86400, // 24 hours
+		MaxAge:   86400,
 		SameSite: http.SameSiteLaxMode,
 	})
-
-	// Redirect to dashboard or requested page.
 	redirect := r.URL.Query().Get("state")
 	if redirect == "" {
 		redirect = "/dashboard"

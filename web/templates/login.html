@@ -47,10 +47,13 @@
         <p class="login-tagline">
           One click. No password. No email.
         </p>
-
+        {{if .HasOAuth}}
         <a href="/auth/github" class="btn login-btn">
           ──▶ Login with GitHub
         </a>
+        {{else}}
+        <p class="login-note text-warning">OAuth not configured. Set GITHUB_CLIENT_ID.</p>
+        {{end}}
 
         <p class="login-note">
           We only request <code>read:user</code> to verify your identity.
