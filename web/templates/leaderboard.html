@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leaderboard — GPU Mesh</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <nav class="topbar">
+    <span class="logo">⚡ GPU Mesh</span>
+    <ul class="nav-links">
+      <li><a href="/index.html">Home</a></li>
+      <li><a href="/dashboard.html">Dashboard</a></li>
+      <li><a href="/models.html">Models</a></li>
+      <li><a href="/leaderboard.html" class="active">Leaderboard</a></li>
+      <li><a href="/status.html">Status</a></li>
+    </ul>
+    <div class="nav-right">
+      <a href="/login.html" class="btn btn--sm nav-login">[Login with GitHub]</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="prompt">cat /leaderboard --period=weekly</div>
+
+    <!-- Period Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab-group="period" data-tab="weekly" onclick="switchTab('period','weekly')">WEEKLY</button>
+      <button class="tab-btn" data-tab-group="period" data-tab="monthly" onclick="switchTab('period','monthly')">MONTHLY</button>
+      <button class="tab-btn" data-tab-group="period" data-tab="alltime" onclick="switchTab('period','alltime')">ALL-TIME</button>
+    </div>
+
+    <!-- Weekly leaderboard -->
+    <div class="tab-panel active" data-tab-group="period" data-tab="weekly">
+
+      <!-- Top-3 Podium -->
+      <div class="podium">
+        <div class="podium-spot first">
+          <div class="medal">🥇</div>
+          <div class="name">alice</div>
+          <div class="badge-icon">💎</div>
+          <div class="tokens">245,300 tok</div>
+        </div>
+        <div class="podium-spot second">
+          <div class="medal">🥈</div>
+          <div class="name">bob</div>
+          <div class="badge-icon">🥇</div>
+          <div class="tokens">182,100 tok</div>
+        </div>
+        <div class="podium-spot third">
+          <div class="medal">🥉</div>
+          <div class="name">carol</div>
+          <div class="badge-icon">🥈</div>
+          <div class="tokens">156,700 tok</div>
+        </div>
+      </div>
+
+      <!-- Ranking Table -->
+      <div class="card">
+        <table>
+          <thead>
+            <tr><th>#</th><th>DONOR</th><th>TOKENS</th><th>REQUESTS</th><th>BADGE</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1</td><td>alice</td><td>245,300</td><td>8,421</td><td>💎</td>
+            </tr>
+            <tr>
+              <td>2</td><td>bob</td><td>182,100</td><td>6,203</td><td>🥇</td>
+            </tr>
+            <tr>
+              <td>3</td><td>carol</td><td>156,700</td><td>5,891</td><td>🥈</td>
+            </tr>
+            <tr>
+              <td>4</td><td>dave</td><td>142,300</td><td>4,512</td><td>🥈</td>
+            </tr>
+            <tr>
+              <td>5</td><td>eve</td><td>128,900</td><td>3,987</td><td>🥈</td>
+            </tr>
+            <tr>
+              <td>6</td><td>frank</td><td>115,200</td><td>3,412</td><td>🥉</td>
+            </tr>
+            <tr>
+              <td>7</td><td>grace</td><td>101,800</td><td>2,891</td><td>🥉</td>
+            </tr>
+            <tr class="current-user">
+              <td>42</td><td>voldemar</td><td>12,430</td><td>423</td><td>🥉</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Monthly leaderboard (same structure, different data) -->
+    <div class="tab-panel" data-tab-group="period" data-tab="monthly">
+      <div class="podium">
+        <div class="podium-spot first">
+          <div class="medal">🥇</div>
+          <div class="name">bob</div>
+          <div class="badge-icon">💎</div>
+          <div class="tokens">890,100 tok</div>
+        </div>
+        <div class="podium-spot second">
+          <div class="medal">🥈</div>
+          <div class="name">alice</div>
+          <div class="badge-icon">🥇</div>
+          <div class="tokens">762,400 tok</div>
+        </div>
+        <div class="podium-spot third">
+          <div class="medal">🥉</div>
+          <div class="name">carol</div>
+          <div class="badge-icon">🥈</div>
+          <div class="tokens">645,300 tok</div>
+        </div>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr><th>#</th><th>DONOR</th><th>TOKENS</th><th>REQUESTS</th><th>BADGE</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>bob</td><td>890,100</td><td>28,421</td><td>💎</td></tr>
+            <tr><td>2</td><td>alice</td><td>762,400</td><td>24,103</td><td>🥇</td></tr>
+            <tr><td>3</td><td>carol</td><td>645,300</td><td>19,891</td><td>🥈</td></tr>
+            <tr><td>4</td><td>dave</td><td>502,100</td><td>15,412</td><td>🥈</td></tr>
+            <tr class="current-user"><td>38</td><td>voldemar</td><td>48,230</td><td>1,842</td><td>🥉</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- All-time leaderboard -->
+    <div class="tab-panel" data-tab-group="period" data-tab="alltime">
+      <div class="podium">
+        <div class="podium-spot first">
+          <div class="medal">🥇</div>
+          <div class="name">alice</div>
+          <div class="badge-icon">💎</div>
+          <div class="tokens">3,452,100 tok</div>
+        </div>
+        <div class="podium-spot second">
+          <div class="medal">🥈</div>
+          <div class="name">bob</div>
+          <div class="badge-icon">💎</div>
+          <div class="tokens">2,981,400 tok</div>
+        </div>
+        <div class="podium-spot third">
+          <div class="medal">🥉</div>
+          <div class="name">carol</div>
+          <div class="badge-icon">🥇</div>
+          <div class="tokens">2,145,300 tok</div>
+        </div>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr><th>#</th><th>DONOR</th><th>TOKENS</th><th>REQUESTS</th><th>BADGE</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>alice</td><td>3,452,100</td><td>110,421</td><td>💎</td></tr>
+            <tr><td>2</td><td>bob</td><td>2,981,400</td><td>95,203</td><td>💎</td></tr>
+            <tr><td>3</td><td>carol</td><td>2,145,300</td><td>78,891</td><td>🥇</td></tr>
+            <tr><td>4</td><td>dave</td><td>1,892,100</td><td>62,412</td><td>🥇</td></tr>
+            <tr class="current-user"><td>31</td><td>voldemar</td><td>512,430</td><td>18,234</td><td>🥇</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <div class="footer-row">
+      <span><a href="https://github.com/gpumesh/gpumesh">GitHub</a></span>
+      <span>▶ 128 donors online</span>
+      <span>MIT License</span>
+    </div>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

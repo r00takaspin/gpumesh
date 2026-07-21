@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — GPU Mesh</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <nav class="topbar">
+    <span class="logo">⚡ GPU Mesh</span>
+    <ul class="nav-links">
+      <li><a href="/index.html">Home</a></li>
+      <li><a href="/dashboard.html">Dashboard</a></li>
+      <li><a href="/models.html">Models</a></li>
+      <li><a href="/leaderboard.html">Leaderboard</a></li>
+      <li><a href="/status.html">Status</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <div class="login-page">
+      <div class="prompt">ssh gpumesh.io</div>
+
+      <div class="card login-card">
+        <div class="login-ascii">
+   ▄▄▄▄▄▄▄ ▄▄▄▄▄▄▄ ▄▄   ▄▄
+  ██▀▀▀▀▀ ██▀▀▀██ ██▄ ▄██
+  ██ ▄▄▄▄ ██  ██  ██▄▄▄██
+  ██ ▀▀██ ██  ██  ██▀████
+  ▀█▄▄▄██ ▀█▄▄▄█▀ ██  ▀██
+   ▀▀▀▀▀▀  ▀▀▀▀▀  ▀▀   ▀▀     mesh
+        </div>
+
+        <p class="login-tagline">
+          One click. No password. No email.
+        </p>
+
+        <a href="/auth/callback.html" class="btn login-btn">
+          ──▶ Login with GitHub
+        </a>
+
+        <p class="login-note">
+          We only request <code>read:user</code> to verify your identity.
+          No repo access. No org data.
+        </p>
+      </div>
+
+      <div class="card login-info mt-2">
+        <div class="prompt">man gpumesh-auth</div>
+        <div class="mono text-dim" style="font-size:0.75rem;line-height:1.8">
+          <strong class="text-accent">Why GitHub?</strong><br>
+          GPU Mesh is built by developers, for developers. You already have<br>
+          a GitHub account. No new passwords, no email verification, no<br>
+          "reset your password" emails. Just click and go.<br><br>
+          <strong class="text-accent">What happens next?</strong><br>
+          1. GitHub confirms your identity<br>
+          2. We create an account (or find your existing one)<br>
+          3. You get an API key on your dashboard<br>
+          4. Start using any OpenAI-compatible tool. Free.
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-row">
+      <span><a href="https://github.com/gpumesh/gpumesh">GitHub</a></span>
+      <span>▶ 128 donors online</span>
+      <span>MIT License</span>
+    </div>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

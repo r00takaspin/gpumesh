@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System Status — GPU Mesh</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <nav class="topbar">
+    <span class="logo">⚡ GPU Mesh</span>
+    <ul class="nav-links">
+      <li><a href="/index.html">Home</a></li>
+      <li><a href="/dashboard.html">Dashboard</a></li>
+      <li><a href="/models.html">Models</a></li>
+      <li><a href="/leaderboard.html">Leaderboard</a></li>
+      <li><a href="/status.html" class="active">Status</a></li>
+    </ul>
+    <div class="nav-right">
+      <a href="/login.html" class="btn btn--sm nav-login">[Login with GitHub]</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="prompt">curl -s /status | jq</div>
+
+    <!-- State tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab-group="sysstate" data-tab="operational" onclick="switchTab('sysstate','operational')">OPERATIONAL</button>
+      <button class="tab-btn" data-tab-group="sysstate" data-tab="degraded" onclick="switchTab('sysstate','degraded')">DEGRADED</button>
+      <button class="tab-btn" data-tab-group="sysstate" data-tab="outage" onclick="switchTab('sysstate','outage')">OUTAGE</button>
+    </div>
+
+    <!-- Operational state -->
+    <div class="tab-panel active" data-tab-group="sysstate" data-tab="operational">
+      <div class="status-banner">
+        🟢 ALL SYSTEMS OPERATIONAL
+      </div>
+
+    <!-- Metric Cards -->
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-value">▶ 128</div>
+        <div class="stat-label">donors</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">▶ 47</div>
+        <div class="stat-label">models</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">▶ 12,431</div>
+        <div class="stat-label">req today</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">▶ 14d</div>
+        <div class="stat-label">uptime</div>
+      </div>
+    </div>
+
+    <!-- Recent Incidents -->
+    <div class="prompt">cat incidents.log</div>
+    <div class="card card-accent">
+      <div class="flex-between mb-1">
+        <span class="mono text-accent" style="font-size:0.85rem;font-weight:700">No incidents reported</span>
+        <span class="mono text-dim" style="font-size:0.7rem">Last 7 days</span>
+      </div>
+      <p class="text-dim" style="font-size:0.8rem">System nominal. All services responding within SLA.</p>
+    </div>
+
+    <!-- Service Status Table -->
+    <div class="prompt">./health-check --all</div>
+    <div class="card mt-2">
+      <table>
+        <thead>
+          <tr><th>SERVICE</th><th>STATUS</th><th>LATENCY</th><th>UPTIME</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>coordinator</td>
+            <td class="text-accent">🟢 healthy</td>
+            <td>12ms</td>
+            <td>14d 3h</td>
+          </tr>
+          <tr>
+            <td>router</td>
+            <td class="text-accent">🟢 healthy</td>
+            <td>8ms</td>
+            <td>14d 3h</td>
+          </tr>
+          <tr>
+            <td>auth</td>
+            <td class="text-accent">🟢 healthy</td>
+            <td>4ms</td>
+            <td>7d 12h</td>
+          </tr>
+          <tr>
+            <td>metrics</td>
+            <td class="text-accent">🟢 healthy</td>
+            <td>3ms</td>
+            <td>14d 3h</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    </div>
+
+    <!-- Degraded state -->
+    <div class="tab-panel" data-tab-group="sysstate" data-tab="degraded">
+      <div class="status-banner warn">
+        🟡 PARTIAL SERVICE DEGRADATION
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">▶ 128</div>
+          <div class="stat-label">donors</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">▶ 43</div>
+          <div class="stat-label">models</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--warning)">▶ 8,921</div>
+          <div class="stat-label">req today</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">▶ 14d</div>
+          <div class="stat-label">uptime</div>
+        </div>
+      </div>
+
+      <div class="prompt">cat incidents.log</div>
+      <div class="card card-warning">
+        <div class="mono text-warning mb-1" style="font-size:0.85rem;font-weight:700">⚠ 1 active incident</div>
+        <div class="mono text-dim" style="font-size:0.75rem">
+          2026-07-21 14:32 UTC — Router latency elevated. 3 of 12 nodes affected.<br>
+          ETA: investigating. Follow <a href="#">#status</a> for updates.
+        </div>
+      </div>
+
+      <div class="prompt mt-2">./health-check --all</div>
+      <div class="card mt-2">
+        <table>
+          <thead>
+            <tr><th>SERVICE</th><th>STATUS</th><th>LATENCY</th><th>UPTIME</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>coordinator</td><td class="text-accent">🟢 healthy</td><td>12ms</td><td>14d 3h</td></tr>
+            <tr><td>router</td><td class="text-warning">🟡 degraded</td><td>1,240ms</td><td>14d 3h</td></tr>
+            <tr><td>auth</td><td class="text-accent">🟢 healthy</td><td>6ms</td><td>7d 12h</td></tr>
+            <tr><td>metrics</td><td class="text-accent">🟢 healthy</td><td>4ms</td><td>14d 3h</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Outage state -->
+    <div class="tab-panel" data-tab-group="sysstate" data-tab="outage">
+      <div class="status-banner error">
+        🔴 MAJOR SERVICE OUTAGE
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-value">▶ 128</div>
+          <div class="stat-label">donors</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--error)">▶ 12</div>
+          <div class="stat-label">models</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--error)">▶ 2,103</div>
+          <div class="stat-label">req today</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">▶ 14d</div>
+          <div class="stat-label">uptime</div>
+        </div>
+      </div>
+
+      <div class="prompt">cat incidents.log</div>
+      <div class="card card-error">
+        <div class="mono text-error mb-1" style="font-size:0.85rem;font-weight:700">🔴 2 active incidents</div>
+        <div class="mono text-dim" style="font-size:0.75rem">
+          2026-07-21 14:32 UTC — Router elevated latency escalated to full outage.<br>
+          2026-07-21 14:48 UTC — Coordinator failover in progress. ETA: 30 min.<br>
+          Follow <a href="#">#status</a> for real-time updates.
+        </div>
+      </div>
+
+      <div class="prompt mt-2">./health-check --all</div>
+      <div class="card mt-2">
+        <table>
+          <thead>
+            <tr><th>SERVICE</th><th>STATUS</th><th>LATENCY</th><th>UPTIME</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>coordinator</td><td class="text-warning">🟡 failover</td><td>8,400ms</td><td>14d 3h</td></tr>
+            <tr><td>router</td><td class="text-error">🔴 down</td><td>—</td><td>—</td></tr>
+            <tr><td>auth</td><td class="text-accent">🟢 healthy</td><td>6ms</td><td>7d 12h</td></tr>
+            <tr><td>metrics</td><td class="text-accent">🟢 healthy</td><td>4ms</td><td>14d 3h</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <div class="footer-row">
+      <span><a href="https://github.com/gpumesh/gpumesh">GitHub</a></span>
+      <span>▶ 128 donors online</span>
+      <span>MIT License</span>
+    </div>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

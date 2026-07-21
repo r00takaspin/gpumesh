@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>500 — GPU Mesh</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <nav class="topbar">
+    <span class="logo">⚡ GPU Mesh</span>
+    <ul class="nav-links">
+      <li><a href="/index.html">Home</a></li>
+      <li><a href="/dashboard.html">Dashboard</a></li>
+      <li><a href="/models.html">Models</a></li>
+      <li><a href="/leaderboard.html">Leaderboard</a></li>
+      <li><a href="/status.html">Status</a></li>
+    </ul>
+    <div class="nav-right">
+      <a href="/login.html" class="btn btn--sm nav-login">[Login with GitHub]</a>
+    </div>
+  </nav>
+
+  <main>
+    <div class="error-page">
+      <div class="card card-error">
+        <div class="error-command">$ curl /api/broken</div>
+        <div class="error-output">&gt; 500: Internal server error</div>
+        <div class="error-msg">&gt; Something went wrong. Our team has been paged (loudly).</div>
+        <div class="error-link">
+          <span class="step-arrow">──▶</span>
+          <a href="/status.html">Check /status</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-row">
+      <span><a href="https://github.com/gpumesh/gpumesh">GitHub</a></span>
+      <span>▶ 128 donors online</span>
+      <span>MIT License</span>
+    </div>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
