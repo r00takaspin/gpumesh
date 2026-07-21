@@ -21,9 +21,6 @@ type Server struct {
 	baseURL  string
 	srv      *http.Server
 
-	// Pending streaming requests.
-	pendingRequests map[string]chan proto.ChunkMsg
-
 	startTime time.Time
 	// Daily counters (reset at midnight).
 	requestsToday int64
@@ -55,7 +52,6 @@ func NewServer(cfg Config) (*Server, error) {
 		registry:        NewRegistry(),
 		limiter:         RateLimitHourly(cfg.RateLimit),
 		baseURL:         cfg.BaseURL,
-		pendingRequests: make(map[string]chan proto.ChunkMsg),
 		startTime:       time.Now(),
 	}
 

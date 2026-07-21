@@ -1,7 +1,6 @@
 package coord
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -250,11 +249,3 @@ func formatDuration(d time.Duration) string {
 }
 
 // handleModelsDataJSON provides raw JSON for HTMX polling.
-func (s *Server) handleModelsDataJSON(w http.ResponseWriter, _ *http.Request) {
-	s.handleModelsData(w, nil)
-}
-
-// --- Logout handler ---
-
-// Already defined in oauth.go
-var _ = json.Marshal // keep json import

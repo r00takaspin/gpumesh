@@ -18,11 +18,11 @@ type Donor struct {
 	Description   string
 	ConnectedAt   time.Time
 	LastHeartbeat time.Time
-	BackendOK     bool
+	BackendOK       bool
+	BackendFailedAt time.Time // when BackendOK was set to false
 	// Session counters reset on disconnect.
 	SessionRequests int
 	SessionTokens   int
-	AvgTokensPerSec float64
 	WSConn          *websocket.Conn
 
 	mu        sync.Mutex
@@ -150,6 +150,9 @@ func (r *Registry) SetBackendOK(providerID string, ok bool) {
 
 	if d := r.donors[providerID]; d != nil {
 		d.BackendOK = ok
+		if !ok {
+			d.BackendFailedAt = time.Now()
+		}
 	}
 }
 
@@ -313,35 +316,46 @@ func (r *Registry) StartHeartbeatMonitor(ctx context.Context, timeout time.Durat
 	}()
 }
 
+const backendUnhealthyEviction = 5 * time.Minute
+
 func (r *Registry) evictStale(timeout time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	now := time.Now()
 	for pid, d := range r.donors {
+		evict := false
 		if now.Sub(d.LastHeartbeat) > timeout {
-			// Cancel all pending requests.
-			d.mu.Lock()
-			for _, cancel := range d.requests {
-				cancel()
-			}
-			for _, ch := range d.chunkCh {
-				close(ch)
-			}
-			d.mu.Unlock()
-
-			// Clean model index.
-			for _, m := range d.Models {
-				delete(r.modelIndex[m], pid)
-				if len(r.modelIndex[m]) == 0 {
-					delete(r.modelIndex, m)
-				}
-			}
-			delete(r.donors, pid)
+			evict = true
 		}
+		// SPEC §5.4: evict donors with backend_ok=false for >5 minutes.
+		if !d.BackendOK && !d.BackendFailedAt.IsZero() && now.Sub(d.BackendFailedAt) > backendUnhealthyEviction {
+			evict = true
+		}
+		if !evict {
+			continue
+		}
+
+		// Cancel all pending requests.
+		d.mu.Lock()
+		for _, cancel := range d.requests {
+			cancel()
+		}
+		for _, ch := range d.chunkCh {
+			close(ch)
+		}
+		d.mu.Unlock()
+
+		// Clean model index.
+		for _, m := range d.Models {
+			delete(r.modelIndex[m], pid)
+			if len(r.modelIndex[m]) == 0 {
+				delete(r.modelIndex, m)
+			}
+		}
+		delete(r.donors, pid)
 	}
 }
-
 // LeaderboardEntry is a row in the donor leaderboard.
 type LeaderboardEntry struct {
 	Rank        int    `json:"rank"`

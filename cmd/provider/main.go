@@ -18,29 +18,22 @@ func main() {
 	flag.StringVar(&cfg.CoordinatorURL, "coordinator", envOrDefault("MESH_COORDINATOR", "wss://gpumesh.io/ws/provider"), "coordinator WebSocket URL")
 	flag.StringVar(&cfg.Token, "token", os.Getenv("MESH_TOKEN"), "donor authentication token")
 	flag.StringVar(&cfg.OllamaURL, "ollama-url", envOrDefault("MESH_OLLAMA_URL", "http://localhost:11434"), "Ollama base URL")
-	flag.String("models", os.Getenv("MESH_MODELS"), "comma-separated model whitelist")
+	var modelsFlag string
+	flag.StringVar(&modelsFlag, "models", os.Getenv("MESH_MODELS"), "comma-separated model whitelist")
 	flag.StringVar(&cfg.Description, "description", envOrDefault("MESH_DESCRIPTION", hostname()), "public donor description")
 	flag.IntVar(&cfg.MaxConcurrent, "max-concurrent", envOrDefaultInt("MESH_MAX_CONCURRENT", 1), "max concurrent requests")
 
 	flag.Parse()
 
-	// Parse models whitelist.
-	if modelsFlag := os.Getenv("MESH_MODELS"); modelsFlag != "" {
-		cfg.Models = strings.Split(modelsFlag, ",")
-		for i := range cfg.Models {
-			cfg.Models[i] = strings.TrimSpace(cfg.Models[i])
-		}
-	}
-
-	// Also check --models flag (though we registered it above, flag parsing fills it).
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "models" {
-			cfg.Models = strings.Split(f.Value.String(), ",")
-			for i := range cfg.Models {
-				cfg.Models[i] = strings.TrimSpace(cfg.Models[i])
+	// Parse models whitelist from flag or env.
+	if modelsFlag != "" {
+		for _, m := range strings.Split(modelsFlag, ",") {
+			m = strings.TrimSpace(m)
+			if m != "" {
+				cfg.Models = append(cfg.Models, m)
 			}
 		}
-	})
+	}
 
 	if cfg.Token == "" {
 		log.Fatal("No token. Get one at https://gpumesh.io/dashboard")

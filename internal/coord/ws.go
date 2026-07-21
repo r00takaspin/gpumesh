@@ -216,6 +216,8 @@ func (s *Server) relayChunk(providerID string, msg proto.ChunkMsg) {
 	if msg.Done {
 		donor.UnregisterChunkChannel(msg.RequestID)
 	}
+	// Count each chunk as one token for session stats.
+	s.registry.AddTokens(providerID, 1)
 }
 
 func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
@@ -234,8 +236,17 @@ func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
 		donor.UnregisterChunkChannel(msg.RequestID)
 	}
 
+	// Parse usage for session token counting.
+	var usage struct {
+		CompletionTokens int `json:"completion_tokens"`
+	}
+	if len(msg.Usage) > 0 {
+		json.Unmarshal(msg.Usage, &usage)
+	}
+	if usage.CompletionTokens > 0 {
+		s.registry.AddTokens(providerID, usage.CompletionTokens)
+	}
 }
-
 func (s *Server) relayError(providerID string, msg proto.ErrorMsg) {
 	donor := s.registry.GetDonor(providerID)
 	if donor == nil {
