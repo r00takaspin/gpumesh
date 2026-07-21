@@ -67,8 +67,8 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /dashboard", s.requireAuth(s.handleDashboard))
 
 	// OAuth.
-	mux.HandleFunc("GET /login", s.handleLogin)
-	mux.HandleFunc("GET /logout", s.handleLogout)
+	mux.HandleFunc("GET /login", s.handleLoginPage)
+	mux.HandleFunc("GET /auth/github", s.handleLoginStart)
 	mux.HandleFunc("GET /auth/github/callback", s.handleGitHubCallback)
 
 	// OpenAI-compatible API.
@@ -164,18 +164,18 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	renderTemplate(w, "index.html", s.pageData(r))
 }
 
 func (s *Server) handleModelsPage(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	renderTemplate(w, "models.html", s.pageData(r))
 }
 
 func (s *Server) handleLeaderboardPage(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	renderTemplate(w, "leaderboard.html", s.pageData(r))
 }
 
 func (s *Server) handleStatusPage(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "Not implemented", http.StatusNotImplemented)
+	renderTemplate(w, "status.html", s.pageData(r))
 }
 

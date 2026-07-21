@@ -16,14 +16,19 @@
   <nav class="topbar">
     <span class="logo">⚡ GPU Mesh</span>
     <ul class="nav-links">
-      <li><a href="/index.html">Home</a></li>
-      <li><a href="/dashboard.html">Dashboard</a></li>
-      <li><a href="/models.html">Models</a></li>
-      <li><a href="/leaderboard.html">Leaderboard</a></li>
-      <li><a href="/status.html" class="active">Status</a></li>
+      <li><a href="/">Home</a></li>
+      <li><a href="/dashboard">Dashboard</a></li>
+      <li><a href="/models">Models</a></li>
+      <li><a href="/leaderboard">Leaderboard</a></li>
+      <li><a href="/status" class="active">Status</a></li>
     </ul>
     <div class="nav-right">
-      <a href="/login.html" class="btn btn--sm nav-login">[Login with GitHub]</a>
+      {{if .LoggedIn}}
+      <span class="nav-user mono text-accent">{{.Login}}</span>
+      <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
+      {{else}}
+      <a href="/login" class="btn btn--sm nav-login">[Login with GitHub]</a>
+      {{end}}
     </div>
   </nav>
 
@@ -140,7 +145,7 @@
         <div class="mono text-warning mb-1" style="font-size:0.85rem;font-weight:700">⚠ 1 active incident</div>
         <div class="mono text-dim" style="font-size:0.75rem">
           2026-07-21 14:32 UTC — Router latency elevated. 3 of 12 nodes affected.<br>
-          ETA: investigating. Follow <a href="/status.html">#status</a> for updates.
+          ETA: investigating. Follow <a href="/status">#status</a> for updates.
         </div>
       </div>
 
@@ -191,7 +196,7 @@
         <div class="mono text-dim" style="font-size:0.75rem">
           2026-07-21 14:32 UTC — Router elevated latency escalated to full outage.<br>
           2026-07-21 14:48 UTC — Coordinator failover in progress. ETA: 30 min.<br>
-          Follow <a href="/status.html">#status</a> for real-time updates.
+          Follow <a href="/status">#status</a> for real-time updates.
         </div>
       </div>
 

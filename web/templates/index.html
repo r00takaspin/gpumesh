@@ -16,14 +16,19 @@
   <nav class="topbar">
     <span class="logo">⚡ GPU Mesh</span>
     <ul class="nav-links">
-      <li><a href="/index.html">Home</a></li>
-      <li><a href="/dashboard.html">Dashboard</a></li>
-      <li><a href="/models.html">Models</a></li>
-      <li><a href="/leaderboard.html">Leaderboard</a></li>
-      <li><a href="/status.html">Status</a></li>
+      <li><a href="/">Home</a></li>
+      <li><a href="/dashboard">Dashboard</a></li>
+      <li><a href="/models">Models</a></li>
+      <li><a href="/leaderboard">Leaderboard</a></li>
+      <li><a href="/status">Status</a></li>
     </ul>
     <div class="nav-right">
-      <a href="/login.html" class="btn btn--sm nav-login">[Login with GitHub]</a>
+      {{if .LoggedIn}}
+      <span class="nav-user mono text-accent">{{.Login}}</span>
+      <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
+      {{else}}
+      <a href="/login" class="btn btn--sm nav-login">[Login with GitHub]</a>
+      {{end}}
     </div>
   </nav>
 
@@ -48,7 +53,7 @@
       </p>
 
       <div class="hero-cta">
-        <a href="/login.html" class="btn btn--hero">Get API Key <span class="arrow">&rarr;</span></a>
+        <a href="/login" class="btn btn--hero">Get API Key <span class="arrow">&rarr;</span></a>
         <a href="#donor-section" class="btn btn--hero btn--secondary">Become a Donor <span class="arrow">&rarr;</span></a>
       </div>
     </section>
@@ -344,7 +349,7 @@ $ gpumesh-provider</code></pre>
 
       <p class="text-center mt-2">
         <span class="prompt" style="display:inline"></span>
-        <a href="/dashboard.html" class="mono">man gpumesh-donor</a>
+        <a href="/dashboard" class="mono">man gpumesh-donor</a>
         &nbsp;│&nbsp;
         <a href="https://github.com/gpumesh/provider/releases" class="mono">All releases →</a>
       </p>
@@ -404,7 +409,7 @@ $ gpumesh-provider</code></pre>
         </div>
       </div>
       <p class="text-center mt-2">
-        <a href="/models.html" class="mono">Browse all models →</a>
+        <a href="/models" class="mono">Browse all models →</a>
       </p>
     </section>
 
@@ -432,7 +437,7 @@ $ gpumesh-provider</code></pre>
         </div>
       </div>
       <p class="text-center mt-2">
-        <a href="/leaderboard.html" class="mono">Full leaderboard →</a>
+        <a href="/leaderboard" class="mono">Full leaderboard →</a>
       </p>
     </section>
 
@@ -465,7 +470,7 @@ $ gpumesh-provider</code></pre>
         </div>
         <div class="accordion-body">
           All Ollama-compatible models that donors have shared. Browse the full catalog at
-          <a href="/models.html">/models</a>. Common picks: llama3.2, codellama, qwen2.5, mistral.
+          <a href="/models">/models</a>. Common picks: llama3.2, codellama, qwen2.5, mistral.
         </div>
       </div>
     </section>

@@ -16,12 +16,20 @@
   <nav class="topbar">
     <span class="logo">⚡ GPU Mesh</span>
     <ul class="nav-links">
-      <li><a href="/index.html">Home</a></li>
-      <li><a href="/dashboard.html">Dashboard</a></li>
-      <li><a href="/models.html">Models</a></li>
-      <li><a href="/leaderboard.html">Leaderboard</a></li>
-      <li><a href="/status.html">Status</a></li>
+      <li><a href="/">Home</a></li>
+      <li><a href="/dashboard">Dashboard</a></li>
+      <li><a href="/models">Models</a></li>
+      <li><a href="/leaderboard">Leaderboard</a></li>
+      <li><a href="/status">Status</a></li>
     </ul>
+    <div class="nav-right">
+      {{if .LoggedIn}}
+      <span class="nav-user mono text-accent">{{.Login}}</span>
+      <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
+      {{else}}
+      <a href="/login" class="btn btn--sm nav-login">[Login with GitHub]</a>
+      {{end}}
+    </div>
   </nav>
 
   <main>
@@ -40,7 +48,7 @@
           One click. No password. No email.
         </p>
 
-        <a href="/auth/callback.html" class="btn login-btn">
+        <a href="/auth/github" class="btn login-btn">
           ──▶ Login with GitHub
         </a>
 

@@ -16,14 +16,19 @@
   <nav class="topbar">
     <span class="logo">⚡ GPU Mesh</span>
     <ul class="nav-links">
-      <li><a href="/index.html">Home</a></li>
-      <li><a href="/dashboard.html">Dashboard</a></li>
-      <li><a href="/models.html" class="active">Models</a></li>
-      <li><a href="/leaderboard.html">Leaderboard</a></li>
-      <li><a href="/status.html">Status</a></li>
+      <li><a href="/">Home</a></li>
+      <li><a href="/dashboard">Dashboard</a></li>
+      <li><a href="/models" class="active">Models</a></li>
+      <li><a href="/leaderboard">Leaderboard</a></li>
+      <li><a href="/status">Status</a></li>
     </ul>
     <div class="nav-right">
-      <a href="/login.html" class="btn btn--sm nav-login">[Login with GitHub]</a>
+      {{if .LoggedIn}}
+      <span class="nav-user mono text-accent">{{.Login}}</span>
+      <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
+      {{else}}
+      <a href="/login" class="btn btn--sm nav-login">[Login with GitHub]</a>
+      {{end}}
     </div>
   </nav>
 

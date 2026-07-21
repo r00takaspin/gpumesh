@@ -3,7 +3,6 @@ package coord
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -24,8 +23,8 @@ func initOAuthConfig(baseURL string) {
 	}
 }
 
-// handleLogin redirects to GitHub OAuth.
-func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+// handleLoginStart redirects to GitHub OAuth.
+func (s *Server) handleLoginStart(w http.ResponseWriter, r *http.Request) {
 	if oauthConfig == nil {
 		initOAuthConfig(s.baseURL)
 	}
@@ -174,24 +173,14 @@ func (s *Server) getGithubLogin(userID int64) string {
 // handleDashboard renders the dashboard page.
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
-	if userID == 0 {
-		// Check cookie.
-		cookie, err := r.Cookie("gpumesh_session")
-		if err != nil {
-			http.Redirect(w, r, "/login", http.StatusFound)
-			return
-		}
-		uid, err := s.store.ValidateSession(cookie.Value)
-		if err != nil || uid == 0 {
-			http.Redirect(w, r, "/login", http.StatusFound)
-			return
-		}
-		userID = uid
-	}
+	login, _ := s.store.GetUserByID(userID)
+	renderTemplate(w, "dashboard.html", PageData{
+		LoggedIn: true,
+		Login:    login,
+	})
+}
 
-	login := s.getGithubLogin(userID)
-	_ = login
-	// Template rendering will be implemented in Step 12.
-	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>Dashboard</title></head><body><h1>Dashboard</h1><p>Welcome, %s</p><p><a href="/logout">Logout</a></p></body></html>`, login)
+// handleLoginPage renders the login page with a GitHub OAuth button.
+func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
+	renderTemplate(w, "login.html", s.pageData(r))
 }
