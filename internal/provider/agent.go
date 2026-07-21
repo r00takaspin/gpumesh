@@ -1,0 +1,496 @@
+package provider
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"math/rand/v2"
+	"net/http"
+	"os"
+	"sync"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/gpumesh/gpumesh/internal/proto"
+)
+
+// Config holds the provider agent configuration (§4.2 SPEC).
+type Config struct {
+	CoordinatorURL  string
+	Token           string
+	OllamaURL       string
+	Models          []string // empty = auto-discover all
+	MaxConcurrent   int
+	Description     string
+	ReconnectMin    time.Duration
+	ReconnectMax    time.Duration
+}
+
+// Agent is the donor agent that connects to the coordinator and proxies Ollama requests.
+type Agent struct {
+	cfg    Config
+	conn   *websocket.Conn
+	mu     sync.Mutex
+
+	currentLoad int
+	// Active requests: request_id → cancel function
+	requests map[string]context.CancelFunc
+	reqMu    sync.Mutex
+
+	providerID string
+	done       chan struct{}
+}
+
+// NewAgent creates a new provider agent.
+func NewAgent(cfg Config) *Agent {
+	if cfg.OllamaURL == "" {
+		cfg.OllamaURL = "http://localhost:11434"
+	}
+	if cfg.MaxConcurrent <= 0 {
+		cfg.MaxConcurrent = 1
+	}
+	if cfg.ReconnectMin == 0 {
+		cfg.ReconnectMin = 1 * time.Second
+	}
+	if cfg.ReconnectMax == 0 {
+		cfg.ReconnectMax = 60 * time.Second
+	}
+	if cfg.Description == "" {
+		host, _ := os.Hostname()
+		cfg.Description = host
+	}
+	return &Agent{
+		cfg:      cfg,
+		requests: make(map[string]context.CancelFunc),
+		done:     make(chan struct{}),
+	}
+}
+
+// Run connects to the coordinator and starts the request processing loop.
+func (a *Agent) Run(ctx context.Context) error {
+	if a.cfg.Token == "" {
+		return fmt.Errorf("no token provided. Get one at https://gpumesh.io/dashboard")
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		if err := a.connect(ctx); err != nil {
+			log.Printf("connection error: %v", err)
+		}
+
+		// Reconnect with backoff.
+		backoff := a.cfg.ReconnectMin
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(backoff):
+			}
+			if err := a.connect(ctx); err == nil {
+				break
+			} else {
+				log.Printf("reconnect error: %v", err)
+			}
+			backoff = time.Duration(float64(backoff) * 2)
+			if backoff > a.cfg.ReconnectMax {
+				backoff = a.cfg.ReconnectMax
+			}
+			// Add jitter.
+			jitter := time.Duration(rand.Int64N(int64(backoff) / 4))
+			backoff += jitter
+		}
+		// Reset backoff on successful connect (after disconnect).
+	}
+}
+
+func (a *Agent) connect(ctx context.Context) error {
+	url := a.cfg.CoordinatorURL + "?token=" + a.cfg.Token
+	log.Printf("connecting to %s", a.cfg.CoordinatorURL)
+
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 10 * time.Second,
+	}
+	conn, _, err := dialer.DialContext(ctx, url, nil)
+	if err != nil {
+		return fmt.Errorf("dial: %w", err)
+	}
+
+	a.mu.Lock()
+	a.conn = conn
+	a.mu.Unlock()
+
+	// Discover models.
+	models, err := a.discoverModels()
+	if err != nil {
+		log.Printf("model discovery error: %v", err)
+		models = a.cfg.Models
+	}
+	if len(models) == 0 {
+		conn.Close()
+		return fmt.Errorf("no models available")
+	}
+
+	log.Printf("discovered models: %v", models)
+
+	// Send register.
+	if err := conn.WriteJSON(proto.RegisterMsg{
+		Type:          proto.TypeRegister,
+		Models:        models,
+		MaxConcurrent: a.cfg.MaxConcurrent,
+		Description:   a.cfg.Description,
+	}); err != nil {
+		conn.Close()
+		return fmt.Errorf("register: %w", err)
+	}
+
+	// Read registered response.
+	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	_, raw, err := conn.ReadMessage()
+	if err != nil {
+		conn.Close()
+		return fmt.Errorf("read registered: %w", err)
+	}
+
+	var reg proto.RegisteredMsg
+	if err := json.Unmarshal(raw, &reg); err != nil || reg.Type != proto.TypeRegistered {
+		conn.Close()
+		return fmt.Errorf("unexpected registration response: %s", raw)
+	}
+
+	a.providerID = reg.ProviderID
+	log.Printf("registered as provider_id=%s", a.providerID)
+
+	// Disable read deadline.
+	conn.SetReadDeadline(time.Time{})
+
+	// Start heartbeat ticker.
+	heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)
+	defer heartbeatCancel()
+	go a.heartbeatLoop(heartbeatCtx)
+
+	// Read loop.
+	return a.readLoop(ctx)
+}
+
+func (a *Agent) readLoop(ctx context.Context) error {
+	defer func() {
+		a.mu.Lock()
+		if a.conn != nil {
+			a.conn.Close()
+			a.conn = nil
+		}
+		a.mu.Unlock()
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		a.mu.Lock()
+		conn := a.conn
+		a.mu.Unlock()
+		if conn == nil {
+			return nil
+		}
+
+		_, raw, err := conn.ReadMessage()
+		if err != nil {
+			return fmt.Errorf("read: %w", err)
+		}
+
+		var env proto.Envelope
+		if err := json.Unmarshal(raw, &env); err != nil {
+			log.Printf("invalid message: %v", err)
+			continue
+		}
+
+		switch env.Type {
+		case proto.TypeRequest:
+			var msg proto.RequestMsg
+			if err := json.Unmarshal(raw, &msg); err != nil {
+				log.Printf("invalid request: %v", err)
+				continue
+			}
+			go a.handleRequest(ctx, msg)
+
+		case proto.TypeCancel:
+			var msg proto.CancelMsg
+			if err := json.Unmarshal(raw, &msg); err != nil {
+				log.Printf("invalid cancel: %v", err)
+				continue
+			}
+			a.reqMu.Lock()
+			if cancel, ok := a.requests[msg.RequestID]; ok {
+				cancel()
+				delete(a.requests, msg.RequestID)
+			}
+			a.reqMu.Unlock()
+
+		case proto.TypeHeartbeatAck:
+			// Nothing to do.
+
+		default:
+			log.Printf("unknown message type: %q", env.Type)
+		}
+	}
+}
+
+func (a *Agent) heartbeatLoop(ctx context.Context) {
+	ticker := time.NewTicker(proto.HeartbeatInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			a.mu.Lock()
+			conn := a.conn
+			a.mu.Unlock()
+			if conn == nil {
+				return
+			}
+			conn.WriteJSON(proto.HeartbeatMsg{Type: proto.TypeHeartbeat})
+		}
+	}
+}
+
+func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
+	// Check capacity.
+	a.mu.Lock()
+	if a.currentLoad >= a.cfg.MaxConcurrent {
+		a.mu.Unlock()
+		a.mu.Lock()
+		conn := a.conn
+		a.mu.Unlock()
+		if conn != nil {
+			conn.WriteJSON(proto.ErrorMsg{
+				Type:      proto.TypeError,
+				RequestID: msg.RequestID,
+				Code:      proto.ErrOverloaded,
+				Message:   "donor at max capacity",
+			})
+		}
+		return
+	}
+	a.currentLoad++
+	a.mu.Unlock()
+
+	defer func() {
+		a.mu.Lock()
+		a.currentLoad--
+		a.mu.Unlock()
+		a.reqMu.Lock()
+		delete(a.requests, msg.RequestID)
+		a.reqMu.Unlock()
+	}()
+
+	reqCtx, cancel := context.WithCancel(ctx)
+	a.reqMu.Lock()
+	a.requests[msg.RequestID] = cancel
+	a.reqMu.Unlock()
+	defer cancel()
+
+	// Send to Ollama.
+	ollamaResp, err := a.sendToOllama(reqCtx, msg)
+	if err != nil {
+		a.mu.Lock()
+		conn := a.conn
+		a.mu.Unlock()
+		if conn != nil {
+			code := proto.ErrInternal
+			msgStr := err.Error()
+			if reqCtx.Err() == context.Canceled {
+				return // request cancelled, don't send error
+			}
+			conn.WriteJSON(proto.ErrorMsg{
+				Type:      proto.TypeError,
+				RequestID: msg.RequestID,
+				Code:      code,
+				Message:   msgStr,
+			})
+		}
+		return
+	}
+	defer ollamaResp.Body.Close()
+
+	if msg.Stream {
+		a.handleStreamingResponse(msg.RequestID, ollamaResp.Body)
+	} else {
+		a.handleNonStreamingResponse(msg.RequestID, msg.Model, ollamaResp.Body)
+	}
+}
+
+func (a *Agent) handleStreamingResponse(requestID string, body io.Reader) {
+	scanner := bufio.NewScanner(body)
+	// Ollama returns NDJSON lines.
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+
+		var chunk struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+			Done bool `json:"done"`
+		}
+		if err := json.Unmarshal(line, &chunk); err != nil {
+			log.Printf("ollama chunk parse error: %v", err)
+			continue
+		}
+
+		a.mu.Lock()
+		conn := a.conn
+		a.mu.Unlock()
+		if conn == nil {
+			return
+		}
+
+		if err := conn.WriteJSON(proto.ChunkMsg{
+			Type:      proto.TypeChunk,
+			RequestID: requestID,
+			Content:   chunk.Message.Content,
+			Done:      chunk.Done,
+		}); err != nil {
+			log.Printf("write chunk error: %v", err)
+			return
+		}
+
+		if chunk.Done {
+			return
+		}
+	}
+}
+
+func (a *Agent) handleNonStreamingResponse(requestID, model string, body io.Reader) {
+	data, err := io.ReadAll(body)
+	if err != nil {
+		log.Printf("read ollama response error: %v", err)
+		return
+	}
+
+	var ollamaResp struct {
+		Message struct {
+			Content string `json:"content"`
+		} `json:"message"`
+		TotalDuration      int64 `json:"total_duration"`
+		PromptEvalCount    int   `json:"prompt_eval_count"`
+		EvalCount          int   `json:"eval_count"`
+	}
+	if err := json.Unmarshal(data, &ollamaResp); err != nil {
+		log.Printf("ollama response parse error: %v", err)
+		return
+	}
+
+	usage, _ := json.Marshal(map[string]interface{}{
+		"prompt_tokens":     ollamaResp.PromptEvalCount,
+		"completion_tokens": ollamaResp.EvalCount,
+		"total_tokens":      ollamaResp.PromptEvalCount + ollamaResp.EvalCount,
+	})
+
+	a.mu.Lock()
+	conn := a.conn
+	a.mu.Unlock()
+	if conn == nil {
+		return
+	}
+
+	conn.WriteJSON(proto.ResponseMsg{
+		Type:      proto.TypeResponse,
+		RequestID: requestID,
+		Content:   ollamaResp.Message.Content,
+		Model:     model,
+		Usage:     usage,
+	})
+}
+
+// sendToOllama sends a chat completion request to the local Ollama instance.
+func (a *Agent) sendToOllama(ctx context.Context, msg proto.RequestMsg) (*http.Response, error) {
+	ollamaReq := map[string]interface{}{
+		"model":    msg.Model,
+		"messages": msg.Messages,
+		"stream":   msg.Stream,
+	}
+
+	// Merge options.
+	if len(msg.Options) > 0 {
+		var opts map[string]interface{}
+		if err := json.Unmarshal(msg.Options, &opts); err == nil {
+			for k, v := range opts {
+				ollamaReq[k] = v
+			}
+		}
+	}
+
+	body, err := json.Marshal(ollamaReq)
+	if err != nil {
+		return nil, fmt.Errorf("marshal ollama request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST",
+		a.cfg.OllamaURL+"/api/chat", nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	// Use pipe for body that supports io.NopCloser.
+	pr, pw := io.Pipe()
+	go func() {
+		pw.Write(body)
+		pw.Close()
+	}()
+	httpReq.Body = pr
+
+	client := &http.Client{Timeout: proto.TotalRequestTimeout}
+	return client.Do(httpReq)
+}
+
+// discoverModels fetches available models from Ollama.
+func (a *Agent) discoverModels() ([]string, error) {
+	resp, err := http.Get(a.cfg.OllamaURL + "/api/tags")
+	if err != nil {
+		return nil, fmt.Errorf("ollama /api/tags: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Models []struct {
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("parse /api/tags: %w", err)
+	}
+
+	var models []string
+	for _, m := range result.Models {
+		// If whitelist configured, only include those.
+		if len(a.cfg.Models) > 0 {
+			for _, wl := range a.cfg.Models {
+				if wl == m.Name {
+					models = append(models, m.Name)
+					break
+				}
+			}
+		} else {
+			models = append(models, m.Name)
+		}
+	}
+	return models, nil
+}
+
