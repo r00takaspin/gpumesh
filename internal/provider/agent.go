@@ -91,7 +91,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 
 		// Reconnect with backoff.
-		backoff := a.cfg.ReconnectMin
+		backoff := a.cfg.ReconnectMin + time.Duration(rand.Int64N(int64(a.cfg.ReconnectMin)/4))
 		for {
 			select {
 			case <-ctx.Done():
@@ -103,13 +103,12 @@ func (a *Agent) Run(ctx context.Context) error {
 			} else {
 				log.Printf("reconnect error: %v", err)
 			}
-			backoff = time.Duration(float64(backoff) * 2)
+			// Add jitter, then apply cap.
+			jitter := time.Duration(rand.Int64N(int64(backoff) / 4))
+			backoff = backoff*2 + jitter
 			if backoff > a.cfg.ReconnectMax {
 				backoff = a.cfg.ReconnectMax
 			}
-			// Add jitter.
-			jitter := time.Duration(rand.Int64N(int64(backoff) / 4))
-			backoff += jitter
 		}
 		// Reset backoff on successful connect (after disconnect).
 	}
