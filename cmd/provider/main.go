@@ -65,9 +65,9 @@ const (
 func printBanner(cfg provider.Config) {
 	host, _ := os.Hostname()
 	banner := `
-` + bold + green + `   ▄▀▀ █▀█ █ █   █▀▄▀█ █▀▀ █▀▀ █ █
-   █▀  █▀▀ █ █   █ ▀ █ █▀▀ ▀▀█ █▀█
-   ▀▀▀ ▀   ▀▀▀   ▀   ▀ ▀▀▀ ▀▀▀ ▀ ▀` + reset + `
+` + bold + green + `   ┌────────────────────────────────┐
+   │     ⚡ GPU MESH — donor agent    │
+   └────────────────────────────────┘` + reset + `
 
 ` + dim + `   peer-to-peer LLM inference mesh` + reset + `
 
@@ -78,6 +78,7 @@ func printBanner(cfg provider.Config) {
 `
 	fmt.Print(banner)
 }
+
 func envOrDefault(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
