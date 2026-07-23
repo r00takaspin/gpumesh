@@ -36,6 +36,7 @@ type ChunkRelay struct {
 	Content string
 	Done    bool
 	Err     string // non-empty on error
+	Tokens  int    // completion tokens for non-streaming responses
 }
 
 // Registry is a thread-safe in-memory donor registry (§5.3 SPEC).

@@ -427,8 +427,8 @@ func (s *Server) sendNonStreamingRequest(ctx context.Context, donor *Donor, req 
 			},
 			"usage": map[string]int{
 				"prompt_tokens":     0,
-				"completion_tokens": 0,
-				"total_tokens":      0,
+				"completion_tokens": cr.Tokens,
+				"total_tokens":      cr.Tokens,
 			},
 		}
 		return result, nil

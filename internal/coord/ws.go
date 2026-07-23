@@ -2,6 +2,7 @@ package coord
 
 import (
 	"crypto/rand"
+	"sync/atomic"
 	"encoding/hex"
 	"encoding/json"
 	"log"
@@ -207,6 +208,7 @@ func (s *Server) relayChunk(providerID string, msg proto.ChunkMsg) {
 	}
 	// Count each chunk as one token for session stats.
 	s.registry.AddTokens(providerID, 1)
+	atomic.AddInt64(&s.tokensToday, 1)
 }
 
 func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
@@ -215,6 +217,15 @@ func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
 		log.Printf("relayResponse: donor not found provider_id=%s request_id=%s", providerID, msg.RequestID)
 		return
 	}
+
+	// Parse usage for token counting.
+	var usage struct {
+		CompletionTokens int `json:"completion_tokens"`
+	}
+	if len(msg.Usage) > 0 {
+		json.Unmarshal(msg.Usage, &usage)
+	}
+
 	donor.mu.Lock()
 	ch, ok := donor.chunkCh[msg.RequestID]
 	donor.mu.Unlock()
@@ -223,22 +234,16 @@ func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
 		return
 	}
 	select {
-	case ch <- ChunkRelay{Content: msg.Content}:
-		log.Printf("relayResponse: delivered request_id=%s content_len=%d", msg.RequestID, len(msg.Content))
+	case ch <- ChunkRelay{Content: msg.Content, Tokens: usage.CompletionTokens}:
+		log.Printf("relayResponse: delivered request_id=%s content_len=%d tokens=%d", msg.RequestID, len(msg.Content), usage.CompletionTokens)
 	default:
 		log.Printf("relayResponse: channel full for request_id=%s", msg.RequestID)
 	}
 	donor.UnregisterChunkChannel(msg.RequestID)
 
-	// Parse usage for session token counting.
-	var usage struct {
-		CompletionTokens int `json:"completion_tokens"`
-	}
-	if len(msg.Usage) > 0 {
-		json.Unmarshal(msg.Usage, &usage)
-	}
 	if usage.CompletionTokens > 0 {
 		s.registry.AddTokens(providerID, usage.CompletionTokens)
+		atomic.AddInt64(&s.tokensToday, int64(usage.CompletionTokens))
 	}
 }
 func (s *Server) relayError(providerID string, msg proto.ErrorMsg) {
