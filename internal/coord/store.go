@@ -244,6 +244,33 @@ func (s *Store) GetDonorStats(userID int64) (*DonorStats, error) {
 	return &ds, nil
 }
 
+// ListAllDonorStats returns all donor statistics rows, ordered by total tokens descending.
+func (s *Store) ListAllDonorStats() ([]DonorStats, error) {
+	rows, err := s.db.Query(
+		`SELECT user_id, total_requests, total_tokens, total_uptime_seconds, last_seen_at
+		 FROM donor_stats ORDER BY total_tokens DESC`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list all donor stats: %w", err)
+	}
+	defer rows.Close()
+
+	var result []DonorStats
+	for rows.Next() {
+		var ds DonorStats
+		var lastSeen *string
+		if err := rows.Scan(&ds.UserID, &ds.TotalRequests, &ds.TotalTokens, &ds.TotalUptimeSec, &lastSeen); err != nil {
+			return nil, fmt.Errorf("list all donor stats: %w", err)
+		}
+		if lastSeen != nil {
+			t, _ := time.Parse("2006-01-02 15:04:05", *lastSeen)
+			ds.LastSeenAt = &t
+		}
+		result = append(result, ds)
+	}
+	return result, rows.Err()
+}
+
 // UpdateDonorStats increments persistent donor counters.
 func (s *Store) UpdateDonorStats(userID int64, requests, tokens, uptimeSec int64) error {
 	_, err := s.db.Exec(

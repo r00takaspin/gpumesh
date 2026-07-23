@@ -42,108 +42,46 @@
       <button class="btn btn--sm">search</button>
     </div>
 
-    <p class="text-dim mono mb-2" style="font-size:0.7rem">Updated 3s ago</p>
 
-    <!-- Model Cards -->
-    <div class="card">
-      <div class="flex-between mb-1">
-        <span class="mono" style="font-size:0.9rem;font-weight:700">llama3.2:3b</span>
-        <span class="mono text-accent">🟢 Fast — 12 donors</span>
-      </div>
-      <div style="border-top:1px solid var(--border);margin:0.5rem 0"></div>
-      <div class="flex-between mb-1">
-        <span class="mono text-dim" style="font-size:0.75rem">Load</span>
-        <span class="mono text-accent" style="font-size:0.75rem">0.3</span>
-      </div>
-      <progress value="0.3" max="1"></progress>
-      <div class="mt-1" style="display:flex;gap:0.35rem;flex-wrap:wrap">
-        <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">chat</span>
-        <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">code</span>
-        <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">general</span>
-      </div>
-      <div class="mt-1">
-        <span class="mono text-dim" style="font-size:0.7rem">Min VRAM: 4 GB</span>
-      </div>
-    </div>
+    <div id="model-list" hx-get="/models" hx-trigger="every 30s" hx-select="#model-list" hx-swap="outerHTML">
+      <p class="text-dim mono mb-2" style="font-size:0.7rem">Updated just now</p>
 
-    <div class="card">
-      <div class="flex-between mb-1">
-        <span class="mono" style="font-size:0.9rem;font-weight:700">codellama:7b</span>
-        <span class="mono text-warning">🟡 Available — 3 donors</span>
+      {{if .Models}}
+      {{range .Models}}
+      <div class="card">
+        <div class="flex-between mb-1">
+          <span class="mono" style="font-size:0.9rem;font-weight:700">{{.Name}}</span>
+          {{if ge .DonorsOnline 5}}
+          <span class="mono text-accent">🟢 Fast — {{.DonorsOnline}} donors</span>
+          {{else if ge .DonorsOnline 1}}
+          <span class="mono text-warning">🟡 Available — {{.DonorsOnline}} donors</span>
+          {{else}}
+          <span class="mono text-error">🔴 Offline</span>
+          {{end}}
+        </div>
+        <div style="border-top:1px solid var(--border);margin:0.5rem 0"></div>
+        <div class="flex-between mb-1">
+          <span class="mono text-dim" style="font-size:0.75rem">Load</span>
+          {{if gt .DonorsOnline 0}}
+          <span class="mono text-accent" style="font-size:0.75rem">{{printf "%.2f" .Load}}</span>
+          {{else}}
+          <span class="mono text-dim" style="font-size:0.75rem">—</span>
+          {{end}}
+        </div>
+        <progress value="{{.Load}}" max="1"></progress>
+        <div class="mt-1" style="display:flex;gap:0.35rem;flex-wrap:wrap">
+          {{range .Tags}}
+          <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">{{.}}</span>
+          {{end}}
+        </div>
+        <div class="mt-1">
+          <span class="mono text-dim" style="font-size:0.7rem">Min VRAM: {{.VRAM}}</span>
+        </div>
       </div>
-      <div style="border-top:1px solid var(--border);margin:0.5rem 0"></div>
-      <div class="flex-between mb-1">
-        <span class="mono text-dim" style="font-size:0.75rem">Load</span>
-        <span class="mono text-warning" style="font-size:0.75rem">0.7</span>
-      </div>
-      <progress value="0.7" max="1"></progress>
-      <div class="mt-1" style="display:flex;gap:0.35rem;flex-wrap:wrap">
-        <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">code</span>
-        <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">fill-in-middle</span>
-      </div>
-      <div class="mt-1">
-        <span class="mono text-dim" style="font-size:0.7rem">Min VRAM: 8 GB</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="flex-between mb-1">
-        <span class="mono" style="font-size:0.9rem;font-weight:700">mistral:7b</span>
-        <span class="mono text-error">🔴 Offline — 0 donors</span>
-      </div>
-      <div style="border-top:1px solid var(--border);margin:0.5rem 0"></div>
-      <div class="flex-between mb-1">
-        <span class="mono text-dim" style="font-size:0.75rem">Load</span>
-        <span class="mono text-dim" style="font-size:0.75rem">—</span>
-      </div>
-      <progress value="0" max="1"></progress>
-      <div class="mt-1" style="display:flex;gap:0.35rem;flex-wrap:wrap">
-        <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">chat</span>
-        <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">general</span>
-      </div>
-      <div class="mt-1">
-        <span class="mono text-dim" style="font-size:0.7rem">Min VRAM: 8 GB</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="flex-between mb-1">
-        <span class="mono" style="font-size:0.9rem;font-weight:700">qwen2.5:0.5b</span>
-        <span class="mono text-accent">🟢 Fast — 9 donors</span>
-      </div>
-      <div style="border-top:1px solid var(--border);margin:0.5rem 0"></div>
-      <div class="flex-between mb-1">
-        <span class="mono text-dim" style="font-size:0.75rem">Load</span>
-        <span class="mono text-accent" style="font-size:0.75rem">0.15</span>
-      </div>
-      <progress value="0.15" max="1"></progress>
-      <div class="mt-1" style="display:flex;gap:0.35rem;flex-wrap:wrap">
-        <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">chat</span>
-        <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">tiny</span>
-        <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">edge</span>
-      </div>
-      <div class="mt-1">
-        <span class="mono text-dim" style="font-size:0.7rem">Min VRAM: 2 GB</span>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="flex-between mb-1">
-        <span class="mono" style="font-size:0.9rem;font-weight:700">nomic-embed-text</span>
-        <span class="mono text-accent">🟢 Fast — 15 donors</span>
-      </div>
-      <div style="border-top:1px solid var(--border);margin:0.5rem 0"></div>
-      <div class="flex-between mb-1">
-        <span class="mono text-dim" style="font-size:0.75rem">Load</span>
-        <span class="mono text-accent" style="font-size:0.75rem">0.05</span>
-      </div>
-      <progress value="0.05" max="1"></progress>
-      <div class="mt-1" style="display:flex;gap:0.35rem;flex-wrap:wrap">
-        <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">embedding</span>
-      </div>
-      <div class="mt-1">
-        <span class="mono text-dim" style="font-size:0.7rem">Min VRAM: 2 GB</span>
-      </div>
+      {{end}}
+      {{else}}
+      <p class="text-dim" style="text-align:center">No models available right now. Check back later or <a href="/dashboard">become a donor</a>!</p>
+      {{end}}
     </div>
 
   </main>

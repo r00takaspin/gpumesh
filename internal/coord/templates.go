@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/gpumesh/gpumesh/web"
@@ -23,11 +24,14 @@ type PageData struct {
 	ModelsOnline  int
 	RequestsToday int
 	StatsError    bool // true → hide stats block
+	TokensToday   int64
 	// Top models / donors for landing page.
 	TopModels []ModelSummary
 	TopDonors []DonorSummary
 	// Dashboard donor tab.
 	HasDonorScope bool
+	// Models page.
+	Models []ModelData
 }
 
 // ModelSummary is a lightweight model entry for template rendering.
@@ -36,6 +40,16 @@ type ModelSummary struct {
 	DonorCount int
 	Vendor     string
 }
+
+// ModelData is a full model entry for the /models page.
+type ModelData struct {
+	Name         string
+	DonorsOnline int
+	Load         float64
+	Tags         []string
+	VRAM         string
+}
+
 
 // DonorSummary is a lightweight donor entry for the landing podium.
 type DonorSummary struct {
@@ -66,6 +80,49 @@ func vendorForModel(name string) string {
 
 func hasPrefix(s, prefix string) bool {
 	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
+// tagsForModel returns category tags for a model name.
+func tagsForModel(name string) []string {
+	switch {
+	case hasPrefix(name, "llama"), hasPrefix(name, "codellama"), hasPrefix(name, "deepseek"):
+		return []string{"chat", "code", "general"}
+	case hasPrefix(name, "mistral"), hasPrefix(name, "mixtral"):
+		return []string{"chat", "general"}
+	case hasPrefix(name, "qwen"):
+		return []string{"chat", "tiny", "edge"}
+	case hasPrefix(name, "phi"):
+		return []string{"chat", "code"}
+	case hasPrefix(name, "nomic"):
+		return []string{"embedding"}
+	case hasPrefix(name, "gemma"):
+		return []string{"chat", "general"}
+	default:
+		return []string{"chat"}
+	}
+}
+
+// vramForModel estimates minimum VRAM from a model name.
+func vramForModel(name string) string {
+	lower := strings.ToLower(name)
+	switch {
+	case strings.Contains(lower, "0.5b"), strings.Contains(lower, "embed"):
+		return "2 GB"
+	case strings.Contains(lower, "1b"), strings.Contains(lower, "1.5b"):
+		return "2 GB"
+	case strings.Contains(lower, "3b"):
+		return "4 GB"
+	case strings.Contains(lower, "7b"), strings.Contains(lower, "8b"):
+		return "8 GB"
+	case strings.Contains(lower, "13b"), strings.Contains(lower, "14b"):
+		return "16 GB"
+	case strings.Contains(lower, "34b"):
+		return "24 GB"
+	case strings.Contains(lower, "70b"):
+		return "48 GB"
+	default:
+		return "8 GB"
+	}
 }
 
 
@@ -145,6 +202,7 @@ func (s *Server) pageDataWithStats(r *http.Request) PageData {
 	pd.DonorsOnline = snap.DonorsOnline
 	pd.ModelsOnline = snap.ModelsOnline
 	pd.RequestsToday = int(s.requestsToday)
+	pd.TokensToday = s.tokensToday
 
 	// Top models: sort by donor count, limit 5.
 	type modelEntry struct {
@@ -163,6 +221,19 @@ func (s *Server) pageDataWithStats(r *http.Request) PageData {
 	for i, m := range models {
 		pd.TopModels[i] = ModelSummary{Name: m.name, DonorCount: m.count, Vendor: vendorForModel(m.name)}
 	}
+
+	// All models for /models page.
+	pd.Models = make([]ModelData, 0, len(snap.Models))
+	for name, ms := range snap.Models {
+		pd.Models = append(pd.Models, ModelData{
+			Name:         name,
+			DonorsOnline: ms.DonorsOnline,
+			Load:         ms.Load,
+			Tags:         tagsForModel(name),
+			VRAM:         vramForModel(name),
+		})
+	}
+	sort.Slice(pd.Models, func(i, j int) bool { return pd.Models[i].Name < pd.Models[j].Name })
 
 	// Top donors: top 3 from registry by lifetime tokens.
 	type donorEntry struct {

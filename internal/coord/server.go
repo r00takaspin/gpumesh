@@ -110,6 +110,7 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /api/donor/stats", s.requireAuth(s.handleDonorStatsAPI))
 	mux.HandleFunc("GET /api/donor/status", s.requireAuth(s.handleDonorStatus))
 	mux.HandleFunc("GET /leaderboard/data", s.corsMiddleware(s.handleLeaderboardData))
+	mux.HandleFunc("GET /leaderboard/page", s.corsMiddleware(s.handleLeaderboardFragment))
 	mux.HandleFunc("GET /models/data", s.corsMiddleware(s.handleModelsData))
 
 	// HTMX dashboard fragments.

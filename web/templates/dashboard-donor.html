@@ -16,10 +16,16 @@
   {{end}}
   {{else}}
   <div class="card">
-    <p class="text-dim">No agents connected. Run gpumesh-provider to share your GPU.</p>
+    <div class="prompt">Share your GPU</div>
+    <div class="steps">
+      <div class="step"><div class="step-num">1. INSTALL</div><div class="step-title">Ollama</div><div class="step-desc">ollama.com</div></div>
+      <div class="step-arrow">──▶</div>
+      <div class="step"><div class="step-num">2. PULL</div><div class="step-title">a model</div><div class="step-desc">ollama pull llama3.2:3b</div></div>
+      <div class="step-arrow">──▶</div>
+      <div class="step"><div class="step-num">3. RUN</div><div class="step-title">the agent</div><div class="step-desc">export MESH_TOKEN="{{.TokenPrefix}}..." && gpumesh-provider</div></div>
+    </div>
   </div>
   {{end}}
-
   <!-- Token -->
   <div class="prompt">cat /etc/gpumesh/token</div>
   <div class="card">
@@ -44,7 +50,7 @@
       <div class="stat-label">Tokens generated</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">{{.Stats.AvgTokensPerSec}}</div>
+      <div class="stat-value">{{.AvgTokensPerSec}}</div>
       <div class="stat-label">Avg tokens/sec</div>
     </div>
     <div class="stat-card">

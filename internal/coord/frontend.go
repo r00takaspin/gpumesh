@@ -126,16 +126,21 @@ func (s *Server) handleLeaderboardData(w http.ResponseWriter, r *http.Request) {
 	// Collect all donors from registry and cross-reference with stats.
 	// For MVP we aggregate from the registry session + persistent stats.
 	var entries []entry
-	seenUsers := map[int64]bool{}
 
-	for _, d := range s.registry.donors {
-		if seenUsers[d.UserID] {
+	allStats, err := s.store.ListAllDonorStats()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to load leaderboard"})
+		return
+	}
+
+	seenUsers := map[int64]bool{}
+	for _, ds := range allStats {
+		if seenUsers[ds.UserID] {
 			continue
 		}
-		seenUsers[d.UserID] = true
+		seenUsers[ds.UserID] = true
 
-		ds, _ := s.store.GetDonorStats(d.UserID)
-		login := s.getGithubLogin(d.UserID)
+		login := s.getGithubLogin(ds.UserID)
 		entries = append(entries, entry{
 			GithubLogin: login,
 			AvatarURL:   fmt.Sprintf("https://github.com/%s.png", login),
@@ -164,8 +169,57 @@ func (s *Server) handleLeaderboardData(w http.ResponseWriter, r *http.Request) {
 		entries = []entry{}
 	}
 
+
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"entries": entries,
+	})
+}
+
+
+// --- GET /leaderboard/page ---
+
+func (s *Server) handleLeaderboardFragment(w http.ResponseWriter, r *http.Request) {
+	period := r.URL.Query().Get("period")
+	limit := 50
+	_ = period
+
+	var entries []LeaderboardEntry
+	seenUsers := map[int64]bool{}
+
+	for _, d := range s.registry.donors {
+		if seenUsers[d.UserID] {
+			continue
+		}
+		seenUsers[d.UserID] = true
+
+		ds, _ := s.store.GetDonorStats(d.UserID)
+		login := s.getGithubLogin(d.UserID)
+		entries = append(entries, LeaderboardEntry{
+			GithubLogin: login,
+			Tokens:      ds.TotalTokens,
+			Requests:    ds.TotalRequests,
+			Badge:       BadgeForTokens(ds.TotalTokens),
+		})
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Tokens > entries[j].Tokens
+	})
+
+	if len(entries) > limit {
+		entries = entries[:limit]
+	}
+
+	for i := range entries {
+		entries[i].Rank = i + 1
+	}
+
+	if entries == nil {
+		entries = []LeaderboardEntry{}
+	}
+
+	renderTemplate(w, "leaderboard-fragment.html", map[string]interface{}{
+		"Entries": entries,
 	})
 }
 
@@ -327,6 +381,12 @@ func (s *Server) handleDashboardDonor(w http.ResponseWriter, r *http.Request) {
 	}
 	tokenFull = tokenPrefix + "..." // can't retrieve full key
 
+	avg := 0.0
+	if stats.TotalUptimeSec > 0 {
+		avg = float64(stats.TotalTokens) / float64(stats.TotalUptimeSec)
+	}
+	avgTokensPerSec := fmt.Sprintf("%.1f", avg)
+
 	data := map[string]interface{}{
 		"Agents":           agents,
 		"Stats":             stats,
@@ -337,6 +397,7 @@ func (s *Server) handleDashboardDonor(w http.ResponseWriter, r *http.Request) {
 		"BadgeThreshold":    badgeThreshold,
 		"BadgePercent":      badgePct,
 		"BadgeRemaining":    remaining,
+		"AvgTokensPerSec":   avgTokensPerSec,
 		"TokenPrefix":       tokenPrefix,
 		"TokenFull":         tokenFull,
 		"TokenID":           tokenID,
@@ -366,7 +427,7 @@ func formatDuration(d time.Duration) string {
 func badgeEmoji(badge string) string {
 	switch badge {
 	case "platinum":
-		return "👑"
+		return "💎"
 	case "gold":
 		return "🥇"
 	case "silver":
