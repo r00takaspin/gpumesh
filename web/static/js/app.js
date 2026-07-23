@@ -90,3 +90,20 @@ function toggleAccordion(el) {
   el.classList.toggle('open');
 }
 
+
+// Activate tab from URL hash on page load.
+document.addEventListener('DOMContentLoaded', () => {
+  const hash = window.location.hash.slice(1); // remove '#'
+  if (hash === 'consumer' || hash === 'donor') {
+    switchTab('dash', hash);
+  }
+  // Also handle clicks on tab buttons — update hash.
+  document.querySelectorAll('.tab-btn[data-tab-group="dash"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.getAttribute('data-tab');
+      if (tab) {
+        history.replaceState(null, '', '#' + tab);
+      }
+    });
+  });
+});
