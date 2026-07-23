@@ -64,10 +64,10 @@ const (
 
 func printBanner(cfg provider.Config) {
 	host, _ := os.Hostname()
-	banner := `
-` + bold + green + `   ┌────────────────────────────────┐
-   │     ⚡ GPU MESH — donor agent    │
-   └────────────────────────────────┘` + reset + `
+	banner := bold + green + `
+   ┌──────────────────────────────────┐
+   │     GPU MESH — donor agent       │
+   └──────────────────────────────────┘` + reset + `
 
 ` + dim + `   peer-to-peer LLM inference mesh` + reset + `
 
