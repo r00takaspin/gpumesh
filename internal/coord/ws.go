@@ -103,25 +103,14 @@ func (s *Server) handleWSProvider(w http.ResponseWriter, r *http.Request) {
 
 	// Disable read deadline for message loop.
 	conn.SetReadDeadline(time.Time{})
-
-	// Read loop.
-	go s.readLoop(donor)
-
-	// Block until connection closes (readLoop will close on error).
-	// We use a simple channel to keep the connection alive.
-	done := make(chan struct{})
+	// Read loop in a goroutine; wait for it to finish.
+	readDone := make(chan struct{})
 	go func() {
-		// Wait for readLoop to finish. The readLoop will close the connection
-		// on error, and we detect it here by trying to read.
-		for {
-			if _, _, err := conn.NextReader(); err != nil {
-				break
-			}
-		}
-		close(done)
+		s.readLoop(donor)
+		close(readDone)
 	}()
 
-	<-done
+	<-readDone
 
 	// Cleanup.
 	userID, sessionReqs, sessionTokens := s.registry.Unregister(providerID)
@@ -167,13 +156,13 @@ func (s *Server) readLoop(donor *Donor) {
 				continue
 			}
 			s.relayChunk(donor.ProviderID, msg)
-
 		case proto.TypeResponse:
 			var msg proto.ResponseMsg
 			if err := json.Unmarshal(raw, &msg); err != nil {
 				log.Printf("ws: invalid response: %v", err)
 				continue
 			}
+			log.Printf("ws: received response provider_id=%s request_id=%s", donor.ProviderID, msg.RequestID)
 			s.relayResponse(donor.ProviderID, msg)
 
 		case proto.TypeError:
@@ -223,18 +212,23 @@ func (s *Server) relayChunk(providerID string, msg proto.ChunkMsg) {
 func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
 	donor := s.registry.GetDonor(providerID)
 	if donor == nil {
+		log.Printf("relayResponse: donor not found provider_id=%s request_id=%s", providerID, msg.RequestID)
 		return
 	}
 	donor.mu.Lock()
 	ch, ok := donor.chunkCh[msg.RequestID]
 	donor.mu.Unlock()
-	if ok {
-		select {
-		case ch <- ChunkRelay{Content: msg.Content}:
-		default:
-		}
-		donor.UnregisterChunkChannel(msg.RequestID)
+	if !ok {
+		log.Printf("relayResponse: no chunk channel for request_id=%s (have %d channels)", msg.RequestID, len(donor.chunkCh))
+		return
 	}
+	select {
+	case ch <- ChunkRelay{Content: msg.Content}:
+		log.Printf("relayResponse: delivered request_id=%s content_len=%d", msg.RequestID, len(msg.Content))
+	default:
+		log.Printf("relayResponse: channel full for request_id=%s", msg.RequestID)
+	}
+	donor.UnregisterChunkChannel(msg.RequestID)
 
 	// Parse usage for session token counting.
 	var usage struct {

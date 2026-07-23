@@ -10,6 +10,7 @@ import (
 	"log"
 	"math/rand/v2"
 	"net/http"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -120,6 +121,17 @@ func (a *Agent) connect(ctx context.Context) error {
 
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
+		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			d := net.Dialer{KeepAlive: 30 * time.Second}
+			conn, err := d.DialContext(ctx, network, addr)
+			if err != nil {
+				return nil, err
+			}
+			if tcp, ok := conn.(*net.TCPConn); ok {
+				tcp.SetKeepAlivePeriod(30 * time.Second)
+			}
+			return conn, nil
+		},
 	}
 	conn, _, err := dialer.DialContext(ctx, url, nil)
 	if err != nil {
@@ -171,10 +183,7 @@ func (a *Agent) connect(ctx context.Context) error {
 	a.providerID = reg.ProviderID
 	log.Printf("registered as provider_id=%s", a.providerID)
 
-	// Disable read deadline.
-	conn.SetReadDeadline(time.Time{})
-
-	// Start heartbeat ticker.
+	// Start heartbeat loop.
 	heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)
 	defer heartbeatCancel()
 	go a.heartbeatLoop(heartbeatCtx)
@@ -182,7 +191,36 @@ func (a *Agent) connect(ctx context.Context) error {
 	// Read loop.
 	return a.readLoop(ctx)
 }
+func (a *Agent) heartbeatLoop(ctx context.Context) {
+	ticker := time.NewTicker(proto.HeartbeatInterval)
+	defer ticker.Stop()
 
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			a.mu.Lock()
+			conn := a.conn
+			a.mu.Unlock()
+			if conn == nil {
+				return
+			}
+			if err := conn.WriteJSON(proto.HeartbeatMsg{Type: proto.TypeHeartbeat}); err != nil {
+				log.Printf("heartbeat write error, closing: %v", err)
+				conn.Close()
+				a.mu.Lock()
+				if a.conn == conn {
+					a.conn = nil
+				}
+				a.mu.Unlock()
+				return
+			}
+		}
+	}
+}
+
+// readLoop reads messages from the coordinator WebSocket.
 func (a *Agent) readLoop(ctx context.Context) error {
 	defer func() {
 		a.mu.Lock()
@@ -193,19 +231,25 @@ func (a *Agent) readLoop(ctx context.Context) error {
 		a.mu.Unlock()
 	}()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
+	// Close connection on context cancellation (Ctrl+C).
+	go func() {
+		<-ctx.Done()
+		a.mu.Lock()
+		if a.conn != nil {
+			a.conn.Close()
 		}
+		a.mu.Unlock()
+	}()
 
+	for {
 		a.mu.Lock()
 		conn := a.conn
 		a.mu.Unlock()
 		if conn == nil {
 			return nil
 		}
+
+		conn.SetReadDeadline(time.Now().Add(proto.HeartbeatTimeout))
 
 		_, raw, err := conn.ReadMessage()
 		if err != nil {
@@ -248,8 +292,8 @@ func (a *Agent) readLoop(ctx context.Context) error {
 		}
 	}
 }
-
-func (a *Agent) heartbeatLoop(ctx context.Context) {
+// pingLoop sends WebSocket ping frames to keep the connection alive and detect half-open TCP.
+func (a *Agent) pingLoop(ctx context.Context) {
 	ticker := time.NewTicker(proto.HeartbeatInterval)
 	defer ticker.Stop()
 
@@ -264,7 +308,9 @@ func (a *Agent) heartbeatLoop(ctx context.Context) {
 			if conn == nil {
 				return
 			}
-			conn.WriteJSON(proto.HeartbeatMsg{Type: proto.TypeHeartbeat})
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)); err != nil {
+				return
+			}
 		}
 	}
 }
@@ -289,6 +335,9 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 	}
 	a.currentLoad++
 	a.mu.Unlock()
+	log.Printf("handleRequest: id=%s model=%s stream=%v", msg.RequestID, msg.Model, msg.Stream)
+
+	// Send to Ollama.
 
 	defer func() {
 		a.mu.Lock()
@@ -327,6 +376,7 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 		return
 	}
 	defer ollamaResp.Body.Close()
+	log.Printf("handleRequest: ollama responded status=%d", ollamaResp.StatusCode)
 
 	if msg.Stream {
 		a.handleStreamingResponse(msg.RequestID, ollamaResp.Body)
@@ -412,13 +462,17 @@ func (a *Agent) handleNonStreamingResponse(requestID, model string, body io.Read
 		return
 	}
 
-	conn.WriteJSON(proto.ResponseMsg{
+	if err := conn.WriteJSON(proto.ResponseMsg{
 		Type:      proto.TypeResponse,
 		RequestID: requestID,
 		Content:   ollamaResp.Message.Content,
 		Model:     model,
 		Usage:     usage,
-	})
+	}); err != nil {
+		log.Printf("write response error: %v", err)
+	} else {
+		log.Printf("handleNonStreamingResponse: sent response_id=%s content_len=%d", requestID, len(ollamaResp.Message.Content))
+	}
 }
 
 // sendToOllama sends a chat completion request to the local Ollama instance.
@@ -451,6 +505,7 @@ func (a *Agent) sendToOllama(ctx context.Context, msg proto.RequestMsg) (*http.R
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
+	log.Printf("sendToOllama: calling %s/api/chat model=%s", a.cfg.OllamaURL, msg.Model)
 	return a.httpClient.Do(httpReq)
 }
 
