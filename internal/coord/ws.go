@@ -209,6 +209,7 @@ func (s *Server) relayChunk(providerID string, msg proto.ChunkMsg) {
 	// Count each chunk as one token for session stats.
 	s.registry.AddTokens(providerID, 1)
 	atomic.AddInt64(&s.tokensToday, 1)
+	s.store.UpdateDonorStats(donor.UserID, 0, 1, 0)
 }
 
 func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
@@ -244,6 +245,7 @@ func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
 	if usage.CompletionTokens > 0 {
 		s.registry.AddTokens(providerID, usage.CompletionTokens)
 		atomic.AddInt64(&s.tokensToday, int64(usage.CompletionTokens))
+		s.store.UpdateDonorStats(donor.UserID, 1, int64(usage.CompletionTokens), 0)
 	}
 }
 func (s *Server) relayError(providerID string, msg proto.ErrorMsg) {
