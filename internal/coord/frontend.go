@@ -2,6 +2,7 @@ package coord
 
 import (
 	"fmt"
+	"sync/atomic"
 	"log"
 	"net/http"
 	"sort"
@@ -368,8 +369,7 @@ func (s *Server) handleDashboardConsumer(w http.ResponseWriter, r *http.Request)
 		"APIKey":        apiKey,
 		"Keys":           kv,
 		"RateLimit":      rateLimit,
-		"RequestsToday":  requestsToday,
-		"TokensToday":    int64(0),
+		"TokensToday":    atomic.LoadInt64(&s.tokensToday),
 		"PercentUsed":    pct,
 	}
 
