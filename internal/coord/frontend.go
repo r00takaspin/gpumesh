@@ -333,11 +333,7 @@ func (s *Server) handleDashboardConsumer(w http.ResponseWriter, r *http.Request)
 
 	keys, _ := s.store.ListKeys(userID)
 	rateLimit := s.limiter.Burst()
-	remaining := rateLimit
-	if len(keys) > 0 {
-		remaining = s.limiter.Remaining(keys[0].KeyHash)
-	}
-	requestsToday := rateLimit - remaining
+	requestsToday := atomic.LoadInt64(&s.requestsToday)
 
 	apiKey := "inf_xxxxxxxx..."
 	if len(keys) > 0 {
@@ -346,7 +342,7 @@ func (s *Server) handleDashboardConsumer(w http.ResponseWriter, r *http.Request)
 
 	pct := 0
 	if rateLimit > 0 {
-		pct = requestsToday * 100 / rateLimit
+		pct = int(requestsToday) * 100 / rateLimit
 	}
 
 	type keyView struct {
@@ -369,6 +365,7 @@ func (s *Server) handleDashboardConsumer(w http.ResponseWriter, r *http.Request)
 		"APIKey":        apiKey,
 		"Keys":           kv,
 		"RateLimit":      rateLimit,
+		"RequestsToday":  requestsToday,
 		"TokensToday":    atomic.LoadInt64(&s.tokensToday),
 		"PercentUsed":    pct,
 	}
