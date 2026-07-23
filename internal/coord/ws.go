@@ -120,7 +120,8 @@ func (s *Server) handleWSProvider(w http.ResponseWriter, r *http.Request) {
 
 	// Persist session stats (best-effort).
 	if userID > 0 && (sessionReqs > 0 || sessionTokens > 0) {
-		if err := s.store.UpdateDonorStats(userID, int64(sessionReqs), int64(sessionTokens), 0); err != nil {
+		uptimeSec := int64(time.Since(donor.ConnectedAt).Seconds())
+		if err := s.store.UpdateDonorStats(userID, int64(sessionReqs), int64(sessionTokens), uptimeSec); err != nil {
 			log.Printf("ws: update donor stats error: %v", err)
 		}
 	}

@@ -139,6 +139,21 @@ func (s *Server) ListenAndServe() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	s.registry.StartHeartbeatMonitor(ctx, proto.HeartbeatTimeout, proto.HeartbeatMonitorTick)
+	// Periodic uptime persistence for connected donors.
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				for _, d := range s.registry.AllDonors() {
+					s.store.UpdateDonorStats(d.UserID, 0, 0, 60)
+				}
+			}
+		}
+	}()
 
 	// Graceful shutdown.
 	go func() {

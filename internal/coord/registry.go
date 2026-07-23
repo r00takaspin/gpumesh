@@ -287,6 +287,17 @@ func (r *Registry) Snapshot() RegistrySnapshot {
 	return snap
 }
 
+
+// AllDonors returns all connected donors for stats persistence.
+func (r *Registry) AllDonors() []*Donor {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	donors := make([]*Donor, 0, len(r.donors))
+	for _, d := range r.donors {
+		donors = append(donors, d)
+	}
+	return donors
+}
 // DonorsForUser returns all donor connections for a given user.
 func (r *Registry) DonorsForUser(userID int64) []*Donor {
 	r.mu.RLock()
