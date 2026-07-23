@@ -75,7 +75,7 @@ func (s *Server) handleListKeys(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleRevokeKey revokes an API key.
+// handleRevokeKey revokes an API key. For HTMX requests, re-renders the consumer tab.
 func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
@@ -93,6 +93,12 @@ func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.RevokeKey(userID, keyID); err != nil {
 		log.Printf("revoke key error: %v", err)
 		writeError(w, http.StatusNotFound, fmt.Sprintf("key not found: %v", err))
+		return
+	}
+
+	// HTMX: re-render the consumer tab fragment.
+	if r.Header.Get("HX-Request") == "true" {
+		s.handleDashboardConsumer(w, r)
 		return
 	}
 

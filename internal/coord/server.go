@@ -115,6 +115,7 @@ func NewServer(cfg Config) (*Server, error) {
 
 	// HTMX dashboard fragments.
 	mux.HandleFunc("GET /dashboard/consumer", s.requireAuth(s.handleDashboardConsumer))
+	mux.HandleFunc("POST /dashboard/keys", s.requireAuth(s.handleDashboardCreateKey))
 	mux.HandleFunc("GET /dashboard/donor", s.requireAuth(s.handleDashboardDonor))
 
 	// Health check.

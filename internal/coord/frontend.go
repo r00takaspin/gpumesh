@@ -223,6 +223,71 @@ func (s *Server) handleLeaderboardFragment(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+// handleDashboardCreateKey creates a key and returns the consumer tab HTML with modal.
+func (s *Server) handleDashboardCreateKey(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+
+	scope := r.URL.Query().Get("scope")
+	if scope == "" {
+		scope = "consumer"
+	}
+
+	rawKey, _, err := s.store.CreateKey(userID, scope)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create key")
+		return
+	}
+
+	// Build the same data as handleDashboardConsumer.
+	keys, _ := s.store.ListKeys(userID)
+	rateLimit := s.limiter.Burst()
+	remaining := rateLimit
+	if len(keys) > 0 {
+		remaining = s.limiter.Remaining(keys[0].KeyHash)
+	}
+	requestsToday := rateLimit - remaining
+
+	apiKey := "inf_xxxxxxxx..."
+	if len(keys) > 0 {
+		apiKey = keys[0].KeyPrefix + "..."
+	}
+
+	pct := 0
+	if rateLimit > 0 {
+		pct = requestsToday * 100 / rateLimit
+	}
+
+	type keyView struct {
+		ID        int64
+		Prefix    string
+		Scope     string
+		CreatedAt string
+	}
+	kv := make([]keyView, len(keys))
+	for i, k := range keys {
+		kv[i] = keyView{
+			ID:        k.ID,
+			Prefix:    k.KeyPrefix,
+			Scope:     k.Scope,
+			CreatedAt: k.CreatedAt.Format("2006-01-02"),
+		}
+	}
+
+	renderTemplate(w, "dashboard-new-key.html", map[string]interface{}{
+		"NewKey":         rawKey,
+		"APIKey":         apiKey,
+		"Keys":           kv,
+		"RateLimit":      rateLimit,
+		"RequestsToday":  requestsToday,
+		"TokensToday":    int64(0),
+		"PercentUsed":    pct,
+	})
+}
+
 // --- GET /models/data ---
 
 func (s *Server) handleModelsData(w http.ResponseWriter, r *http.Request) {
