@@ -254,21 +254,36 @@ $ export OPENAI_API_KEY="inf_7a3b9c..."</code></pre>
       <p class="text-center mb-2" style="max-width:38rem;margin-inline:auto">
         Run the agent, climb the leaderboard, earn badges. Every request you serve builds your reputation in the mesh.
       </p>
+      {{if not .LoggedIn}}
+      <p class="text-center mb-2">
+        <a href="/login" class="btn">──▶ Login with GitHub to get your donor token</a>
+      </p>
+      {{else}}
+      <p class="text-center mb-2">
+        <a href="/dashboard" class="btn">──▶ Get your donor token from Dashboard</a>
+      </p>
+      {{end}}
       <div class="steps">
         <div class="step">
-          <div class="step-num">1. INSTALL</div>
+          <div class="step-num">1. GET TOKEN</div>
+          <div class="step-title">from Dashboard</div>
+          <div class="step-desc">Create a donor-scoped API key</div>
+        </div>
+        <div class="step-arrow">──▶</div>
+        <div class="step">
+          <div class="step-num">2. INSTALL</div>
           <div class="step-title">Ollama</div>
           <div class="step-desc">ollama.com</div>
         </div>
         <div class="step-arrow">──▶</div>
         <div class="step">
-          <div class="step-num">2. PULL</div>
+          <div class="step-num">3. PULL</div>
           <div class="step-title">a model</div>
           <div class="step-desc">ollama pull llama3.2:3b</div>
         </div>
         <div class="step-arrow">──▶</div>
         <div class="step">
-          <div class="step-num">3. RUN</div>
+          <div class="step-num">4. RUN</div>
           <div class="step-title">our agent</div>
           <div class="step-desc">gpumesh-provider</div>
         </div>

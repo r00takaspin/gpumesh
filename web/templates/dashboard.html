@@ -33,6 +33,15 @@
       <a href="/logout" class="btn btn--sm">logout</a>
     </div>
 
+    {{if not .HasDonorScope}}
+    <div class="card card-accent mb-1">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="mono" style="font-size:0.85rem">🔌 Share your GPU — become a donor</span>
+        <button class="btn btn--sm" hx-post="/dashboard/keys?scope=donor" hx-target="#tab-consumer" hx-swap="outerHTML">+ Create Donor Token</button>
+      </div>
+    </div>
+    {{end}}
+
     <!-- Dashboard Tabs -->
     <div class="tabs">
       <button class="tab-btn active" data-tab-group="dash" data-tab="consumer" onclick="switchTab('dash','consumer')">[CONSUMER]</button>
