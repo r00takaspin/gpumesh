@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/gpumesh/gpumesh/web"
@@ -17,7 +18,56 @@ type PageData struct {
 	HasOAuth bool
 	HasKeys  bool
 	NewKey   string // full key, shown only once after auto-creation
+	// Live data for dynamic pages.
+	DonorsOnline  int
+	ModelsOnline  int
+	RequestsToday int
+	StatsError    bool // true → hide stats block
+	// Top models / donors for landing page.
+	TopModels []ModelSummary
+	TopDonors []DonorSummary
+	// Dashboard donor tab.
+	HasDonorScope bool
 }
+
+// ModelSummary is a lightweight model entry for template rendering.
+type ModelSummary struct {
+	Name       string
+	DonorCount int
+	Vendor     string
+}
+
+// DonorSummary is a lightweight donor entry for the landing podium.
+type DonorSummary struct {
+	Name   string
+	Tokens int64
+	Badge  string
+}
+
+// vendorForModel derives a vendor name from the model ID prefix.
+func vendorForModel(name string) string {
+	switch {
+	case hasPrefix(name, "llama"), hasPrefix(name, "codellama"):
+		return "Meta"
+	case hasPrefix(name, "mistral"), hasPrefix(name, "mixtral"):
+		return "Mistral AI"
+	case hasPrefix(name, "qwen"):
+		return "Alibaba"
+	case hasPrefix(name, "phi"):
+		return "Microsoft"
+	case hasPrefix(name, "gemma"):
+		return "Google"
+	case hasPrefix(name, "deepseek"):
+		return "DeepSeek"
+	default:
+		return "Community"
+	}
+}
+
+func hasPrefix(s, prefix string) bool {
+	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+}
+
 
 var (
 	templates     map[string]*template.Template
@@ -27,7 +77,7 @@ var (
 func getTemplates() map[string]*template.Template {
 	templatesOnce.Do(func() {
 		templates = make(map[string]*template.Template)
-		entries, err := web.TemplatesFS.ReadDir("templates")
+		entries, err := web.EmbeddedFS.ReadDir("templates")
 		if err != nil {
 			log.Printf("templates: readdir: %v", err)
 			return
@@ -36,7 +86,7 @@ func getTemplates() map[string]*template.Template {
 			if e.IsDir() || filepath.Ext(e.Name()) != ".html" {
 				continue
 			}
-			tmpl, err := template.ParseFS(web.TemplatesFS, "templates/"+e.Name())
+			tmpl, err := template.ParseFS(web.EmbeddedFS, "templates/"+e.Name())
 			if err != nil {
 				log.Printf("templates: parse %s: %v", e.Name(), err)
 				continue
@@ -47,7 +97,7 @@ func getTemplates() map[string]*template.Template {
 	return templates
 }
 
-func renderTemplate(w http.ResponseWriter, name string, data PageData) {
+func renderTemplate(w http.ResponseWriter, name string, data any) {
 	tmpl, ok := getTemplates()[name]
 	if !ok {
 		http.Error(w, "template not found", http.StatusInternalServerError)
@@ -73,6 +123,14 @@ func (s *Server) pageData(r *http.Request) PageData {
 	if pd.LoggedIn {
 		n, _ := s.store.CountKeys(uid)
 		pd.HasKeys = n > 0
+		// Check for donor-scoped keys.
+		keys, _ := s.store.ListKeys(uid)
+		for _, k := range keys {
+			if k.Scope == "donor" || k.Scope == "both" {
+				pd.HasDonorScope = true
+				break
+			}
+		}
 	}
 	if oauthConfig == nil {
 		initOAuthConfig(s.baseURL)
@@ -80,3 +138,60 @@ func (s *Server) pageData(r *http.Request) PageData {
 	pd.HasOAuth = oauthConfig.ClientID != ""
 	return pd
 }
+// pageDataWithStats enriches PageData with a registry snapshot for dynamic pages.
+func (s *Server) pageDataWithStats(r *http.Request) PageData {
+	pd := s.pageData(r)
+	snap := s.registry.Snapshot()
+	pd.DonorsOnline = snap.DonorsOnline
+	pd.ModelsOnline = snap.ModelsOnline
+	pd.RequestsToday = int(s.requestsToday)
+
+	// Top models: sort by donor count, limit 5.
+	type modelEntry struct {
+		name  string
+		count int
+	}
+	var models []modelEntry
+	for name, ms := range snap.Models {
+		models = append(models, modelEntry{name, ms.DonorsOnline})
+	}
+	sort.Slice(models, func(i, j int) bool { return models[i].count > models[j].count })
+	if len(models) > 5 {
+		models = models[:5]
+	}
+	pd.TopModels = make([]ModelSummary, len(models))
+	for i, m := range models {
+		pd.TopModels[i] = ModelSummary{Name: m.name, DonorCount: m.count, Vendor: vendorForModel(m.name)}
+	}
+
+	// Top donors: top 3 from registry by lifetime tokens.
+	type donorEntry struct {
+		userID int64
+		tokens int64
+	}
+	seen := map[int64]bool{}
+	var donors []donorEntry
+	for _, d := range s.registry.donors {
+		if seen[d.UserID] {
+			continue
+		}
+		seen[d.UserID] = true
+		ds, _ := s.store.GetDonorStats(d.UserID)
+		donors = append(donors, donorEntry{d.UserID, ds.TotalTokens})
+	}
+	sort.Slice(donors, func(i, j int) bool { return donors[i].tokens > donors[j].tokens })
+	if len(donors) > 3 {
+		donors = donors[:3]
+	}
+	pd.TopDonors = make([]DonorSummary, len(donors))
+	for i, d := range donors {
+		pd.TopDonors[i] = DonorSummary{
+			Name:   s.getGithubLogin(d.userID),
+			Tokens: d.tokens,
+			Badge:  BadgeForTokens(d.tokens),
+		}
+	}
+
+	return pd
+}
+

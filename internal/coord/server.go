@@ -2,14 +2,17 @@ package coord
 
 import (
 	"context"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/gpumesh/gpumesh/internal/proto"
+	"github.com/gpumesh/gpumesh/web"
 )
 
 // Server is the coordinator HTTP server.
@@ -25,14 +28,27 @@ type Server struct {
 	// Daily counters (reset at midnight).
 	requestsToday int64
 	tokensToday   int64
+
+	// Sticky consumer→donor affinity for KV-cache reuse.
+	affinity    map[int64]consumerAffinity
+	affinityMu  sync.RWMutex
+	affinityTTL time.Duration
+}
+
+// consumerAffinity tracks a sticky consumer→donor binding for KV-cache reuse.
+type consumerAffinity struct {
+	ProviderID string
+	Model      string
+	ExpiresAt  time.Time
 }
 
 // Config holds server configuration.
 type Config struct {
-	Addr     string
-	DBPath   string
-	BaseURL  string
-	RateLimit int // requests per hour per key
+	Addr        string
+	DBPath      string
+	BaseURL     string
+	RateLimit   int // requests per hour per key
+	AffinityTTL int // seconds, sticky consumer→donor affinity (0 = default 120)
 }
 
 // NewServer creates a new coordinator server.
@@ -53,6 +69,8 @@ func NewServer(cfg Config) (*Server, error) {
 		limiter:         RateLimitHourly(cfg.RateLimit),
 		baseURL:         cfg.BaseURL,
 		startTime:       time.Now(),
+		affinity:        make(map[int64]consumerAffinity),
+		affinityTTL:     time.Duration(cfg.AffinityTTL) * time.Second,
 	}
 
 	mux := http.NewServeMux()
@@ -102,7 +120,8 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /health", s.handleHealth)
 
 	// Static files.
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
+	staticFS, _ := fs.Sub(web.EmbeddedFS, "static")
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
 	s.srv = &http.Server{
 		Addr:    cfg.Addr,
@@ -163,20 +182,19 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
 }
-
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "index.html", s.pageData(r))
+	renderTemplate(w, "index.html", s.pageDataWithStats(r))
 }
 
 func (s *Server) handleModelsPage(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "models.html", s.pageData(r))
+	renderTemplate(w, "models.html", s.pageDataWithStats(r))
 }
 
 func (s *Server) handleLeaderboardPage(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "leaderboard.html", s.pageData(r))
+	renderTemplate(w, "leaderboard.html", s.pageDataWithStats(r))
 }
 
 func (s *Server) handleStatusPage(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "status.html", s.pageData(r))
+	renderTemplate(w, "status.html", s.pageDataWithStats(r))
 }
 

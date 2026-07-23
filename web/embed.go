@@ -2,7 +2,7 @@ package web
 
 import "embed"
 
-// TemplatesFS embeds the templates directory.
+// EmbeddedFS embeds templates and static files for single-binary deployment.
 //
-//go:embed templates/*
-var TemplatesFS embed.FS
+//go:embed templates/* static/*
+var EmbeddedFS embed.FS

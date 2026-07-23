@@ -206,30 +206,145 @@ func (s *Server) handleModelsData(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDashboardConsumer(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
-	login := s.getGithubLogin(userID)
-	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, `<div id="tab-consumer">
-<h2>Consumer</h2>
-<p>Welcome, %s</p>
-<p>Your API keys and usage stats will appear here.</p>
-</div>`, login)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+
+	keys, _ := s.store.ListKeys(userID)
+	rateLimit := s.limiter.Burst()
+	remaining := rateLimit
+	if len(keys) > 0 {
+		remaining = s.limiter.Remaining(keys[0].KeyHash)
+	}
+	requestsToday := rateLimit - remaining
+
+	apiKey := "inf_xxxxxxxx..."
+	if len(keys) > 0 {
+		apiKey = keys[0].KeyPrefix + "..."
+	}
+
+	pct := 0
+	if rateLimit > 0 {
+		pct = requestsToday * 100 / rateLimit
+	}
+
+	type keyView struct {
+		ID        int64
+		Prefix    string
+		Scope     string
+		CreatedAt string
+	}
+	kv := make([]keyView, len(keys))
+	for i, k := range keys {
+		kv[i] = keyView{
+			ID:        k.ID,
+			Prefix:    k.KeyPrefix,
+			Scope:     k.Scope,
+			CreatedAt: k.CreatedAt.Format("2006-01-02"),
+		}
+	}
+
+	data := map[string]interface{}{
+		"APIKey":        apiKey,
+		"Keys":           kv,
+		"RateLimit":      rateLimit,
+		"RequestsToday":  requestsToday,
+		"TokensToday":    int64(0),
+		"PercentUsed":    pct,
+	}
+
+	renderTemplate(w, "dashboard-consumer.html", data)
 }
 
 func (s *Server) handleDashboardDonor(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
-	donors := s.registry.DonorsForUser(userID)
-	w.Header().Set("Content-Type", "text/html")
-	if len(donors) == 0 {
-		fmt.Fprintf(w, `<div id="tab-donor">
-<h2>Donor</h2>
-<p>No agents connected. Run gpumesh-provider to share your GPU.</p>
-</div>`)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-	fmt.Fprintf(w, `<div id="tab-donor">
-<h2>Donor</h2>
-<p>%d agent(s) online</p>
-</div>`, len(donors))
+
+	donors := s.registry.DonorsForUser(userID)
+	stats, _ := s.store.GetDonorStats(userID)
+	badge := BadgeForTokens(stats.TotalTokens)
+	badgeEmoji := badgeEmoji(badge)
+
+	type agentView struct {
+		ProviderID    string
+		ModelCount    int
+		CurrentLoad   int
+		MaxConcurrent int
+		Uptime        string
+		ModelList     string
+	}
+	agents := make([]agentView, len(donors))
+	for i, d := range donors {
+		agents[i] = agentView{
+			ProviderID:    d.ProviderID,
+			ModelCount:    len(d.Models),
+			CurrentLoad:   d.CurrentLoad,
+			MaxConcurrent: d.MaxConcurrent,
+			Uptime:        formatDuration(time.Since(d.ConnectedAt)),
+			ModelList:     joinModels(d.Models),
+		}
+	}
+
+	// Leaderboard position: count users with more tokens.
+	pos := 1
+	total := 1
+	for _, d := range s.registry.donors {
+		if d.UserID == userID {
+			continue
+		}
+		ds, _ := s.store.GetDonorStats(d.UserID)
+		total++
+		if ds.TotalTokens > stats.TotalTokens {
+			pos++
+		}
+	}
+
+	// Badge progress.
+	badgeNext, badgeThreshold := nextBadge(stats.TotalTokens)
+	badgePct := 0
+	if badgeThreshold > 0 {
+		badgePct = int(stats.TotalTokens * 100 / badgeThreshold)
+	}
+	remaining := badgeThreshold - stats.TotalTokens
+
+	// Find donor-scoped key for token display.
+	keys, _ := s.store.ListKeys(userID)
+	var tokenPrefix, tokenFull string
+	var tokenID int64
+	for _, k := range keys {
+		if k.Scope == "donor" || k.Scope == "both" {
+			tokenPrefix = k.KeyPrefix
+			tokenID = k.ID
+			break
+		}
+	}
+	if tokenPrefix == "" {
+		tokenPrefix = "inf_xxxx"
+	}
+	tokenFull = tokenPrefix + "..." // can't retrieve full key
+
+	data := map[string]interface{}{
+		"Agents":           agents,
+		"Stats":             stats,
+		"Badge":             badge,
+		"BadgeEmoji":        badgeEmoji,
+		"BadgeNext":         badgeNext,
+		"BadgeProgress":     stats.TotalTokens,
+		"BadgeThreshold":    badgeThreshold,
+		"BadgePercent":      badgePct,
+		"BadgeRemaining":    remaining,
+		"TokenPrefix":       tokenPrefix,
+		"TokenFull":         tokenFull,
+		"TokenID":           tokenID,
+		"LeaderboardPos":    pos,
+		"LeaderboardTotal":  total,
+	}
+
+	renderTemplate(w, "dashboard-donor.html", data)
 }
 
 // --- Helpers ---
@@ -248,4 +363,43 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%dm", minutes)
 }
 
-// handleModelsDataJSON provides raw JSON for HTMX polling.
+func badgeEmoji(badge string) string {
+	switch badge {
+	case "platinum":
+		return "👑"
+	case "gold":
+		return "🥇"
+	case "silver":
+		return "🥈"
+	case "bronze":
+		return "🥉"
+	default:
+		return "🫐"
+	}
+}
+
+func nextBadge(tokens int64) (name string, threshold int64) {
+	switch {
+	case tokens < 1_000:
+		return "Bronze", 1_000
+	case tokens < 10_000:
+		return "Silver", 10_000
+	case tokens < 100_000:
+		return "Gold", 100_000
+	case tokens < 1_000_000:
+		return "Platinum", 1_000_000
+	default:
+		return "Max", 1_000_000
+	}
+}
+
+func joinModels(models []string) string {
+	if len(models) == 0 {
+		return ""
+	}
+	s := models[0]
+	for i := 1; i < len(models); i++ {
+		s += ", " + models[i]
+	}
+	return s
+}

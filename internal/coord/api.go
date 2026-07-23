@@ -98,19 +98,35 @@ func (s *Server) handleAPIChatCompletions(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Sort by load and select.
-	sort.Slice(donors, func(i, j int) bool {
-		li := float64(donors[i].CurrentLoad) / float64(donors[i].MaxConcurrent)
-		lj := float64(donors[j].CurrentLoad) / float64(donors[j].MaxConcurrent)
-		return li < lj
-	})
-
-	// Select donor with capacity.
+	// Sticky session: prefer the same donor for KV-cache reuse.
+	userID := getUserID(r)
 	var selected *Donor
-	for _, d := range donors {
-		if d.CurrentLoad < d.MaxConcurrent {
-			selected = d
-			break
+	if userID != 0 {
+		s.affinityMu.RLock()
+		aff, ok := s.affinity[userID]
+		s.affinityMu.RUnlock()
+		if ok && aff.Model == req.Model && time.Now().Before(aff.ExpiresAt) {
+			for _, d := range donors {
+				if d.ProviderID == aff.ProviderID && d.CurrentLoad < d.MaxConcurrent {
+					selected = d
+					break
+				}
+			}
+		}
+	}
+
+	// Fallback: sort by load, pick least-loaded donor with capacity.
+	if selected == nil {
+		sort.Slice(donors, func(i, j int) bool {
+			li := float64(donors[i].CurrentLoad) / float64(donors[i].MaxConcurrent)
+			lj := float64(donors[j].CurrentLoad) / float64(donors[j].MaxConcurrent)
+			return li < lj
+		})
+		for _, d := range donors {
+			if d.CurrentLoad < d.MaxConcurrent {
+				selected = d
+				break
+			}
 		}
 	}
 	if selected == nil {
@@ -119,6 +135,21 @@ func (s *Server) handleAPIChatCompletions(w http.ResponseWriter, r *http.Request
 			"retry_after_seconds":  30,
 		})
 		return
+	}
+
+	// Refresh affinity.
+	if userID != 0 {
+		ttl := s.affinityTTL
+		if ttl == 0 {
+			ttl = 2 * time.Minute
+		}
+		s.affinityMu.Lock()
+		s.affinity[userID] = consumerAffinity{
+			ProviderID: selected.ProviderID,
+			Model:      req.Model,
+			ExpiresAt:  time.Now().Add(ttl),
+		}
+		s.affinityMu.Unlock()
 	}
 
 	// Generate request_id.

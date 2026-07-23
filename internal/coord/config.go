@@ -18,11 +18,18 @@ func ConfigFromEnv() Config {
 			rateLimit = n
 		}
 	}
+	affinityTTL := 120
+	if v := os.Getenv("MESH_AFFINITY_TTL"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			affinityTTL = n
+		}
+	}
 	cfg := Config{
-		Addr:      envOrDefault("MESH_ADDR", ":8080"),
-		DBPath:    envOrDefault("MESH_DB", "data/gpumesh.db"),
-		BaseURL:   envOrDefault("MESH_BASE_URL", "http://localhost:8080"),
-		RateLimit: rateLimit,
+		Addr:        envOrDefault("MESH_ADDR", ":8080"),
+		DBPath:      envOrDefault("MESH_DB", "data/gpumesh.db"),
+		BaseURL:     envOrDefault("MESH_BASE_URL", "http://localhost:8080"),
+		RateLimit:   rateLimit,
+		AffinityTTL: affinityTTL,
 	}
 	return cfg
 }

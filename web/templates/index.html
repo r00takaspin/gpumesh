@@ -76,19 +76,12 @@
 
 
     <!-- Live Stats -->
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="stat-value">▶ 47</div>
-        <div class="stat-label">models online</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">▶ 128</div>
-        <div class="stat-label">donors online</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">▶ 12,431</div>
-        <div class="stat-label">req today</div>
-      </div>
+    <div id="live-stats" class="stat-grid" hx-get="/" hx-trigger="every 10s" hx-select="#live-stats" hx-swap="outerHTML">
+      {{if not .StatsError}}
+      <div class="stat-card"><div class="stat-value">▶ {{.ModelsOnline}}</div><div class="stat-label">models online</div></div>
+      <div class="stat-card"><div class="stat-value">▶ {{.DonorsOnline}}</div><div class="stat-label">donors online</div></div>
+      <div class="stat-card"><div class="stat-value">▶ {{.RequestsToday}}</div><div class="stat-label">req today</div></div>
+      {{end}}
     </div>
 
     <!-- How It Works -->
@@ -155,6 +148,7 @@
           <div class="prompt">cat ~/.continue/config.json</div>
           <pre class="code-block"><code>{
   "models": [{
+    "title": "GPU Mesh (free)",
     "provider": "openai",
     "apiBase": "https://gpumesh.io/v1",
     "apiKey": "inf_7a3b9c...",
@@ -167,11 +161,10 @@
 
       <div class="tab-panel" data-tab-group="tools" data-tab="codex">
         <div class="card">
-          <div class="prompt">cat ~/.codex/config.toml</div>
-          <pre class="code-block"><code>provider = "openai"
-api_base = "https://gpumesh.io/v1"
-api_key = "inf_7a3b9c..."
-model = "llama3.2:3b"</code></pre>
+          <div class="prompt">codex invocation</div>
+          <pre class="code-block"><code>$ export OPENAI_BASE_URL="https://gpumesh.io/v1"
+$ export OPENAI_API_KEY="inf_7a3b9c..."
+$ codex exec "list python files"</code></pre>
           <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
         </div>
       </div>
@@ -189,10 +182,12 @@ $ aider --model openai/llama3.2:3b</code></pre>
       <div class="tab-panel" data-tab-group="tools" data-tab="cline">
         <div class="card">
           <div class="prompt">Cline extension settings</div>
-          <pre class="code-block"><code>API Provider: OpenAI Compatible
-Base URL: https://gpumesh.io/v1
-API Key: inf_7a3b9c...
-Model ID: llama3.2:3b</code></pre>
+          <pre class="code-block"><code>{
+  "cline.apiProvider": "openai",
+  "cline.openAiBaseUrl": "https://gpumesh.io/v1",
+  "cline.openAiApiKey": "inf_7a3b9c...",
+  "cline.openAiModel": "llama3.2:3b"
+}</code></pre>
           <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
         </div>
       </div>
@@ -217,11 +212,14 @@ client = OpenAI(
     api_key="inf_7a3b9c..."
 )
 
-response = client.chat.completions.create(
+stream = client.chat.completions.create(
     model="llama3.2:3b",
-    messages=[{"role": "user", "content": "Hello!"}]
+    messages=[{"role": "user", "content": "Hello!"}],
+    stream=True
 )
-print(response.choices[0].message.content)</code></pre>
+for chunk in stream:
+    if chunk.choices[0].delta.content:
+        print(chunk.choices[0].delta.content, end="")</code></pre>
           <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
         </div>
       </div>
@@ -229,7 +227,7 @@ print(response.choices[0].message.content)</code></pre>
       <div class="tab-panel" data-tab-group="tools" data-tab="curl">
         <div class="card">
           <div class="prompt">curl invocation</div>
-          <pre class="code-block"><code>curl https://gpumesh.io/v1/chat/completions \
+          <pre class="code-block"><code>curl -s https://gpumesh.io/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer inf_7a3b9c..." \
   -d '{"model":"llama3.2:3b","messages":[{"role":"user","content":"Hello!"}]}'</code></pre>
@@ -240,12 +238,8 @@ print(response.choices[0].message.content)</code></pre>
       <div class="tab-panel" data-tab-group="tools" data-tab="omp">
         <div class="card">
           <div class="prompt">omp config</div>
-          <pre class="code-block"><code># ~/.omp/config.yaml
-providers:
-  gpumesh:
-    base_url: "https://gpumesh.io/v1"
-    api_key: "inf_7a3b9c..."
-    default_model: "llama3.2:3b"</code></pre>
+          <pre class="code-block"><code>$ export OPENAI_BASE_URL="https://gpumesh.io/v1"
+$ export OPENAI_API_KEY="inf_7a3b9c..."</code></pre>
           <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
         </div>
       </div>
@@ -290,8 +284,8 @@ providers:
 
       <div class="tab-panel active" data-tab-group="install" data-tab="linux-arm64">
         <div class="card">
-          <div class="prompt">curl -sL https://github.com/gpumesh/provider/releases/latest</div>
-          <pre class="code-block"><code>$ curl -sLO https://github.com/gpumesh/provider/releases/latest/download/gpumesh-provider_linux_arm64.tar.gz
+          <div class="prompt">curl -sL https://github.com/gpumesh/gpumesh/releases/latest</div>
+          <pre class="code-block"><code>$ curl -sLO https://github.com/gpumesh/gpumesh/releases/latest/download/gpumesh-provider_linux_arm64.tar.gz
 $ tar xzf gpumesh-provider_linux_arm64.tar.gz
 $ sudo mv gpumesh-provider /usr/local/bin/
 $ export MESH_TOKEN="inf_xxxxxxxx"
@@ -303,8 +297,8 @@ $ gpumesh-provider</code></pre>
 
       <div class="tab-panel" data-tab-group="install" data-tab="linux-amd64">
         <div class="card">
-          <div class="prompt">curl -sL https://github.com/gpumesh/provider/releases/latest</div>
-          <pre class="code-block"><code>$ curl -sLO https://github.com/gpumesh/provider/releases/latest/download/gpumesh-provider_linux_amd64.tar.gz
+          <div class="prompt">curl -sL https://github.com/gpumesh/gpumesh/releases/latest</div>
+          <pre class="code-block"><code>$ curl -sLO https://github.com/gpumesh/gpumesh/releases/latest/download/gpumesh-provider_linux_amd64.tar.gz
 $ tar xzf gpumesh-provider_linux_amd64.tar.gz
 $ sudo mv gpumesh-provider /usr/local/bin/
 $ export MESH_TOKEN="inf_xxxxxxxx"
@@ -316,8 +310,8 @@ $ gpumesh-provider</code></pre>
 
       <div class="tab-panel" data-tab-group="install" data-tab="macos">
         <div class="card">
-          <div class="prompt">curl -sL https://github.com/gpumesh/provider/releases/latest</div>
-          <pre class="code-block"><code>$ curl -sLO https://github.com/gpumesh/provider/releases/latest/download/gpumesh-provider_darwin_arm64.tar.gz
+          <div class="prompt">curl -sL https://github.com/gpumesh/gpumesh/releases/latest</div>
+          <pre class="code-block"><code>$ curl -sLO https://github.com/gpumesh/gpumesh/releases/latest/download/gpumesh-provider_darwin_arm64.tar.gz
 $ tar xzf gpumesh-provider_darwin_arm64.tar.gz
 $ sudo mv gpumesh-provider /usr/local/bin/
 $ sudo xattr -d com.apple.quarantine /usr/local/bin/gpumesh-provider
@@ -331,7 +325,7 @@ $ gpumesh-provider</code></pre>
       <div class="tab-panel" data-tab-group="install" data-tab="go">
         <div class="card">
           <div class="prompt">go install</div>
-          <pre class="code-block"><code>$ go install github.com/gpumesh/provider@latest
+          <pre class="code-block"><code>$ go install github.com/gpumesh/gpumesh/cmd/provider@latest
 $ export MESH_TOKEN="inf_xxxxxxxx"
 $ gpumesh-provider</code></pre>
           <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
@@ -357,7 +351,7 @@ $ gpumesh-provider</code></pre>
         <span class="prompt" style="display:inline"></span>
         <a href="/dashboard" class="mono">man gpumesh-donor</a>
         &nbsp;│&nbsp;
-        <a href="https://github.com/gpumesh/provider/releases" class="mono">All releases →</a>
+        <a href="https://github.com/gpumesh/gpumesh/releases" class="mono">All releases →</a>
       </p>
     </section>
 
@@ -377,42 +371,20 @@ $ gpumesh-provider</code></pre>
     <!-- Available Models -->
     <section class="section">
       <div class="section-title">TOP MODELS RIGHT NOW</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;max-width:52rem;margin:0 auto">
+      <div id="top-models" hx-get="/" hx-trigger="every 30s" hx-select="#top-models" hx-swap="outerHTML" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;max-width:52rem;margin:0 auto">
+        {{if .TopModels}}
+        {{range .TopModels}}
         <div class="card" style="display:flex;justify-content:space-between;align-items:center">
           <div>
-            <div class="mono" style="font-weight:600">llama3.2:3b</div>
-            <div class="text-dim" style="font-size:0.78rem">Meta</div>
+            <div class="mono" style="font-weight:600">{{.Name}}</div>
+            <div class="text-dim" style="font-size:0.78rem">{{.Vendor}}</div>
           </div>
-          <div class="text-accent" style="font-size:0.85rem">▶ 42 donors</div>
+          <div class="text-accent" style="font-size:0.85rem">▶ {{.DonorCount}} donors</div>
         </div>
-        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div class="mono" style="font-weight:600">codellama:7b</div>
-            <div class="text-dim" style="font-size:0.78rem">Meta</div>
-          </div>
-          <div class="text-accent" style="font-size:0.85rem">▶ 31 donors</div>
-        </div>
-        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div class="mono" style="font-weight:600">qwen2.5:7b</div>
-            <div class="text-dim" style="font-size:0.78rem">Alibaba</div>
-          </div>
-          <div class="text-accent" style="font-size:0.85rem">▶ 28 donors</div>
-        </div>
-        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div class="mono" style="font-weight:600">mistral:7b</div>
-            <div class="text-dim" style="font-size:0.78rem">Mistral AI</div>
-          </div>
-          <div class="text-accent" style="font-size:0.85rem">▶ 24 donors</div>
-        </div>
-        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <div class="mono" style="font-weight:600">phi4:14b</div>
-            <div class="text-dim" style="font-size:0.78rem">Microsoft</div>
-          </div>
-          <div class="text-accent" style="font-size:0.85rem">▶ 19 donors</div>
-        </div>
+        {{end}}
+        {{else}}
+        <p class="text-dim" style="grid-column:1/-1;text-align:center">No models online — check back soon</p>
+        {{end}}
       </div>
       <p class="text-center mt-2">
         <a href="/models" class="mono">Browse all models →</a>
@@ -422,25 +394,24 @@ $ gpumesh-provider</code></pre>
     <!-- Leaderboard Preview -->
     <section class="section">
       <div class="section-title">TOP DONORS THIS WEEK</div>
-      <div class="podium">
+      <div id="top-donors" hx-get="/" hx-trigger="every 30s" hx-select="#top-donors" hx-swap="outerHTML" class="podium">
+        {{if .TopDonors}}
+        {{range $i, $d := .TopDonors}}
+        {{if eq $i 0}}<div class="podium-spot first">{{else if eq $i 1}}<div class="podium-spot second">{{else}}<div class="podium-spot third">{{end}}
+          {{if eq $i 0}}<div class="medal">🥇</div>{{else if eq $i 1}}<div class="medal">🥈</div>{{else}}<div class="medal">🥉</div>{{end}}
+          <div class="name mono">{{$d.Name}}</div>
+          <div class="badge-icon">{{$d.Badge}}</div>
+          <div class="tokens">{{$d.Tokens}} tokens</div>
+        </div>
+        {{end}}
+        {{else}}
         <div class="podium-spot first">
           <div class="medal">🥇</div>
-          <div class="name mono">alexei-k</div>
-          <div class="badge-icon">⚡</div>
-          <div class="tokens">847K tokens</div>
+          <div class="name mono">---</div>
+          <div class="badge-icon"></div>
+          <div class="tokens">0 tokens</div>
         </div>
-        <div class="podium-spot second">
-          <div class="medal">🥈</div>
-          <div class="name mono">rtx4090-east</div>
-          <div class="badge-icon">🔋</div>
-          <div class="tokens">612K tokens</div>
-        </div>
-        <div class="podium-spot third">
-          <div class="medal">🥉</div>
-          <div class="name mono">pi-cluster-01</div>
-          <div class="badge-icon">🫐</div>
-          <div class="tokens">489K tokens</div>
-        </div>
+        {{end}}
       </div>
       <p class="text-center mt-2">
         <a href="/leaderboard" class="mono">Full leaderboard →</a>
@@ -485,11 +456,12 @@ $ gpumesh-provider</code></pre>
   <footer>
     <div class="footer-row">
       <span><a href="https://github.com/gpumesh/gpumesh">GitHub</a></span>
-      <span>▶ 128 donors online</span>
+      <span>▶ {{.DonorsOnline}} donors online</span>
       <span>MIT License</span>
     </div>
   </footer>
 
   <script src="/static/js/app.js"></script>
+  <script src="https://unpkg.com/htmx.org@2"></script>
 </body>
 </html>

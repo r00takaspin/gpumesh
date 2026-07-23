@@ -166,12 +166,7 @@ func (s *Server) getGithubLogin(userID int64) string {
 // handleDashboard renders the dashboard page.
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
-	login, _ := s.store.GetUserByID(userID)
-
-	pd := PageData{
-		LoggedIn: true,
-		Login:    login,
-	}
+	pd := s.pageDataWithStats(r)
 
 	// Auto-create first key if requested and user has none.
 	if r.URL.Query().Get("new") == "1" {

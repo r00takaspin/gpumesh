@@ -1,0 +1,81 @@
+<div id="tab-donor">
+  {{if .Agents}}
+  {{range .Agents}}
+  <!-- Agent Status -->
+  <div class="prompt">systemctl status gpumesh-provider</div>
+  <div class="card card-accent">
+    <div class="flex-between mb-1">
+      <span class="mono" style="font-size:0.9rem;font-weight:700">Agent: {{.ProviderID}}</span>
+      <span class="mono text-accent">🟢 ONLINE</span>
+    </div>
+    <div class="mono text-dim" style="font-size:0.75rem;line-height:1.8">
+      Models: {{.ModelCount}} &nbsp;│&nbsp; Load: {{.CurrentLoad}}/{{.MaxConcurrent}} &nbsp;│&nbsp; Uptime: {{.Uptime}}<br>
+      Models: {{.ModelList}}
+    </div>
+  </div>
+  {{end}}
+  {{else}}
+  <div class="card">
+    <p class="text-dim">No agents connected. Run gpumesh-provider to share your GPU.</p>
+  </div>
+  {{end}}
+
+  <!-- Token -->
+  <div class="prompt">cat /etc/gpumesh/token</div>
+  <div class="card">
+    <div class="flex-between">
+      <span class="mono text-accent">{{.TokenPrefix}}****</span>
+      <span>
+        <button class="btn btn--sm" onclick="copyToClipboard(this)" data-copy="{{.TokenFull}}">Copy</button>
+        <button class="btn btn--sm btn--warning" hx-post="/api/keys/{{.TokenID}}/regenerate" hx-target="#tab-donor" hx-swap="outerHTML">Regenerate</button>
+      </span>
+    </div>
+  </div>
+
+  <!-- Donor Stats -->
+  <div class="prompt">./donor-stats --all-time</div>
+  <div class="stat-grid">
+    <div class="stat-card">
+      <div class="stat-value">{{.Stats.TotalRequests}}</div>
+      <div class="stat-label">Requests served</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{.Stats.TotalTokens}}</div>
+      <div class="stat-label">Tokens generated</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{.Stats.AvgTokensPerSec}}</div>
+      <div class="stat-label">Avg tokens/sec</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value">{{.Stats.TotalUptime}}</div>
+      <div class="stat-label">Total uptime</div>
+    </div>
+  </div>
+
+  <!-- Badge -->
+  <div class="prompt">cat /var/gpumesh/badge</div>
+  <div class="badge-card">
+    <div class="badge-tier">{{.BadgeEmoji}}</div>
+    <div class="badge-name">{{.Badge}} DONOR</div>
+    <div class="badge-detail">{{.Stats.TotalTokens}} lifetime tokens</div>
+    <progress value="{{.BadgeProgress}}" max="{{.BadgeThreshold}}"></progress>
+    <div class="progress-label">
+      <span>{{.BadgeRemaining}} to {{.BadgeNext}}</span>
+      <span class="text-accent">{{.BadgePercent}}%</span>
+    </div>
+  </div>
+
+  <!-- Leaderboard Position -->
+  <div class="prompt">leaderboard --my-position</div>
+  <div class="card mt-1">
+    <p class="mono" style="font-size:0.85rem">
+      You are <strong class="text-accent">#{{.LeaderboardPos}}</strong> of <strong>{{.LeaderboardTotal}}</strong> donors
+    </p>
+    <p class="mt-1">
+      <span class="step-arrow">──▶</span>
+      <a href="/leaderboard" class="mono">View full leaderboard</a>
+    </p>
+  </div>
+
+</div>

@@ -36,254 +36,26 @@
     <!-- Dashboard Tabs -->
     <div class="tabs">
       <button class="tab-btn active" data-tab-group="dash" data-tab="consumer" onclick="switchTab('dash','consumer')">[CONSUMER]</button>
+      {{if .HasDonorScope}}
       <button class="tab-btn" data-tab-group="dash" data-tab="donor" onclick="switchTab('dash','donor')">[DONOR]</button>
+      {{end}}
     </div>
 
     <!-- === CONSUMER TAB === -->
     <div class="tab-panel active" data-tab-group="dash" data-tab="consumer">
-
-      <!-- Quickstart -->
-      <div class="prompt">cat QUICKSTART.txt</div>
-      <div class="card">
-        <pre class="code-block"><code>export OPENAI_BASE_URL="https://gpumesh.io/v1"
-export OPENAI_API_KEY="inf_7a3b9c4d2e1f8a6b..."</code></pre>
-        <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
+      <div id="tab-consumer" hx-get="/dashboard/consumer" hx-trigger="load">
+        <div class="card"><p class="text-dim">Loading...</p></div>
       </div>
-
-      <!-- API Keys -->
-      <div class="prompt">ls -la ./api-keys/</div>
-      <div class="card">
-        <table>
-          <thead>
-            <tr><th>PREFIX</th><th>SCOPE</th><th>CREATED</th><th>ACTIONS</th></tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="text-accent">inf_7a3b</td>
-              <td>consumer</td>
-              <td class="text-dim">2026-07-15</td>
-              <td><button class="btn btn--sm btn--danger">Revoke</button></td>
-            </tr>
-            <tr>
-              <td class="text-accent">inf_b2c8</td>
-              <td>both</td>
-              <td class="text-dim">2026-07-20</td>
-              <td><button class="btn btn--sm btn--danger">Revoke</button></td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="mt-1">
-          <button class="btn btn--sm">+ Create New Key</button>
-        </div>
-      </div>
-
-      <!-- Usage -->
-      <div class="prompt">./usage --today</div>
-      <div class="card">
-        <div class="flex-between mb-1">
-          <span class="mono" style="font-size:0.8rem">Requests</span>
-          <span class="mono text-accent" style="font-size:0.8rem">67/100 (67%)</span>
-        </div>
-        <progress value="67" max="100"></progress>
-        <div class="progress-label">
-          <span>Tokens today</span>
-          <span class="text-accent">12,430</span>
-        </div>
-      </div>
-
-      <!-- Tool Configs Accordion -->
-      <div class="prompt">cat tools/*.config</div>
-
-      <div class="accordion" onclick="toggleAccordion(this)">
-        <div class="accordion-header">
-          <span class="caret">▶</span> Continue.dev
-        </div>
-        <div class="accordion-body">
-          <pre class="code-block"><code>{
-  "models": [{
-    "provider": "openai",
-    "apiBase": "https://gpumesh.io/v1",
-    "apiKey": "inf_7a3b9c...",
-    "model": "llama3.2:3b"
-  }]
-}</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="accordion" onclick="toggleAccordion(this)">
-        <div class="accordion-header">
-          <span class="caret">▶</span> Aider
-        </div>
-        <div class="accordion-body">
-          <pre class="code-block"><code>aider --openai-api-base https://gpumesh.io/v1 \
-     --openai-api-key inf_7a3b9c... \
-     --model openai/llama3.2:3b</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="accordion" onclick="toggleAccordion(this)">
-        <div class="accordion-header">
-          <span class="caret">▶</span> Codex CLI
-        </div>
-        <div class="accordion-body">
-          <pre class="code-block"><code>provider = "openai"
-api_base = "https://gpumesh.io/v1"
-api_key = "inf_7a3b9c..."
-model = "llama3.2:3b"</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="accordion" onclick="toggleAccordion(this)">
-        <div class="accordion-header">
-          <span class="caret">▶</span> Cline
-        </div>
-        <div class="accordion-body">
-          <pre class="code-block"><code>API Provider: OpenAI Compatible
-Base URL: https://gpumesh.io/v1
-API Key: inf_7a3b9c...
-Model ID: llama3.2:3b</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="accordion" onclick="toggleAccordion(this)">
-        <div class="accordion-header">
-          <span class="caret">▶</span> Open WebUI
-        </div>
-        <div class="accordion-body">
-          <pre class="code-block"><code>URL: https://gpumesh.io/v1
-Key: inf_7a3b9c...
-Model: llama3.2:3b</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="accordion" onclick="toggleAccordion(this)">
-        <div class="accordion-header">
-          <span class="caret">▶</span> Python SDK
-        </div>
-        <div class="accordion-body">
-          <pre class="code-block"><code>from openai import OpenAI
-client = OpenAI(
-    base_url="https://gpumesh.io/v1",
-    api_key="inf_7a3b9c..."
-)
-response = client.chat.completions.create(
-    model="llama3.2:3b",
-    messages=[{"role": "user", "content": "Hello!"}]
-)</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="accordion" onclick="toggleAccordion(this)">
-        <div class="accordion-header">
-          <span class="caret">▶</span> curl
-        </div>
-        <div class="accordion-body">
-          <pre class="code-block"><code>curl https://gpumesh.io/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer inf_7a3b9c..." \
-  -d '{"model":"llama3.2:3b","messages":[{"role":"user","content":"Hello!"}]}'</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="accordion" onclick="toggleAccordion(this)">
-        <div class="accordion-header">
-          <span class="caret">▶</span> Oh My Pi
-        </div>
-        <div class="accordion-body">
-          <pre class="code-block"><code># ~/.omp/config.yaml
-providers:
-  gpumesh:
-    base_url: "https://gpumesh.io/v1"
-    api_key: "inf_7a3b9c..."
-    default_model: "llama3.2:3b"</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
     </div>
 
+    {{if .HasDonorScope}}
     <!-- === DONOR TAB === -->
     <div class="tab-panel" data-tab-group="dash" data-tab="donor">
-
-      <!-- Agent Status -->
-      <div class="prompt">systemctl status gpumesh-provider</div>
-      <div class="card card-accent">
-        <div class="flex-between mb-1">
-          <span class="mono" style="font-size:0.9rem;font-weight:700">Agent: rpi5-cluster</span>
-          <span class="mono text-accent">🟢 ONLINE</span>
-        </div>
-        <div class="mono text-dim" style="font-size:0.75rem;line-height:1.8">
-          Models: 3 &nbsp;│&nbsp; Load: 1/2 &nbsp;│&nbsp; Uptime: 4h 12m<br>
-          Models: llama3.2:3b, codellama:7b, qwen2.5:0.5b
-        </div>
+      <div id="tab-donor" hx-get="/dashboard/donor" hx-trigger="load">
+        <div class="card"><p class="text-dim">Loading...</p></div>
       </div>
-
-      <!-- Token -->
-      <div class="prompt">cat /etc/gpumesh/token</div>
-      <div class="card">
-        <div class="flex-between">
-          <span class="mono text-accent">inf_d4e5****</span>
-          <span>
-            <button class="btn btn--sm" onclick="copyToClipboard(this)" data-copy="inf_d4e5f6a7b8c9">Copy</button>
-            <button class="btn btn--sm btn--warning">Regenerate</button>
-          </span>
-        </div>
-      </div>
-
-      <!-- Donor Stats -->
-      <div class="prompt">./donor-stats --all-time</div>
-      <div class="stat-grid">
-        <div class="stat-card">
-          <div class="stat-value">3,421</div>
-          <div class="stat-label">Requests served</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">512,430</div>
-          <div class="stat-label">Tokens generated</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">142.3</div>
-          <div class="stat-label">Avg tokens/sec</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">127h</div>
-          <div class="stat-label">Total uptime</div>
-        </div>
-      </div>
-
-      <!-- Badge -->
-      <div class="prompt">cat /var/gpumesh/badge</div>
-      <div class="badge-card">
-        <div class="badge-tier">🥇</div>
-        <div class="badge-name">GOLD DONOR</div>
-        <div class="badge-detail">512,430 lifetime tokens</div>
-        <progress value="512430" max="1000000"></progress>
-        <div class="progress-label">
-          <span>487,570 to Platinum</span>
-          <span class="text-accent">51%</span>
-        </div>
-      </div>
-
-      <!-- Leaderboard Position -->
-      <div class="prompt">leaderboard --my-position</div>
-      <div class="card mt-1">
-        <p class="mono" style="font-size:0.85rem">
-          You are <strong class="text-accent">#42</strong> of <strong>230</strong> donors this week
-        </p>
-        <p class="mt-1">
-          <span class="step-arrow">──▶</span>
-          <a href="/leaderboard" class="mono">View full leaderboard</a>
-        </p>
-      </div>
-
     </div>
+    {{end}}
 
     {{if .NewKey}}
     <div class="modal-overlay" id="new-key-modal" onclick="if(event.target===this)this.remove()">
@@ -322,11 +94,12 @@ providers:
   <footer>
     <div class="footer-row">
       <span><a href="https://github.com/gpumesh/gpumesh">GitHub</a></span>
-      <span>▶ 128 donors online</span>
+      <span>▶ {{.DonorsOnline}} donors online</span>
       <span>MIT License</span>
     </div>
   </footer>
 
   <script src="/static/js/app.js"></script>
+  <script src="https://unpkg.com/htmx.org@2"></script>
 </body>
 </html>
