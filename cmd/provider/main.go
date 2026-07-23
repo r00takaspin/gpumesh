@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -44,12 +45,39 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
+	printBanner(cfg)
+
 	log.Printf("starting provider agent, coordinator=%s", cfg.CoordinatorURL)
 	if err := agent.Run(ctx); err != nil {
 		log.Fatalf("agent: %v", err)
 	}
 }
 
+const (
+	reset  = "\033[0m"
+	bold   = "\033[1m"
+	dim    = "\033[2m"
+	green  = "\033[32m"
+	yellow = "\033[33m"
+	blue   = "\033[36m"
+)
+
+func printBanner(cfg provider.Config) {
+	host, _ := os.Hostname()
+	banner := `
+` + bold + green + `   ▄▀▀ █▀█ █ █   █▀▄▀█ █▀▀ █▀▀ █ █
+   █▀  █▀▀ █ █   █ ▀ █ █▀▀ ▀▀█ █▀█
+   ▀▀▀ ▀   ▀▀▀   ▀   ▀ ▀▀▀ ▀▀▀ ▀ ▀` + reset + `
+
+` + dim + `   peer-to-peer LLM inference mesh` + reset + `
+
+` + yellow + `⚡` + reset + ` agent:    ` + bold + cfg.Description + reset + `
+` + blue + `⌬` + reset + ` endpoint: ` + dim + cfg.CoordinatorURL + reset + `
+` + green + `⬡` + reset + ` ollama:   ` + dim + cfg.OllamaURL + reset + `
+` + yellow + `⚡` + reset + ` host:     ` + dim + host + reset + `
+`
+	fmt.Print(banner)
+}
 func envOrDefault(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v

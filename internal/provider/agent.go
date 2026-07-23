@@ -88,7 +88,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 
 		if err := a.connect(ctx); err != nil {
-			log.Printf("connection error: %v", err)
+			log.Printf("\033[31m✗\033[0m connection error: %v", err)
 		}
 
 		// Reconnect with backoff.
@@ -102,7 +102,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			if err := a.connect(ctx); err == nil {
 				break
 			} else {
-				log.Printf("reconnect error: %v", err)
+				log.Printf("\033[31m✗\033[0m reconnect error: %v", err)
 			}
 			// Add jitter, then apply cap.
 			jitter := time.Duration(rand.Int64N(int64(backoff) / 4))
@@ -117,7 +117,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 func (a *Agent) connect(ctx context.Context) error {
 	url := a.cfg.CoordinatorURL + "?token=" + a.cfg.Token
-	log.Printf("connecting to %s", a.cfg.CoordinatorURL)
+	log.Printf("\033[36m⌬\033[0m connecting to %s", a.cfg.CoordinatorURL)
 
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
@@ -153,7 +153,7 @@ func (a *Agent) connect(ctx context.Context) error {
 		return fmt.Errorf("no models available")
 	}
 
-	log.Printf("discovered models: %v", models)
+	log.Printf("\033[33m⬡\033[0m models: %v", models)
 
 	// Send register.
 	if err := conn.WriteJSON(proto.RegisterMsg{
@@ -181,7 +181,7 @@ func (a *Agent) connect(ctx context.Context) error {
 	}
 
 	a.providerID = reg.ProviderID
-	log.Printf("registered as provider_id=%s", a.providerID)
+	log.Printf("\033[32m⚡\033[0m \033[1mregistered\033[0m provider_id=%s", a.providerID)
 
 	// Start heartbeat loop.
 	heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)
