@@ -451,10 +451,12 @@ func (s *Server) handleDashboardDonor(w http.ResponseWriter, r *http.Request) {
 		avg = float64(stats.TotalTokens) / float64(stats.TotalUptimeSec)
 	}
 	avgTokensPerSec := fmt.Sprintf("%.1f", avg)
+	totalUptime := formatDuration(time.Duration(stats.TotalUptimeSec) * time.Second)
 
 	data := map[string]interface{}{
 		"Agents":           agents,
 		"Stats":             stats,
+		"TotalUptime":       totalUptime,
 		"Badge":             badge,
 		"BadgeEmoji":        badgeEmoji,
 		"BadgeNext":         badgeNext,

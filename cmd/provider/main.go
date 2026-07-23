@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"strconv"
 	"strings"
@@ -94,8 +95,19 @@ func envOrDefaultInt(key string, def int) int {
 	}
 	return def
 }
-
 func hostname() string {
 	h, _ := os.Hostname()
+	// On macOS, try to detect the model.
+	if model := darwinModel(); model != "" {
+		return model
+	}
 	return h
+}
+
+func darwinModel() string {
+	out, err := exec.Command("sysctl", "-n", "hw.model").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }
