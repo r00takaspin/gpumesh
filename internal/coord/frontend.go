@@ -390,6 +390,7 @@ func (s *Server) handleDashboardDonor(w http.ResponseWriter, r *http.Request) {
 
 	type agentView struct {
 		ProviderID    string
+		Description   string
 		ModelCount    int
 		CurrentLoad   int
 		MaxConcurrent int
@@ -400,6 +401,7 @@ func (s *Server) handleDashboardDonor(w http.ResponseWriter, r *http.Request) {
 	for i, d := range donors {
 		agents[i] = agentView{
 			ProviderID:    d.ProviderID,
+			Description:   d.Description,
 			ModelCount:    len(d.Models),
 			CurrentLoad:   d.CurrentLoad,
 			MaxConcurrent: d.MaxConcurrent,
