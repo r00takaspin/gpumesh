@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/gpumesh/gpumesh/internal/proto"
+	"github.com/r00takaspin/gpumesh/internal/proto"
 )
 
 var upgrader = websocket.Upgrader{

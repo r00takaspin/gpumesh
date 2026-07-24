@@ -1,4 +1,4 @@
-module github.com/gpumesh/gpumesh
+module github.com/r00takaspin/gpumesh
 
 go 1.25.0
 

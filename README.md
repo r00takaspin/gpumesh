@@ -43,7 +43,7 @@ client = OpenAI(base_url=os.environ["OPENAI_BASE_URL"], api_key=os.environ["OPEN
 
 ```bash
 # Install
-go install github.com/gpumesh/gpumesh/cmd/provider@latest
+go install github.com/r00takaspin/gpumesh/cmd/provider@latest
 
 # Run
 export MESH_TOKEN="inf_xxxxxxxx"

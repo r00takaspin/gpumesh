@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gpumesh/gpumesh/internal/proto"
+	"github.com/r00takaspin/gpumesh/internal/proto"
 )
 
 // handleCreateKey creates a new API key for the authenticated user.

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/gpumesh/gpumesh/internal/provider"
+	"github.com/r00takaspin/gpumesh/internal/provider"
 )
 func main() {
 	var cfg provider.Config

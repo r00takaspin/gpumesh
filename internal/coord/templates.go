@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gpumesh/gpumesh/web"
+	"github.com/r00takaspin/gpumesh/web"
 )
 
 // PageData is passed to every template render.

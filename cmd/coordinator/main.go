@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/gpumesh/gpumesh/internal/coord"
+	"github.com/r00takaspin/gpumesh/internal/coord"
 )
 
 func main() {

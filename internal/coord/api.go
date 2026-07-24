@@ -13,7 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gpumesh/gpumesh/internal/proto"
+	"github.com/r00takaspin/gpumesh/internal/proto"
 )
 
 // --- GET /v1/models ---

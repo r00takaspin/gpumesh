@@ -11,8 +11,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gpumesh/gpumesh/internal/proto"
-	"github.com/gpumesh/gpumesh/web"
+	"github.com/r00takaspin/gpumesh/internal/proto"
+	"github.com/r00takaspin/gpumesh/web"
 )
 
 // Server is the coordinator HTTP server.

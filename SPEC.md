@@ -818,7 +818,7 @@ gpumesh/
 ### 12.2 `go install`
 
 ```bash
-go install github.com/gpumesh/gpumesh/cmd/provider@latest
+go install github.com/r00takaspin/gpumesh/cmd/provider@latest
 ```
 
 - Требует установленного Go (≥1.21).
@@ -879,10 +879,10 @@ curl -sSfL https://gpumesh.io/install.sh | bash
 
 ```bash
 # Вариант 1: go install (если стоит Go)
-go install github.com/gpumesh/gpumesh/cmd/provider@latest
+go install github.com/r00takaspin/gpumesh/cmd/provider@latest
 
 # Вариант 2: GitHub Releases (без Go)
-curl -sSfL "https://github.com/gpumesh/gpumesh/releases/latest/download/gpumesh-provider_$(uname -s)_$(uname -m).tar.gz" | tar xz
+curl -sSfL "https://github.com/r00takaspin/gpumesh/releases/latest/download/gpumesh-provider_$(uname -s)_$(uname -m).tar.gz" | tar xz
 sudo mv gpumesh-provider /usr/local/bin/
 ```
 

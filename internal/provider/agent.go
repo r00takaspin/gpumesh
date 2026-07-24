@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/gpumesh/gpumesh/internal/proto"
+	"github.com/r00takaspin/gpumesh/internal/proto"
 )
 
 // Config holds the provider agent configuration (§4.2 SPEC).
