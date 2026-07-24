@@ -67,7 +67,7 @@ function flashCopied(btn, codeBlock) {
  * Switch between tabs in a tab group.
  */
 function switchTab(tabGroup, tabName) {
-  document.querySelectorAll(`.tab-btn[data-tab-group="${tabGroup}"]`).forEach(btn => {
+  document.querySelectorAll(`.tool-tab-btn[data-tab-group="${tabGroup}"]`).forEach(btn => {
     btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
   });
   document.querySelectorAll(`.tab-panel[data-tab-group="${tabGroup}"]`).forEach(panel => {
