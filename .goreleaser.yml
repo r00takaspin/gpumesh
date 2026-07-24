@@ -4,23 +4,12 @@ builds:
     binary: gpumesh-provider
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
-  - id: coordinator
-    main: ./cmd/coordinator
-    binary: gpumesh-coordinator
-    goos: [linux, darwin]
-    goarch: [amd64, arm64]
 
 archives:
-  - id: provider-archive
-    builds: [provider]
-    formats: [tar.gz]
+  - formats: [tar.gz]
     format_overrides:
       - goos: windows
         formats: [zip]
-    name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-  - id: coordinator-archive
-    builds: [coordinator]
-    formats: [tar.gz]
     name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
