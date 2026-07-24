@@ -293,9 +293,9 @@ $ export OPENAI_API_KEY="inf_7a3b9c..."</code></pre>
         <button class="tool-tab-btn active" data-tab-group="install" data-tab="linux-arm64" onclick="switchTab('install','linux-arm64')">Linux arm64</button>
         <button class="tool-tab-btn" data-tab-group="install" data-tab="linux-amd64" onclick="switchTab('install','linux-amd64')">Linux amd64</button>
         <button class="tool-tab-btn" data-tab-group="install" data-tab="macos" onclick="switchTab('install','macos')">macOS</button>
+        <button class="tool-tab-btn" data-tab-group="install" data-tab="windows" onclick="switchTab('install','windows')">Windows</button>
         <button class="tool-tab-btn" data-tab-group="install" data-tab="go" onclick="switchTab('install','go')">Go install</button>
         <button class="tool-tab-btn" data-tab-group="install" data-tab="docker" onclick="switchTab('install','docker')">Docker</button>
-      </div>
 
       <div class="tab-panel active" data-tab-group="install" data-tab="linux-arm64">
         <div class="card">
@@ -334,6 +334,18 @@ $ export MESH_TOKEN="inf_xxxxxxxx"
 $ gpumesh-provider</code></pre>
           <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
           <p class="mono text-dim mt-1" style="font-size:0.68rem">Apple Silicon (M1/M2/M3/M4). If blocked, allow in <strong>System Settings → Privacy &amp; Security</strong>.</p>
+        </div>
+      </div>
+
+      <div class="tab-panel" data-tab-group="install" data-tab="windows">
+        <div class="card">
+          <div class="prompt">PowerShell</div>
+          <pre class="code-block"><code>PS&gt; curl -sLO https://github.com/r00takaspin/gpumesh/releases/latest/download/gpumesh-provider_windows_amd64.zip
+PS&gt; Expand-Archive gpumesh-provider_windows_amd64.zip -Dest .
+PS&gt; $env:MESH_TOKEN="inf_xxxxxxxx"
+PS&gt; .\gpumesh-provider.exe</code></pre>
+          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
+          <p class="mono text-dim mt-1" style="font-size:0.68rem">Windows 10/11 x64. PowerShell or Windows Terminal recommended.</p>
         </div>
       </div>
 
