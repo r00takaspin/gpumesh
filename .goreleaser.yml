@@ -11,10 +11,16 @@ builds:
     goarch: [amd64, arm64]
 
 archives:
-  - formats: [tar.gz]
+  - id: provider-archive
+    builds: [provider]
+    formats: [tar.gz]
     format_overrides:
       - goos: windows
         formats: [zip]
+    name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - id: coordinator-archive
+    builds: [coordinator]
+    formats: [tar.gz]
     name_template: "{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
 checksum:
