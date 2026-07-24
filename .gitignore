@@ -2,3 +2,10 @@ node_modules/
 main
 data/
 .env
+/gpumesh-provider
+/gpumesh-coordinator
+/provider
+/provider.exe
+/gpumesh-provider.exe
+/coordinator
+/dist/
