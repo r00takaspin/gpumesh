@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Consumer — GPU Mesh</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0d1117; --bg-card: #161b22; --border: #30363d;
+      --text: #c9d1d6; --text-dim: #8b949e; --text-bright: #f0f6fc;
+      --accent: #3fb950; --accent-dim: rgba(63,185,80,0.12);
+      --blue: #58a6ff; --blue-dim: rgba(88,166,255,0.12);
+      --orange: #d2991d; --red: #f85149;
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
+      --radius: 8px; --radius-sm: 6px;
+    }
+    body.consumer-page {
+      background: var(--bg); color: var(--text);
+      font-family: var(--font); min-height: 100vh; line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .consumer-page .topbar {
+      background: var(--bg-card); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .consumer-page main {
+      max-width: 720px; margin: 0 auto; padding: 32px 24px 80px;
+    }
+
+    /* Hero */
+    .hero { padding: 48px 0 32px; text-align: center; }
+    .hero-logo {
+      font-family: var(--font-mono); font-size: 13px; line-height: 1.4;
+      color: var(--accent); white-space: pre; margin-bottom: 24px;
+    }
+    .hero-command {
+      font-family: var(--font-mono); font-size: 13px; color: var(--text);
+      margin-bottom: 16px;
+    }
+    .hero h1 {
+      font-family: var(--font); font-size: 28px; font-weight: 600;
+      color: var(--text-bright); margin-bottom: 8px; letter-spacing: -0.02em;
+    }
+    .hero p {
+      font-size: 15px; color: var(--text-dim); max-width: 440px; margin: 0 auto 24px;
+      line-height: 1.6;
+    }
+
+    /* Cards */
+    .consumer-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px; margin-bottom: 12px;
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 13px; font-weight: 600; color: var(--text);
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+
+    /* API Key strip */
+    .key-strip {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 14px;
+      font-family: var(--font-mono); font-size: 13px;
+      margin-bottom: 16px;
+    }
+    .key-label { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+    .key-value { color: var(--blue); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .key-copy {
+      font-family: var(--font); font-size: 12px; color: var(--text-dim);
+      background: var(--border); border: none; padding: 4px 10px;
+      border-radius: 4px; cursor: pointer; white-space: nowrap;
+    }
+    .key-copy:hover { color: var(--text); }
+    .key-warning { font-size: 11px; color: var(--orange); margin-bottom: 16px; padding: 0 2px; }
+
+    /* Tabs */
+    .consumer-tabs {
+      display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px;
+    }
+    .consumer-tab {
+      font-family: var(--font); font-size: 13px; font-weight: 500;
+      color: var(--text-dim); padding: 10px 16px; cursor: pointer;
+      border-bottom: 2px solid transparent; background: none;
+      border-top: none; border-left: none; border-right: none;
+      margin-bottom: -1px; transition: all 0.1s;
+    }
+    .consumer-tab:hover { color: var(--text); }
+    .consumer-tab.active { color: var(--text-bright); border-bottom-color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* Model cards */
+    .model-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden; margin-bottom: 8px;
+      transition: border-color 0.1s;
+    }
+    .model-card:hover { border-color: #484f58; }
+    .model-card-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; cursor: pointer;
+    }
+    .model-card-head:hover { background: #21262d; }
+    .model-name {
+      font-family: var(--font-mono); font-size: 14px; font-weight: 500;
+      color: var(--text);
+    }
+    .model-badge {
+      font-size: 11px; font-weight: 500; color: var(--accent);
+      background: var(--accent-dim); padding: 2px 8px; border-radius: 10px;
+    }
+    .model-meta {
+      font-size: 12px; color: var(--text-dim); display: flex; gap: 16px;
+    }
+    .model-configs { display: none; border-top: 1px solid var(--border); padding: 0; }
+    .model-configs.open { display: block; }
+
+    /* Tool row */
+    .tool-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .tool-row:last-child { border-bottom: none; }
+    .tool-row:hover { background: #21262d; }
+    .tool-row-name {
+      font-family: var(--font-mono); font-size: 12px; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .tool-row-name .chevron { color: var(--text-dim); font-size: 10px; transition: transform 0.15s; }
+    .tool-row.open .tool-row-name .chevron { transform: rotate(90deg); }
+    .tool-snippet { display: none; padding: 0 16px 12px 28px; }
+    .tool-row.open + .tool-snippet { display: block; }
+
+    /* Code */
+    pre.code-block {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 0;
+      overflow-x: auto; color: var(--text); margin: 8px 0 16px 0; position: relative;
+    }
+    pre.code-block code {
+      font-size: 12px; display: block; padding: 10px 40px 10px 12px;
+    }
+    .code-copy-btn {
+      position: absolute; top: 8px; right: 8px; z-index: 1;
+      font-family: var(--font); font-size: 11px; color: var(--text-dim);
+      background: var(--bg-card); border: 1px solid var(--border);
+      padding: 3px 8px; border-radius: 4px; cursor: pointer;
+    }
+    .code-copy-btn:hover { color: var(--text); background: #21262d; }
+
+    /* Oh My Pi inline field */
+    .omp-field {
+      display: flex; align-items: center; gap: 8px; margin-top: 4px;
+    }
+    .omp-field-code {
+      flex: 1; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; padding: 6px 10px;
+      font-family: var(--font-mono); font-size: 12px; color: var(--blue);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Stats */
+    .stat-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
+    }
+    .stat-box {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px;
+    }
+    .stat-num {
+      font-family: var(--font-mono); font-size: 22px; font-weight: 600;
+      color: var(--text-bright); margin-bottom: 4px;
+    }
+    .stat-label { font-size: 12px; color: var(--text-dim); }
+
+    /* Steps */
+    .steps {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
+    }
+    .step {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px; text-align: center;
+    }
+    .step-num {
+      font-family: var(--font-mono); font-size: 20px; font-weight: 600;
+      color: var(--accent); margin-bottom: 6px;
+    }
+    .step-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+    .step-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+
+    /* Community banner */
+    .community-banner {
+      background: #21262d; border-radius: var(--radius-sm);
+      padding: 10px 14px; margin-bottom: 16px;
+      font-size: 13px; color: var(--text-dim); text-align: center; line-height: 1.5;
+    }
+    .community-banner strong { color: var(--text); }
+
+    /* Footer */
+    .consumer-page footer {
+      text-align: center; padding: 24px; border-top: 1px solid var(--border);
+      font-size: 12px; color: var(--text-dim);
+    }
+    .consumer-page footer a { color: var(--text-dim); text-decoration: none; }
+    .consumer-page footer a:hover { color: var(--text); }
+
+    /* Key list card */
+    .key-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px; margin-bottom: 8px;
+    }
+    .key-card-row {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .key-card-prefix {
+      font-family: var(--font-mono); font-size: 13px; color: var(--blue); margin-bottom: 2px;
+    }
+    .key-card-meta { font-size: 11px; color: var(--text-dim); }
+
+    /* Buttons */
+    .btn-consumer {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: var(--font); font-size: 13px; font-weight: 500;
+      padding: 6px 16px; border-radius: var(--radius-sm); cursor: pointer;
+      border: none; text-decoration: none; transition: all 0.1s;
+      line-height: 1.4;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { opacity: 0.9; text-decoration: none; }
+    .btn-ghost { background: transparent; color: var(--text-dim); }
+    .btn-ghost:hover { color: var(--text); background: #21262d; }
+    .btn-sm { font-size: 12px; padding: 4px 12px; }
+    .btn-danger { color: var(--red); }
+    .btn-danger:hover { background: rgba(248,81,73,0.1); }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 40px 0; color: var(--text-dim); font-size: 13px; }
+    .empty-state strong { color: var(--text); }
+
+    @media (max-width: 600px) {
+      .consumer-page main { padding: 24px 16px; }
+      .stat-grid, .steps { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 22px; }
+    }
+
+    /* ── Pico.css overrides ── */
+    .consumer-page main { --pico-block-spacing-vertical: 0; }
+    .consumer-page .model-card { margin-bottom: 8px; }
+    .consumer-page pre,
+    .consumer-page code { padding: 0; background: none; }
+    .consumer-page .model-configs .tool-row,
+    .consumer-page .model-configs .tool-snippet { margin: 0; padding-left: 16px; padding-right: 16px; }
+    .consumer-page .model-card,
+    .consumer-page .model-configs { --pico-block-spacing-vertical: 0; }
+    .consumer-page button { --pico-block-spacing-vertical: 0; margin: 0; }
+    .consumer-page .key-card-row button { margin: 0; }
+  </style>
+</head>
+<body class="consumer-page">
+
+{{if not .LoggedIn}}
+<!-- ====== LOGGED OUT ====== -->
+<nav class="topbar">
+  <span class="logo">⚡ GPU Mesh</span>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/models">Models</a></li>
+    <li><a href="/leaderboard">Leaderboard</a></li>
+    <li><a href="/status">Status</a></li>
+  </ul>
+  <div class="nav-right">
+    <a href="/auth/github?redirect=/consumer" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
+  </div>
+</nav>
+
+<main>
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-logo">
+  _____ _____  _    _    __  __ ______  _____ _    _
+ / ____|  __ \| |  | |  |  \/  |  ____|/ ____| |  | |
+| |  __| |__) | |  | |  | \  / | |__  | (___ | |__| |
+| | |_ |  ___/| |  | |  | |\/| |  __|  \___ \|  __  |
+| |__| | |    | |__| |  | |  | | |____ ____) | |  | |
+ \_____|_|     \____/   |_|  |_|______|_____/|_|  |_|
+    </div>
+    <div class="hero-command">
+      [user@mesh]:~$ free_llm_inference --powered-by community_gpus<span class="blink"></span>
+    </div>
+    <h1>Free LLM inference</h1>
+    <p>Use any OpenAI-compatible tool with community GPUs. No credit card, no limits. One click to get started.</p>
+    <a href="/auth/github?redirect=/consumer" class="btn-consumer btn-primary">Sign in with GitHub →</a>
+  </div>
+
+  <!-- How it works -->
+  <div class="consumer-card">
+    <div class="card-title">How it works</div>
+    <div class="community-banner">
+      GPU Mesh is powered by <strong>community GPUs</strong>.
+      Enthusiasts run Ollama and share spare compute — you get free inference.
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-title">Sign in</div>
+        <div class="step-desc">GitHub OAuth. No password. API key created automatically.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-title">Pick a model</div>
+        <div class="step-desc">Browse live models from community donors. Choose any.</div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-title">Use it</div>
+        <div class="step-desc">Copy the config for your tool. It just works — OpenAI-compatible.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live stats -->
+  <div class="stat-grid">
+    <div class="stat-box">
+      <div class="stat-num">{{.ModelsOnline}}</div>
+      <div class="stat-label">Models online</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">{{.DonorsOnline}}</div>
+      <div class="stat-label">Donors online</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">{{.RequestsToday}}</div>
+      <div class="stat-label">Requests today</div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+  &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
+</footer>
+
+{{else}}
+<!-- ====== LOGGED IN ====== -->
+<nav class="topbar">
+  <span class="logo">⚡ GPU Mesh</span>
+  <ul class="nav-links">
+    <li><a href="/consumer" class="active">Consumer</a></li>
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/models">Models</a></li>
+    <li><a href="/leaderboard">Leaderboard</a></li>
+    <li><a href="/status">Status</a></li>
+  </ul>
+  <div class="nav-right">
+    <span class="nav-user mono text-accent">{{.Login}}</span>
+    <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
+  </div>
+</nav>
+
+<main>
+  {{if .NewKey}}
+  <!-- One-time API key display -->
+  <div class="key-strip" id="onetime-key">
+    <span style="font-size:11px;color:var(--orange);white-space:nowrap;margin-right:8px">⚠</span>
+    <span class="key-label">API key</span>
+    <span class="key-value">{{.NewKey}}</span>
+    <button class="key-copy" onclick="copyKey(this, '{{.NewKey}}')">Copy</button>
+    <button class="key-copy" onclick="dismissKey()" style="margin-left:4px" title="Dismiss">✕</button>
+  </div>
+  <div id="onetime-warning" class="key-warning">
+    ⚠ Copy this key now — it won't be shown again.
+  </div>
+  {{else if .HasKeys}}
+  <!-- Normal key strip showing prefix -->
+  <div class="key-strip">
+    <span class="key-label">API key</span>
+    <span class="key-value">{{(index .Keys 0).KeyPrefix}}...</span>
+    <button class="key-copy" onclick="copyText(this, '{{(index .Keys 0).KeyPrefix}}...')">Copy</button>
+  </div>
+  {{end}}
+
+  <!-- Tabs -->
+  <div class="consumer-tabs">
+    <button class="consumer-tab{{if eq .Tab "overview"}} active{{end}}" onclick="switchTab('overview', this)">Overview</button>
+    <button class="consumer-tab{{if eq .Tab "keys"}} active{{end}}" onclick="switchTab('keys', this)">API Keys</button>
+    <button class="consumer-tab{{if eq .Tab "models"}} active{{end}}" onclick="switchTab('models', this)">Models</button>
+  </div>
+
+  <!-- TAB: Overview -->
+  <div class="tab-panel{{if eq .Tab "overview"}} active{{end}}" id="tab-overview">
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="stat-num">{{.RequestsToday}}<span style="font-size:14px;color:var(--text-dim)">/{{.RateLimit}}</span></div>
+        <div class="stat-label">Requests today</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">{{.TokensToday}}</div>
+        <div class="stat-label">Tokens today</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">{{len .Models}}</div>
+        <div class="stat-label">Models available</div>
+      </div>
+    </div>
+
+    <div class="consumer-card">
+      <div class="card-title">Quickstart</div>
+      <pre class="code-block"><code>export OPENAI_BASE_URL="{{$.BaseURL}}/v1"
+export OPENAI_API_KEY="{{if .HasKeys}}{{(index .Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}"</code>
+        <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+      </pre>
+      <p style="font-size:12px;color:var(--text-dim);margin-top:8px">Set these two environment variables and any OpenAI-compatible tool will use GPU Mesh automatically.</p>
+    </div>
+  </div>
+
+  <!-- TAB: API Keys -->
+  <div class="tab-panel{{if eq .Tab "keys"}} active{{end}}" id="tab-keys">
+    <div id="consumer-keys-list" hx-get="/consumer/keys" hx-trigger="load">
+      {{range .Keys}}
+      <div class="key-card">
+        <div class="key-card-row">
+          <div>
+            <div class="key-card-prefix">{{.KeyPrefix}}…</div>
+            <div class="key-card-meta">Created {{.CreatedAt.Format "2006-01-02"}} · Scope <span class="model-badge" style="font-size:10px">{{.Scope}}</span></div>
+          </div>
+          <button class="btn-consumer btn-sm btn-danger"
+            hx-delete="/api/keys/{{.ID}}"
+            hx-target="#consumer-keys-list"
+            hx-swap="innerHTML"
+            hx-confirm="Revoke this key?">Revoke</button>
+        </div>
+      </div>
+      {{end}}
+      <button class="btn-consumer btn-primary btn-sm"
+        hx-post="/consumer/keys"
+        hx-target="#consumer-keys-list"
+        hx-swap="innerHTML">
+        + Create new key
+      </button>
+    </div>
+  </div>
+
+  <!-- TAB: Models -->
+  <div class="tab-panel{{if eq .Tab "models"}} active{{end}}" id="tab-models">
+    {{if .Models}}
+    {{range $idx, $m := .Models}}
+    <div class="model-card">
+      <div class="model-card-head" onclick="toggleModel(this)">
+        <div>
+          <div class="model-name">{{$m.Name}}{{if gt $m.DonorsOnline 0}}<span class="model-badge" style="margin-left:8px">available</span>{{else}}<span class="model-badge" style="margin-left:8px;color:var(--text-dim);background:rgba(139,148,158,0.12)">unavailable</span>{{end}}</div>
+          <div class="model-meta" style="margin-top:2px">
+            <span>{{$m.DonorsOnline}} donors</span><span>Load {{printf "%.0f" $m.Load}}%</span><span>{{$m.Vendor}}</span>
+          </div>
+        </div>
+        <span style="font-size:10px;color:var(--text-dim)">▼</span>
+      </div>
+      <div class="model-configs">
+        <!-- Continue.dev -->
+        <div class="tool-row" onclick="toggleTool(this, event)">
+          <div class="tool-row-name"><span class="chevron">▶</span> Continue.dev</div>
+          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+        </div>
+        <div class="tool-snippet">
+          <pre class="code-block"><code>{
+  "models": [{
+    "title": "GPU Mesh (free)",
+    "provider": "openai",
+    "apiBase": "{{$.BaseURL}}/v1",
+    "apiKey": "{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}",
+    "model": "{{$m.Name}}"
+  }]
+}</code>
+            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+          </pre>
+        </div>
+
+        <!-- Aider -->
+        <div class="tool-row" onclick="toggleTool(this, event)">
+          <div class="tool-row-name"><span class="chevron">▶</span> Aider</div>
+          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+        </div>
+        <div class="tool-snippet">
+          <pre class="code-block"><code>aider --openai-api-base {{$.BaseURL}}/v1 \
+     --openai-api-key {{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}} \
+     --model openai/{{$m.Name}}</code>
+            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+          </pre>
+        </div>
+
+        <!-- Codex CLI -->
+        <div class="tool-row" onclick="toggleTool(this, event)">
+          <div class="tool-row-name"><span class="chevron">▶</span> Codex CLI</div>
+          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+        </div>
+        <div class="tool-snippet">
+          <pre class="code-block"><code>export OPENAI_BASE_URL="{{$.BaseURL}}/v1"
+export OPENAI_API_KEY="{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}"
+codex exec "your prompt"</code>
+            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+          </pre>
+        </div>
+
+        <!-- Cline -->
+        <div class="tool-row" onclick="toggleTool(this, event)">
+          <div class="tool-row-name"><span class="chevron">▶</span> Cline</div>
+          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+        </div>
+        <div class="tool-snippet">
+          <pre class="code-block"><code>{
+  "cline.apiProvider": "openai",
+  "cline.openAiBaseUrl": "{{$.BaseURL}}/v1",
+  "cline.openAiApiKey": "{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}",
+  "cline.openAiModel": "{{$m.Name}}"
+}</code>
+            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+          </pre>
+        </div>
+
+        <!-- Open WebUI -->
+        <div class="tool-row" onclick="toggleTool(this, event)">
+          <div class="tool-row-name"><span class="chevron">▶</span> Open WebUI</div>
+          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+        </div>
+        <div class="tool-snippet">
+          <pre class="code-block"><code>OPENAI_API_BASE_URL={{$.BaseURL}}/v1
+OPENAI_API_KEY={{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}</code>
+            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+          </pre>
+        </div>
+
+        <!-- curl -->
+        <div class="tool-row" onclick="toggleTool(this, event)">
+          <div class="tool-row-name"><span class="chevron">▶</span> curl</div>
+          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+        </div>
+        <div class="tool-snippet">
+          <pre class="code-block"><code>curl -s {{$.BaseURL}}/v1/chat/completions \
+  -H "Authorization: Bearer {{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"{{$m.Name}}","messages":[{"role":"user","content":"Hi!"}]}'</code>
+            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+          </pre>
+        </div>
+
+        <!-- Python SDK -->
+        <div class="tool-row" onclick="toggleTool(this, event)">
+          <div class="tool-row-name"><span class="chevron">▶</span> Python SDK</div>
+          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+        </div>
+        <div class="tool-snippet">
+          <pre class="code-block"><code>from openai import OpenAI
+client = OpenAI(
+    base_url="{{$.BaseURL}}/v1",
+    api_key="{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}"
+)
+client.chat.completions.create(
+    model="{{$m.Name}}",
+    messages=[{"role":"user","content":"Hello!"}],
+    stream=True
+)</code>
+            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+          </pre>
+        </div>
+
+        <!-- Oh My Pi -->
+        <div class="tool-row" onclick="toggleTool(this, event)">
+          <div class="tool-row-name"><span class="chevron">▶</span> Oh My Pi</div>
+          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+        </div>
+        <div class="tool-snippet">
+          <pre class="code-block"><code>export OPENAI_BASE_URL="{{$.BaseURL}}/v1"
+export OPENAI_API_KEY="{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}"</code>
+            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+          </pre>
+          <div class="omp-field">
+            <span style="font-size:11px;color:var(--text-dim);white-space:nowrap">Launch:</span>
+            <code class="omp-field-code">omp run "write a hello world" --model {{$m.Name}}</code>
+            <button class="btn-consumer btn-sm btn-ghost omp-copy-btn" data-model="{{$m.Name}}" onclick="event.stopPropagation();copyOmpCmd(this)" style="white-space:nowrap">Copy</button>
+      </div>
+    </div>
+    </div>
+    </div>
+    {{end}}
+    {{else}}
+    <div class="empty-state">
+      <strong>No models available</strong><br>Check back soon — donors come online regularly.
+    </div>
+    {{end}}
+  </div>
+</main>
+
+<footer>
+  <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+  &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
+</footer>
+{{end}}
+
+<script src="/static/js/app.js"></script>
+<script src="https://unpkg.com/htmx.org@2"></script>
+<script>
+function switchTab(tab, el) {
+  document.querySelectorAll('.consumer-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+function dismissKey() {
+  document.getElementById('onetime-key').style.display = 'none';
+  document.getElementById('onetime-warning').style.display = 'none';
+}
+function toggleModel(head) {
+  head.parentElement.querySelector('.model-configs').classList.toggle('open');
+}
+function toggleTool(row, evt) {
+  row.classList.toggle('open');
+}
+
+function doCopy(btn, text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  document.body.removeChild(ta);
+  btn.textContent = 'Copied!';
+  setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
+}
+
+function copyCode(btn) {
+  var pre = btn.closest('pre');
+  if (!pre) return;
+  var code = pre.querySelector('code');
+  var text = code ? code.textContent : pre.textContent;
+  doCopy(btn, text.trim());
+}
+function copyText(btn, text) {
+  doCopy(btn, text);
+}
+function copyKey(btn, key) {
+  doCopy(btn, key);
+}
+function copyOmpCmd(btn) {
+  var model = btn.getAttribute('data-model');
+  doCopy(btn, 'omp run "write a hello world" --model ' + model);
+}
+</script>
+</body>
+</html>

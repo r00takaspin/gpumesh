@@ -530,3 +530,67 @@ func joinModels(models []string) string {
 	}
 	return s
 }
+
+// --- HTMX consumer fragments ---
+
+// handleConsumerKeys renders the API Keys tab content as an HTMX fragment.
+func (s *Server) handleConsumerKeys(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	keys, _ := s.store.ListKeys(userID)
+	type keyView struct {
+		ID        int64
+		Prefix    string
+		Scope     string
+		CreatedAt string
+	}
+	kv := make([]keyView, len(keys))
+	for i, k := range keys {
+		kv[i] = keyView{
+			ID:        k.ID,
+			Prefix:    k.KeyPrefix,
+			Scope:     k.Scope,
+			CreatedAt: k.CreatedAt.Format("2006-01-02"),
+		}
+	}
+	renderTemplate(w, "consumer-keys.html", map[string]interface{}{
+		"Keys": kv,
+	})
+}
+
+// handleConsumerCreateKey creates a new consumer key and returns the API Keys fragment.
+func (s *Server) handleConsumerCreateKey(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	rawKey, _, err := s.store.CreateKey(userID, "consumer")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create key")
+		return
+	}
+	keys, _ := s.store.ListKeys(userID)
+	type keyView struct {
+		ID        int64
+		Prefix    string
+		Scope     string
+		CreatedAt string
+	}
+	kv := make([]keyView, len(keys))
+	for i, k := range keys {
+		kv[i] = keyView{
+			ID:        k.ID,
+			Prefix:    k.KeyPrefix,
+			Scope:     k.Scope,
+			CreatedAt: k.CreatedAt.Format("2006-01-02"),
+		}
+	}
+	renderTemplate(w, "consumer-keys.html", map[string]interface{}{
+		"Keys":    kv,
+		"NewKey":  rawKey,
+	})
+}

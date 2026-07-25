@@ -240,11 +240,14 @@ Consumer                     Coordinator                        Donor
 | `GET` | `/api/donor/stats` | Токен донора | Статистика донора |
 | `GET` | `/api/status` | Нет | Глобальная статистика (модели онлайн, доноры, аптайм) |
 | `GET` | `/dashboard` | GitHub OAuth | Страница веб-дашборда |
+| `GET` | `/consumer` | Нет (публичный) | Страница потребителя (два состояния: logged-out/logged-in) |
 
 Аутентификация:
 - **API-ключ потребителя:** заголовок `Authorization: Bearer <key>`. Аналогично OpenAI.
 - **GitHub OAuth:** сессионная cookie после логина через GitHub.
 - **Токен донора:** API-ключ с scope `donor` или `both`, передаётся в WS как query-параметр `?token=<key>` при подключении.
+
+**OAuth редирект:** Параметр `?redirect=<path>` в `/auth/github` позволяет указать целевой URL после успешного логина. По умолчанию — `/dashboard`. Пример: `/auth/github?redirect=/consumer` перенаправляет на страницу потребителя после логина.
 
 **CORS:** Все эндпоинты `/v1/*` возвращают заголовки `Access-Control-Allow-Origin: *` и `Access-Control-Allow-Headers: Authorization, Content-Type`. Необходимо для работы из браузерных инструментов (Open WebUI, LobeChat).
 
@@ -551,6 +554,107 @@ export OPENAI_API_KEY="$API_KEY"
 | Badge | Бейдж + прогресс | «No badge yet. Serve 1,000 tokens to earn Bronze.» | — | — |
 
 ---
+
+### 6.2a Consumer Page (`/consumer`)
+
+**URL:** `/consumer`  
+**Доступ:** Публичный (два состояния: logged-out и logged-in)  
+**Цель:** Привлечь новых потребителей и предоставить рабочее пространство для использования GPU Mesh
+
+Страница имеет два принципиально разных состояния в зависимости от аутентификации.
+
+---
+
+#### 6.2a.1 Состояние «Logged Out» (публичный лендинг)
+
+Отображается неавторизованным пользователям. Цель — объяснить ценность и конвертировать в регистрацию.
+
+##### Компоненты
+
+| # | Компонент | Описание |
+|---|---|---|
+| 1 | **Hero** | ASCII-логотип «GPU MESH». Заголовок «Free LLM inference». Подзаголовок: «Use any OpenAI-compatible tool with community GPUs. No credit card, no limits. One click to get started.». CTA-кнопка «Sign in with GitHub →» (ведёт на `/auth/github?redirect=/consumer`) |
+| 2 | **Community GPU banner** | Информационная полоса: «GPU Mesh is powered by community GPUs. Enthusiasts run Ollama and share spare compute — you get free inference.» |
+| 3 | **How it works** | Три шага в карточках: ① Sign in (GitHub OAuth, API key created automatically), ② Pick a model (Browse live models from community donors), ③ Use it (Copy config for your tool, OpenAI-compatible). Каждый шаг — карточка с номером, заголовком и описанием |
+| 4 | **Live stats** | Три блока с числами: Models online (количество), Donors online (количество), Requests today (счётчик). Данные из реестра координатора |
+
+---
+
+#### 6.2a.2 Состояние «Logged In» (дашборд потребителя)
+
+Отображается авторизованным пользователям. Три таба: Overview, API Keys, Models. По умолчанию активен Models.
+
+##### One-time API Key Display
+
+При первом заходе (параметр `?new=1` в URL после OAuth-редиректа) отображается:
+- Полоса с ключом (`inf_...`) жёлтого цвета с иконкой ⚠
+- Кнопка «Copy» для копирования ключа
+- Кнопка «✕» для скрытия полосы (dismiss)
+- Предупреждение: «Copy this key now — it won't be shown again.»
+
+При последующих заходах отображается префикс ключа (первые 8 символов) без возможности dismiss.
+
+##### Таб «Overview»
+
+| # | Компонент | Описание |
+|---|---|---|
+| 1 | **Usage stats** | Три блока: Requests today (X/Y rate limit), Tokens today, Models available (количество) |
+| 2 | **Quickstart** | Блок кода с `export OPENAI_BASE_URL` и `export OPENAI_API_KEY`. API-ключ подставляется автоматически (префикс или плейсхолдер). Кнопка копирования |
+
+##### Таб «API Keys»
+
+Список API-ключей пользователя в виде карточек. Каждая карточка:
+- Префикс ключа (синий моноширинный)
+- Дата создания и scope (badge)
+- Кнопка «Revoke» (HTMX: `DELETE /api/keys/{id}`)
+
+Кнопка «+ Create new key» (HTMX: `POST /consumer/keys`) создаёт новый ключ и обновляет список. При создании новый ключ показывается полностью с предупреждением.
+
+##### Таб «Models»
+
+Список доступных моделей в виде раскрывающихся карточек. Каждая карточка:
+- **Заголовок:** название модели (моноширинный), badge «available»/«unavailable», количество доноров, загрузка (%), вендор
+- **Раскрытие:** клик по заголовку показывает/скрывает конфигурации для 8 инструментов
+
+**Первая модель и Codex CLI в ней открыты по умолчанию.**
+
+**8 инструментов (tool rows):**
+
+Каждый инструмент — раскрывающаяся строка с названием, шевроном и кнопкой Copy:
+
+1. **Continue.dev** — JSON-конфигурация для `config.json`
+2. **Aider** — команда запуска с флагами `--openai-api-base` и `--openai-api-key`
+3. **Codex CLI** — `export` переменных окружения + `codex exec`
+4. **Cline** — JSON-конфигурация для VS Code settings
+5. **Open WebUI** — переменные окружения
+6. **curl** — пример запроса к `/v1/chat/completions`
+7. **Python SDK** — код на Python с использованием `openai` библиотеки
+8. **Oh My Pi** — переменные окружения + инлайн-поле с командой `omp run "... " --model {name}` и кнопкой Copy
+
+Все сниппеты содержат реальное название модели (подстановка через шаблон) и префикс API-ключа пользователя.
+
+##### Состояния
+
+| Компонент | Нормальное | Пустое | Загрузка | Ошибка |
+|---|---|---|---|---|
+| Models | Карточки с донорами | «No models available. Check back soon.» | — | — |
+| API Keys | Список ключей | Кнопка «Create new key» | HTMX-индикатор | — |
+| One-time key | Полоса с ключом + ⚠ | Префикс ключа | — | — |
+
+##### Навигация
+
+В навбаре для авторизованных пользователей: «Consumer» (активная), «Dashboard», «Models», «Leaderboard», «Status».
+
+---
+
+#### 6.2a.3 Технические детали
+
+- **Авто-создание ключа:** при первом заходе через OAuth с `redirect=/consumer` и отсутствии ключей у пользователя автоматически создаётся API-ключ со scope `consumer`. Ключ отображается один раз.
+- **OAuth редирект:** `/auth/github?redirect=/consumer` — параметр `redirect` задаёт целевой путь после логина. При отсутствии ключей добавляется `?new=1`.
+- **HTMX-фрагменты:** `GET /consumer/keys` (список ключей), `POST /consumer/keys` (создание ключа с показом полного значения).
+- **Табы:** переключение через JavaScript `switchTab()`, активный таб определяется query-параметром `?tab=models|keys|overview`.
+- **Раскрытие tool rows:** CSS-класс `.open` на `.tool-row` показывает следующий `.tool-snippet`.
+- **Копирование:** `navigator.clipboard.writeText()` с визуальной обратной связью «Copied!» на 2 секунды.
 
 ### 6.3 Каталог моделей (`/models`)
 

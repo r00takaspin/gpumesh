@@ -83,6 +83,8 @@ func NewServer(cfg Config) (*Server, error) {
 
 	// Dashboard (auth required).
 	mux.HandleFunc("GET /dashboard", s.requireAuth(s.handleDashboard))
+	// Consumer page (auth optional, page shows two states).
+	mux.HandleFunc("GET /consumer", s.corsMiddleware(s.handleConsumer))
 
 	// OAuth.
 	mux.HandleFunc("GET /login", s.handleLoginPage)
@@ -117,6 +119,9 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /dashboard/consumer", s.requireAuth(s.handleDashboardConsumer))
 	mux.HandleFunc("POST /dashboard/keys", s.requireAuth(s.handleDashboardCreateKey))
 	mux.HandleFunc("GET /dashboard/donor", s.requireAuth(s.handleDashboardDonor))
+	// HTMX consumer fragments.
+	mux.HandleFunc("GET /consumer/keys", s.requireAuth(s.handleConsumerKeys))
+	mux.HandleFunc("POST /consumer/keys", s.requireAuth(s.handleConsumerCreateKey))
 
 	// Health check.
 	mux.HandleFunc("GET /health", s.handleHealth)

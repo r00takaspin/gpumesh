@@ -32,6 +32,11 @@ type PageData struct {
 	HasDonorScope bool
 	// Models page.
 	Models []ModelData
+	// Consumer page.
+	Tab       string   // active tab: "overview", "keys", or "models"
+	Keys      []APIKey // user's API keys for the consumer page
+	RateLimit int      // daily request limit
+	BaseURL   string   // server base URL for tool config snippets
 }
 
 // ModelSummary is a lightweight model entry for template rendering.
@@ -48,6 +53,7 @@ type ModelData struct {
 	Load         float64
 	Tags         []string
 	VRAM         string
+	Vendor       string
 }
 
 
@@ -231,6 +237,7 @@ func (s *Server) pageDataWithStats(r *http.Request) PageData {
 			Load:         ms.Load,
 			Tags:         tagsForModel(name),
 			VRAM:         vramForModel(name),
+			Vendor:       vendorForModel(name),
 		})
 	}
 	sort.Slice(pd.Models, func(i, j int) bool { return pd.Models[i].Name < pd.Models[j].Name })

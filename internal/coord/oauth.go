@@ -99,10 +99,10 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		redirect = "/dashboard"
 	}
 	// First login with no keys → auto-create flow.
-	if redirect == "/dashboard" {
+	if redirect == "/dashboard" || redirect == "/consumer" {
 		n, _ := s.store.CountKeys(userID)
 		if n == 0 {
-			redirect = "/dashboard?new=1"
+			redirect = redirect + "?new=1"
 		}
 	}
 	http.Redirect(w, r, redirect, http.StatusFound)
@@ -180,6 +180,50 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	renderTemplate(w, "dashboard.html", pd)
+}
+
+// handleConsumer renders the consumer page.
+func (s *Server) handleConsumer(w http.ResponseWriter, r *http.Request) {
+	pd := s.pageDataWithStats(r)
+
+	// Extract user ID from session (public page, no requireAuth wrapper).
+	var userID int64
+	if cookie, err := r.Cookie("gpumesh_session"); err == nil {
+		uid, err := s.store.ValidateSession(cookie.Value)
+		if err == nil && uid != 0 {
+			userID = uid
+		}
+	}
+
+	// Set rate limit.
+	pd.RateLimit = s.limiter.Burst()
+	// Set base URL for tool config snippets.
+	pd.BaseURL = s.baseURL
+
+	// Set active tab from query param, default to "models".
+	pd.Tab = r.URL.Query().Get("tab")
+	if pd.Tab == "" {
+		pd.Tab = "models"
+	}
+
+	if userID != 0 {
+		// Auto-create consumer key if none exists.
+		if r.URL.Query().Get("new") == "1" {
+			n, _ := s.store.CountKeys(userID)
+			if n == 0 {
+				rawKey, _, err := s.store.CreateKey(userID, "consumer")
+				if err == nil {
+					pd.NewKey = rawKey
+				}
+			}
+		}
+
+		// Populate keys for the API Keys tab.
+		keys, _ := s.store.ListKeys(userID)
+		pd.Keys = keys
+	}
+
+	renderTemplate(w, "consumer.html", pd)
 }
 
 // handleLoginPage renders the login page with a GitHub OAuth button.

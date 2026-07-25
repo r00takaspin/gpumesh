@@ -1,0 +1,34 @@
+{{if .NewKey}}
+<div class="key-strip" id="onetime-key" style="margin-bottom:16px">
+  <span style="font-size:11px;color:var(--orange);white-space:nowrap;margin-right:8px">⚠</span>
+  <span class="key-label">New API key</span>
+  <span class="key-value">{{.NewKey}}</span>
+  <button class="key-copy" onclick="navigator.clipboard.writeText('{{.NewKey}}');this.textContent='Copied!'">Copy</button>
+</div>
+<div style="font-size:11px;color:var(--orange);margin-bottom:16px;padding:0 2px">
+  ⚠ Copy this key now — it won't be shown again.
+</div>
+{{end}}
+
+{{range .Keys}}
+<div class="key-card">
+  <div class="key-card-row">
+    <div>
+      <div class="key-card-prefix">{{.Prefix}}…</div>
+      <div class="key-card-meta">Created {{.CreatedAt}} · Scope <span class="model-badge" style="font-size:10px">{{.Scope}}</span></div>
+    </div>
+    <button class="btn-consumer btn-sm btn-danger"
+      hx-delete="/api/keys/{{.ID}}"
+      hx-target="#consumer-keys-list"
+      hx-swap="innerHTML"
+      hx-confirm="Revoke this key?">Revoke</button>
+  </div>
+</div>
+{{end}}
+
+<button class="btn-consumer btn-primary btn-sm"
+  hx-post="/consumer/keys"
+  hx-target="#consumer-keys-list"
+  hx-swap="innerHTML">
+  + Create new key
+</button>
