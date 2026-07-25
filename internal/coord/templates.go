@@ -33,10 +33,11 @@ type PageData struct {
 	// Models page.
 	Models []ModelData
 	// Consumer page.
-	Tab       string   // active tab: "overview", "keys", or "models"
-	Keys      []APIKey // user's API keys for the consumer page
-	RateLimit int      // daily request limit
-	BaseURL   string   // server base URL for tool config snippets
+	Tab          string   // active tab: "overview", "keys", or "models"
+	Keys         []APIKey // user's API keys for the consumer page
+	RateLimit    int      // daily request limit
+	BaseURL      string   // server base URL for tool config snippets
+	DefaultModel string   // most popular model name (for "Try it now" block)
 }
 
 // ModelSummary is a lightweight model entry for template rendering.
@@ -241,6 +242,13 @@ func (s *Server) pageDataWithStats(r *http.Request) PageData {
 		})
 	}
 	sort.Slice(pd.Models, func(i, j int) bool { return pd.Models[i].Name < pd.Models[j].Name })
+	// Default model: most popular (first in TopModels after donor-count sort).
+	// Falls back to a widely-used model so the "Try it now" block always renders.
+	pd.DefaultModel = "llama3.2:3b"
+	if len(pd.TopModels) > 0 {
+		pd.DefaultModel = pd.TopModels[0].Name
+	}
+
 
 	// Top donors: top 3 from registry by lifetime tokens.
 	type donorEntry struct {

@@ -574,15 +574,14 @@ export OPENAI_API_KEY="$API_KEY"
 | # | Компонент | Описание |
 |---|---|---|
 | 1 | **Hero** | ASCII-логотип «GPU MESH». Заголовок «Free LLM inference». Подзаголовок: «Use any OpenAI-compatible tool with community GPUs. No credit card, no limits. One click to get started.». CTA-кнопка «Sign in with GitHub →» (ведёт на `/auth/github?redirect=/consumer`) |
-| 2 | **Community GPU banner** | Информационная полоса: «GPU Mesh is powered by community GPUs. Enthusiasts run Ollama and share spare compute — you get free inference.» |
-| 3 | **How it works** | Три шага в карточках: ① Sign in (GitHub OAuth, API key created automatically), ② Pick a model (Browse live models from community donors), ③ Use it (Copy config for your tool, OpenAI-compatible). Каждый шаг — карточка с номером, заголовком и описанием |
-| 4 | **Live stats** | Три блока с числами: Models online (количество), Donors online (количество), Requests today (счётчик). Данные из реестра координатора |
+| 2 | **How it works** | Карточка с заголовком «How it works», внутри которой размещён Community GPU banner («GPU Mesh is powered by community GPUs…») и три шага: ① Sign in (GitHub OAuth, API key created automatically), ② Pick a model (Browse live models from community donors), ③ Use it (Copy config for your tool, OpenAI-compatible) |
+| 3 | **Live stats** | Три блока с числами: Models online (количество), Donors online (количество), Requests today (счётчик). Данные из реестра координатора |
 
 ---
 
 #### 6.2a.2 Состояние «Logged In» (дашборд потребителя)
 
-Отображается авторизованным пользователям. Три таба: Overview, API Keys, Models. По умолчанию активен Models.
+Отображается авторизованным пользователям. Три таба: Overview, API Keys, Models. По умолчанию активен Overview.
 
 ##### One-time API Key Display
 
@@ -614,23 +613,19 @@ export OPENAI_API_KEY="$API_KEY"
 
 Список доступных моделей в виде раскрывающихся карточек. Каждая карточка:
 - **Заголовок:** название модели (моноширинный), badge «available»/«unavailable», количество доноров, загрузка (%), вендор
-- **Раскрытие:** клик по заголовку показывает/скрывает конфигурации для 8 инструментов
+- **Раскрытие:** клик по заголовку показывает/скрывает конфигурации для 7 инструментов
 
-**Первая модель и Codex CLI в ней открыты по умолчанию.**
-
-**8 инструментов (tool rows):**
+**7 инструментов (tool rows):**
 
 Каждый инструмент — раскрывающаяся строка с названием, шевроном и кнопкой Copy:
 
 1. **Continue.dev** — JSON-конфигурация для `config.json`
 2. **Aider** — команда запуска с флагами `--openai-api-base` и `--openai-api-key`
-3. **Codex CLI** — `export` переменных окружения + `codex exec`
-4. **Cline** — JSON-конфигурация для VS Code settings
-5. **Open WebUI** — переменные окружения
-6. **curl** — пример запроса к `/v1/chat/completions`
-7. **Python SDK** — код на Python с использованием `openai` библиотеки
-8. **Oh My Pi** — переменные окружения + инлайн-поле с командой `omp run "... " --model {name}` и кнопкой Copy
-
+3. **Cline** — JSON-конфигурация для VS Code settings
+4. **Open WebUI** — переменные окружения
+5. **curl** — пример запроса к `/v1/chat/completions`
+6. **Python SDK** — код на Python с использованием `openai` библиотеки
+7. **Oh My Pi** — переменные окружения + инлайн-поле с командой `omp run "... " --model {name}` и кнопкой Copy
 Все сниппеты содержат реальное название модели (подстановка через шаблон) и префикс API-ключа пользователя.
 
 ##### Состояния

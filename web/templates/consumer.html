@@ -396,6 +396,26 @@
   </div>
 {{end}}
 
+{{if and .LoggedIn .DefaultModel}}
+  <!-- Try it now -->
+  <div class="consumer-card" id="try-now" style="border-color:var(--accent);border-left:3px solid var(--accent);display:none">
+    <div class="card-header"><div class="card-title">Try it now</div><button class="key-copy" onclick="dismissTryNow()" title="Dismiss" style="margin-left:auto">✕</button></div>
+    <p style="font-size:13px;color:var(--text-dim);margin:0 0 10px 0">Run this in your terminal — your first request in seconds.</p>
+    <pre class="code-block"><code>curl -s {{.BaseURL}}/v1/chat/completions \
+  -H "Authorization: Bearer {{if .NewKey}}{{.NewKey}}{{else if .HasKeys}}{{(index .Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"{{.DefaultModel}}","messages":[{"role":"user","content":"Hello!"}]}'</code>
+      <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+    </pre>
+{{if .NewKey}}
+    <p style="font-size:11px;color:var(--orange);margin:8px 0 0 0">This snippet includes your full key — copy now, it won't be shown again.</p>
+{{end}}
+    <p style="font-size:12px;color:var(--text-dim);margin-top:8px">Tool-specific configs (Continue.dev, Aider, Cline, etc.) for each model are in the <a href="?tab=models" onclick="switchTab('models',document.querySelector('.consumer-tab:nth-child(3)'));return false" style="color:var(--blue)">Models tab →</a></p>
+  </div>
+{{end}}
+
+
+
   <!-- Tabs -->
   <div class="consumer-tabs">
     <button class="consumer-tab{{if eq .Tab "overview"}} active{{end}}" onclick="switchTab('overview', this)">Overview</button>
@@ -420,14 +440,6 @@
       </div>
     </div>
 
-    <div class="consumer-card">
-      <div class="card-title">Quickstart</div>
-      <pre class="code-block"><code>export OPENAI_BASE_URL="{{$.BaseURL}}/v1"
-export OPENAI_API_KEY="{{if .HasKeys}}{{(index .Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}"</code>
-        <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-      </pre>
-      <p style="font-size:12px;color:var(--text-dim);margin-top:8px">Set these two environment variables and any OpenAI-compatible tool will use GPU Mesh automatically.</p>
-    </div>
   </div>
 
   <!-- TAB: API Keys -->
@@ -616,6 +628,19 @@ function dismissKey() {
   document.getElementById('onetime-key').style.display = 'none';
   document.getElementById('onetime-warning').style.display = 'none';
 }
+function dismissTryNow() {
+  var el = document.getElementById('try-now');
+  if (el) { el.style.display = 'none'; localStorage.setItem('try-now-dismissed', '1'); }
+}
+// Check on load: show if not dismissed
+(function() {
+  if (localStorage.getItem('try-now-dismissed') !== '1') {
+    var el = document.getElementById('try-now');
+    if (el) el.style.display = '';
+  }
+})();
+
+
 function toggleModel(head) {
   head.parentElement.querySelector('.model-configs').classList.toggle('open');
 }
