@@ -1,3 +1,4 @@
+<div id="share-status">
 {{if .Agents}}
 {{range .Agents}}
 <!-- Agent Status -->
@@ -14,46 +15,109 @@
 </div>
 {{end}}
 {{else}}
-<!-- Onboarding -->
+<!-- Onboarding: OS-tabbed Get Started -->
 <div class="consumer-card" style="border-color:var(--accent);border-left:3px solid var(--accent)">
   <div class="card-title">Get Started</div>
   <div class="community-banner">
-    Run this command on your GPU machine to start sharing compute.
+    Install Ollama, pull a model, and run the provider on your GPU machine.
   </div>
-  <pre class="code-block"><code>export MESH_TOKEN="{{.TokenPrefix}}..." && gpumesh-provider</code>
-    <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
   </pre>
-  <div class="steps" style="margin-top:12px">
-    <div class="step">
-      <div class="step-num">1</div>
-      <div class="step-title">Install Ollama</div>
-      <div class="step-desc">ollama.com</div>
+
+  <div class="os-tabs">
+    <input type="radio" name="os-tab" id="os-linux-amd64" class="os-tab-input" checked>
+    <label for="os-linux-amd64" class="os-tab-label">Linux (amd64)</label>
+    <input type="radio" name="os-tab" id="os-linux-arm64" class="os-tab-input">
+    <label for="os-linux-arm64" class="os-tab-label">Linux (arm64)</label>
+    <input type="radio" name="os-tab" id="os-macos" class="os-tab-input">
+    <label for="os-macos" class="os-tab-label">macOS</label>
+    <input type="radio" name="os-tab" id="os-docker" class="os-tab-input">
+    <label for="os-docker" class="os-tab-label">Docker</label>
+
+    <!-- Linux amd64 -->
+    <div class="os-tab-content" id="content-linux-amd64">
+      <div class="steps" style="grid-template-columns:repeat(4,1fr);margin-top:12px">
+        <div class="step"><div class="step-num">1</div><div class="step-title">Install Ollama</div><div class="step-desc"><code>curl -fsSL https://ollama.com/install.sh | sh</code></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-title">Pull a model</div><div class="step-desc"><code>ollama pull llama3.2:3b</code></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>go install github.com/r00takaspin/gpumesh/cmd/provider@latest</code></div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-title">Run</div><div class="step-desc">Paste the command above</div></div>
+      </div>
     </div>
-    <div class="step">
-      <div class="step-num">2</div>
-      <div class="step-title">Pull a model</div>
-      <div class="step-desc">ollama pull llama3.2:3b</div>
+
+    <!-- Linux arm64 -->
+    <div class="os-tab-content" id="content-linux-arm64">
+      <div class="steps" style="grid-template-columns:repeat(4,1fr);margin-top:12px">
+        <div class="step"><div class="step-num">1</div><div class="step-title">Install Ollama</div><div class="step-desc"><code>curl -fsSL https://ollama.com/install.sh | sh</code></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-title">Pull a model</div><div class="step-desc"><code>ollama pull llama3.2:3b</code></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>go install github.com/r00takaspin/gpumesh/cmd/provider@latest</code></div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-title">Run</div><div class="step-desc">Paste the command above</div></div>
+      </div>
+      <div class="text-dim" style="font-size:11px;margin-top:8px">No Go? Download from <a href="https://github.com/r00takaspin/gpumesh/releases/latest">GitHub Releases</a> &rarr; pick <code>linux_arm64.tar.gz</code></div>
     </div>
-    <div class="step">
-      <div class="step-num">3</div>
-      <div class="step-title">Run the agent</div>
-      <div class="step-desc">Paste the command above</div>
+
+    <!-- macOS -->
+    <div class="os-tab-content" id="content-macos">
+      <div class="steps" style="grid-template-columns:repeat(4,1fr);margin-top:12px">
+        <div class="step"><div class="step-num">1</div><div class="step-title">Install Ollama</div><div class="step-desc"><code>brew install ollama</code> or <a href="https://ollama.com/download/mac">download</a></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-title">Pull a model</div><div class="step-desc"><code>ollama pull llama3.2:3b</code></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>go install github.com/r00takaspin/gpumesh/cmd/provider@latest</code></div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-title">Run</div><div class="step-desc">Paste the command above</div></div>
+      </div>
+      <div class="text-dim" style="font-size:11px;margin-top:8px">Works on both Apple Silicon and Intel Macs. Requires <a href="https://go.dev/dl/">Go</a> &ge; 1.21.</div>
+    </div>
+
+    <!-- Docker -->
+    <div class="os-tab-content" id="content-docker">
+      <div class="steps" style="grid-template-columns:repeat(4,1fr);margin-top:12px">
+        <div class="step"><div class="step-num">1</div><div class="step-title">Start Ollama</div><div class="step-desc"><code>docker run -d --gpus all -p 11434:11434 --name ollama ollama/ollama</code></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-title">Pull a model</div><div class="step-desc"><code>docker exec -it ollama ollama pull llama3.2:3b</code></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>go install github.com/r00takaspin/gpumesh/cmd/provider@latest</code></div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-title">Run</div><div class="step-desc">Paste the command above</div></div>
+      </div>
+      <div class="text-dim" style="font-size:11px;margin-top:8px">Provider runs on host and connects to Ollama at <code>localhost:11434</code>. <code>--gpus all</code> requires nvidia-container-toolkit.</div>
     </div>
   </div>
 </div>
 {{end}}
 
-<!-- Donor Token -->
-<div class="consumer-card">
-  <div class="card-title">Donor Token</div>
-  <div class="flex-between">
-    <span class="mono text-accent">{{.TokenPrefix}}****</span>
-    <span>
-      <button class="btn-consumer btn-sm btn-ghost" onclick="copyToClipboard(this)" data-copy="{{.TokenFull}}">Copy</button>
-      <button class="btn-ghost-sm" hx-post="/api/keys/{{.TokenID}}/regenerate" hx-target="closest .consumer-card" hx-swap="outerHTML">Regenerate</button>
-    </span>
+<!-- Donor Tokens -->
+{{if .NewTokenFull}}
+<div class="key-strip" style="margin-bottom:16px">
+  <span style="font-size:11px;color:var(--orange);white-space:nowrap;margin-right:8px">⚠</span>
+  <span class="key-label">New donor token</span>
+  <span class="key-value">{{.NewTokenFull}}</span>
+  <button class="key-copy" onclick="copyKey(this, '{{.NewTokenFull}}')">Copy</button>
+</div>
+<div style="font-size:11px;color:var(--orange);margin-bottom:16px;padding:0 2px">
+  ⚠ Copy this token now — it won't be shown again.
+</div>
+{{end}}
+
+{{if .DonorKeys}}
+{{range .DonorKeys}}
+<div class="key-card">
+  <div class="key-card-row">
+    <div>
+      <div class="key-card-prefix">{{.KeyPrefix}}…</div>
+      <div class="key-card-meta">Created {{.CreatedAt}} · Scope <span class="model-badge" style="font-size:10px">donor</span></div>
+    </div>
+    <button class="btn-danger-sm"
+      hx-delete="/api/keys/{{.ID}}"
+      hx-target="#share-status"
+      hx-swap="outerHTML"
+      hx-confirm="Revoke this token?">Revoke</button>
   </div>
 </div>
+{{end}}
+{{else}}
+{{end}}
+
+<button class="btn-consumer btn-primary btn-sm"
+  hx-post="/share/tokens"
+  hx-target="#share-status"
+  hx-swap="outerHTML"
+  style="margin:12px 0 16px 0">
+  + Generate token
+</button>
 
 <!-- Donor Stats -->
 <div class="consumer-card">
@@ -91,4 +155,5 @@
       <span class="text-accent">{{.BadgePercent}}%</span>
     </div>
   </div>
+</div>
 </div>

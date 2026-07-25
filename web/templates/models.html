@@ -18,7 +18,6 @@
       <li><a href="/use">Use Models</a></li>
       <li><a href="/share">Share GPU</a></li>
       <li><a href="/models" class="active">Models</a></li>
-      <li><a href="/status">Status</a></li>
     </ul>
     <div class="nav-right">
       {{if .LoggedIn}}
@@ -43,124 +42,11 @@
         {{if .Models}}
         {{range $idx, $m := .Models}}
         <div class="model-card">
-          <div class="model-card-head" onclick="toggleModel(this)">
+          <div class="model-card-head">
             <div>
               <div class="model-name">{{$m.Name}}{{if gt $m.DonorsOnline 0}}<span class="model-badge" style="margin-left:8px">available</span>{{else}}<span class="model-badge" style="margin-left:8px;color:var(--text-dim);background:rgba(139,148,158,0.12)">unavailable</span>{{end}}</div>
               <div class="model-meta" style="margin-top:2px">
                 <span>{{$m.DonorsOnline}} donors</span><span>Load {{printf "%.0f" $m.Load}}%</span><span>{{$m.Vendor}}</span>
-              </div>
-            </div>
-            <span style="font-size:10px;color:var(--text-dim)">▼</span>
-          </div>
-          <div class="model-configs">
-            <!-- Continue.dev -->
-            <div class="tool-row" onclick="toggleTool(this, event)">
-              <div class="tool-row-name"><span class="chevron">▶</span> Continue.dev</div>
-              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-            </div>
-            <div class="tool-snippet">
-              <pre class="code-block"><code>{
-  "models": [{
-    "title": "GPU Mesh (free)",
-    "provider": "openai",
-    "apiBase": "{{$.BaseURL}}/v1",
-    "apiKey": "inf_your_key",
-    "model": "{{$m.Name}}"
-  }]
-}</code>
-                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-              </pre>
-            </div>
-
-            <!-- Aider -->
-            <div class="tool-row" onclick="toggleTool(this, event)">
-              <div class="tool-row-name"><span class="chevron">▶</span> Aider</div>
-              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-            </div>
-            <div class="tool-snippet">
-              <pre class="code-block"><code>aider --openai-api-base {{$.BaseURL}}/v1 \
-     --openai-api-key inf_your_key \
-     --model openai/{{$m.Name}}</code>
-                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-              </pre>
-            </div>
-
-            <!-- Cline -->
-            <div class="tool-row" onclick="toggleTool(this, event)">
-              <div class="tool-row-name"><span class="chevron">▶</span> Cline</div>
-              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-            </div>
-            <div class="tool-snippet">
-              <pre class="code-block"><code>{
-  "cline.apiProvider": "openai",
-  "cline.openAiBaseUrl": "{{$.BaseURL}}/v1",
-  "cline.openAiApiKey": "inf_your_key",
-  "cline.openAiModel": "{{$m.Name}}"
-}</code>
-                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-              </pre>
-            </div>
-
-            <!-- Open WebUI -->
-            <div class="tool-row" onclick="toggleTool(this, event)">
-              <div class="tool-row-name"><span class="chevron">▶</span> Open WebUI</div>
-              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-            </div>
-            <div class="tool-snippet">
-              <pre class="code-block"><code>OPENAI_API_BASE_URL={{$.BaseURL}}/v1
-OPENAI_API_KEY=inf_your_key</code>
-                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-              </pre>
-            </div>
-
-            <!-- curl -->
-            <div class="tool-row" onclick="toggleTool(this, event)">
-              <div class="tool-row-name"><span class="chevron">▶</span> curl</div>
-              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-            </div>
-            <div class="tool-snippet">
-              <pre class="code-block"><code>curl -s {{$.BaseURL}}/v1/chat/completions \
-  -H "Authorization: Bearer inf_your_key" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"{{$m.Name}}","messages":[{"role":"user","content":"Hi!"}]}'</code>
-                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-              </pre>
-            </div>
-
-            <!-- Python SDK -->
-            <div class="tool-row" onclick="toggleTool(this, event)">
-              <div class="tool-row-name"><span class="chevron">▶</span> Python SDK</div>
-              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-            </div>
-            <div class="tool-snippet">
-              <pre class="code-block"><code>from openai import OpenAI
-client = OpenAI(
-    base_url="{{$.BaseURL}}/v1",
-    api_key="inf_your_key"
-)
-client.chat.completions.create(
-    model="{{$m.Name}}",
-    messages=[{"role":"user","content":"Hello!"}],
-    stream=True
-)</code>
-                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-              </pre>
-            </div>
-
-            <!-- Oh My Pi -->
-            <div class="tool-row" onclick="toggleTool(this, event)">
-              <div class="tool-row-name"><span class="chevron">▶</span> Oh My Pi</div>
-              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-            </div>
-            <div class="tool-snippet">
-              <pre class="code-block"><code>export OPENAI_BASE_URL="{{$.BaseURL}}/v1"
-export OPENAI_API_KEY="inf_your_key"</code>
-                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-              </pre>
-              <div class="omp-field">
-                <span style="font-size:11px;color:var(--text-dim);white-space:nowrap">Launch:</span>
-                <code class="omp-field-code">omp run "write a hello world" --model {{$m.Name}}</code>
-                <button class="btn-consumer btn-sm btn-ghost omp-copy-btn" data-model="{{$m.Name}}" onclick="event.stopPropagation();copyOmpCmd(this)" style="white-space:nowrap">Copy</button>
               </div>
             </div>
           </div>

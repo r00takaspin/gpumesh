@@ -442,6 +442,23 @@ input[type="text"]:focus, input[type="search"]:focus { border-color: var(--accen
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 .inline-mono { font-family: var(--font-mono); font-size: 0.85em; }
 
+
+
+/* === OS tabs === */
+.os-tabs { margin-top: 12px; }
+.os-tab-input { display: none; }
+.os-tab-label { display: inline-block; font-size: 11px; padding: 4px 10px; margin-right: 4px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; color: var(--text-dim); user-select: none; }
+.os-tab-input:checked + .os-tab-label { color: var(--text); border-color: var(--accent); background: rgba(88,166,255,0.08); }
+.os-tab-content { display: none; }
+#os-linux-amd64:checked ~ #content-linux-amd64,
+#os-linux-arm64:checked ~ #content-linux-arm64,
+#os-macos:checked ~ #content-macos,
+#os-docker:checked ~ #content-docker { display: block; }
+/* /use variant — suffixed radio IDs */
+#os-linux-amd64-use:checked ~ #content-linux-amd64-use,
+#os-linux-arm64-use:checked ~ #content-linux-arm64-use,
+#os-macos-use:checked ~ #content-macos-use,
+#os-docker-use:checked ~ #content-docker-use { display: block; }
 /* === Responsive === */
 @media (max-width: 768px) {
   main { padding: 24px 16px; }

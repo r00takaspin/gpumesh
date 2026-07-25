@@ -78,7 +78,6 @@ func NewServer(cfg Config) (*Server, error) {
 	// Public pages.
 	mux.HandleFunc("GET /", s.corsMiddleware(s.handleIndex))
 	mux.HandleFunc("GET /models", s.corsMiddleware(s.handleModelsPage))
-	mux.HandleFunc("GET /status", s.corsMiddleware(s.handleStatusPage))
 
 	// Use Models (auth optional, page shows two states).
 	mux.HandleFunc("GET /use", s.corsMiddleware(s.handleUse))
@@ -108,7 +107,6 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("POST /api/report", s.requireAPIKey(s.handleReport))
 
 	// Frontend data API.
-	mux.HandleFunc("GET /api/status", s.corsMiddleware(s.handleAPIStatus))
 	mux.HandleFunc("GET /api/consumer/stats", s.requireAuth(s.handleConsumerStats))
 	mux.HandleFunc("GET /api/donor/stats", s.requireAuth(s.handleDonorStatsAPI))
 	mux.HandleFunc("GET /api/donor/status", s.requireAuth(s.handleDonorStatus))
@@ -118,6 +116,7 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("POST /use/keys", s.requireAuth(s.handleUseCreateKey))
 	mux.HandleFunc("GET /use/donor", s.requireAuth(s.handleUseDonor))
 	mux.HandleFunc("GET /share/status", s.requireAuth(s.handleShareStatus))
+	mux.HandleFunc("POST /share/tokens", s.requireAuth(s.handleShareCreateToken))
 
 	// Health check.
 	mux.HandleFunc("GET /health", s.handleHealth)
@@ -208,9 +207,6 @@ func (s *Server) handleModelsPage(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "models.html", s.pageDataWithStats(r))
 }
 
-func (s *Server) handleStatusPage(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "status.html", s.pageDataWithStats(r))
-}
 
 func (s *Server) redirectUse(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/use", http.StatusMovedPermanently)

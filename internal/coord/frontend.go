@@ -1,26 +1,13 @@
 package coord
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 )
 
-// --- GET /api/status ---
-
-func (s *Server) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
-	snap := s.registry.Snapshot()
-	uptime := time.Since(s.startTime)
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"donors_online": snap.DonorsOnline,
-		"models_online": snap.ModelsOnline,
-		"requests_today": s.requestsToday,
-		"tokens_today":   s.tokensToday,
-		"uptime":         formatDuration(uptime),
-	})
-}
 
 // --- GET /api/consumer/stats ---
 
@@ -148,20 +135,29 @@ func (s *Server) handleUseDonor(w http.ResponseWriter, r *http.Request) {
 	remaining := badgeThreshold - stats.TotalTokens
 
 	// Find donor-scoped key for token display.
+	// Collect all donor/both keys for the token list.
+	type donorKeyView struct {
+		ID        int64
+		KeyPrefix string
+		CreatedAt string
+	}
 	keys, _ := s.store.ListKeys(userID)
-	var tokenPrefix, tokenFull string
-	var tokenID int64
+	var donorKeys []donorKeyView
 	for _, k := range keys {
 		if k.Scope == "donor" || k.Scope == "both" {
-			tokenPrefix = k.KeyPrefix
-			tokenID = k.ID
-			break
+			donorKeys = append(donorKeys, donorKeyView{
+				ID:        k.ID,
+				KeyPrefix: k.KeyPrefix,
+				CreatedAt: k.CreatedAt.Format("2006-01-02"),
+			})
 		}
 	}
-	if tokenPrefix == "" {
-		tokenPrefix = "inf_xxxx"
+
+	tokenPrefix := "inf_xxxx"
+	if len(donorKeys) > 0 {
+		tokenPrefix = donorKeys[0].KeyPrefix
 	}
-	tokenFull = tokenPrefix + "..."
+	tokenFull := tokenPrefix + "..."
 
 	avg := 0.0
 	if stats.TotalUptimeSec > 0 {
@@ -184,11 +180,14 @@ func (s *Server) handleUseDonor(w http.ResponseWriter, r *http.Request) {
 		"AvgTokensPerSec":   avgTokensPerSec,
 		"TokenPrefix":       tokenPrefix,
 		"TokenFull":         tokenFull,
-		"TokenID":           tokenID,
+		"DonorKeys":         donorKeys,
 	}
 
 	renderTemplate(w, "use-donor.html", data)
 }
+const ctxKeyNewToken contextKey = "newToken"
+
+
 
 // handleShareStatus renders the share GPU status fragment.
 func (s *Server) handleShareStatus(w http.ResponseWriter, r *http.Request) {
@@ -232,20 +231,31 @@ func (s *Server) handleShareStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	remaining := badgeThreshold - stats.TotalTokens
 
+	// Collect all donor/both keys for the token list.
+	type donorKeyView struct {
+		ID        int64
+		KeyPrefix string
+		CreatedAt string
+	}
 	keys, _ := s.store.ListKeys(userID)
-	var tokenPrefix, tokenFull string
-	var tokenID int64
+	var donorKeys []donorKeyView
 	for _, k := range keys {
 		if k.Scope == "donor" || k.Scope == "both" {
-			tokenPrefix = k.KeyPrefix
-			tokenID = k.ID
-			break
+			donorKeys = append(donorKeys, donorKeyView{
+				ID:        k.ID,
+				KeyPrefix: k.KeyPrefix,
+				CreatedAt: k.CreatedAt.Format("2006-01-02"),
+			})
 		}
 	}
-	if tokenPrefix == "" {
-		tokenPrefix = "inf_xxxx"
+
+	tokenPrefix := "inf_xxxx"
+	if len(donorKeys) > 0 {
+		tokenPrefix = donorKeys[0].KeyPrefix
 	}
-	tokenFull = tokenPrefix + "..."
+	tokenFull := tokenPrefix + "..."
+
+	newTokenFull, _ := r.Context().Value(ctxKeyNewToken).(string)
 
 	avg := 0.0
 	if stats.TotalUptimeSec > 0 {
@@ -268,10 +278,27 @@ func (s *Server) handleShareStatus(w http.ResponseWriter, r *http.Request) {
 		"AvgTokensPerSec":   avgTokensPerSec,
 		"TokenPrefix":       tokenPrefix,
 		"TokenFull":         tokenFull,
-		"TokenID":           tokenID,
+		"DonorKeys":         donorKeys,
+		"NewTokenFull":      newTokenFull,
 	}
 
 	renderTemplate(w, "share-status.html", data)
+}
+
+// handleShareCreateToken creates a new donor token and re-renders the share status.
+func (s *Server) handleShareCreateToken(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	rawKey, _, err := s.store.CreateKey(userID, "donor")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create token")
+		return
+	}
+	ctx := context.WithValue(r.Context(), ctxKeyNewToken, rawKey)
+	s.handleShareStatus(w, r.WithContext(ctx))
 }
 
 // --- Helpers ---
@@ -347,13 +374,15 @@ func (s *Server) handleUseKeys(w http.ResponseWriter, r *http.Request) {
 		Scope     string
 		CreatedAt string
 	}
-	kv := make([]keyView, len(keys))
-	for i, k := range keys {
-		kv[i] = keyView{
-			ID:        k.ID,
-			Prefix:    k.KeyPrefix,
-			Scope:     k.Scope,
-			CreatedAt: k.CreatedAt.Format("2006-01-02"),
+	var kv []keyView
+	for _, k := range keys {
+		if k.Scope == "consumer" || k.Scope == "both" {
+			kv = append(kv, keyView{
+				ID:        k.ID,
+				Prefix:    k.KeyPrefix,
+				Scope:     k.Scope,
+				CreatedAt: k.CreatedAt.Format("2006-01-02"),
+			})
 		}
 	}
 	renderTemplate(w, "use-keys.html", map[string]interface{}{
