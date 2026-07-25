@@ -78,6 +78,7 @@ nav.topbar .logo {
   font-weight: 700;
   width: 140px;
   flex-shrink: 0;
+  text-decoration: none;
 }
 
 nav.topbar .nav-links {

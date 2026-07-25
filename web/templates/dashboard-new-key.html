@@ -87,17 +87,6 @@ export OPENAI_API_KEY="{{.NewKey}}"</code></pre>
     </div>
   </div>
 
-  <div class="accordion" onclick="toggleAccordion(this)">
-    <div class="accordion-header">
-      <span class="caret">▶</span> Codex CLI
-    </div>
-    <div class="accordion-body">
-      <pre class="code-block"><code>export OPENAI_BASE_URL="https://gpumesh.io/v1"
-export OPENAI_API_KEY="{{.APIKey}}"
-codex exec "list python files"</code></pre>
-      <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-    </div>
-  </div>
 
   <div class="accordion" onclick="toggleAccordion(this)">
     <div class="accordion-header">
@@ -188,9 +177,22 @@ export OPENAI_API_KEY="{{.APIKey}}"</code></pre>
 <script>
 function copyNewKey(btn) {
   var text = document.getElementById('new-key-text').textContent;
-  navigator.clipboard.writeText(text).then(function(){
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(function(){
+      btn.textContent = '[Copied!]';
+      btn.classList.add('copied');
+    });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
     btn.textContent = '[Copied!]';
     btn.classList.add('copied');
-  });
+  }
 }
 </script>

@@ -200,10 +200,10 @@ func (s *Server) handleConsumer(w http.ResponseWriter, r *http.Request) {
 	// Set base URL for tool config snippets.
 	pd.BaseURL = s.baseURL
 
-	// Set active tab from query param, default to "models".
+	// Set active tab from query param, default to "overview".
 	pd.Tab = r.URL.Query().Get("tab")
 	if pd.Tab == "" {
-		pd.Tab = "models"
+		pd.Tab = "overview"
 	}
 
 	if userID != 0 {

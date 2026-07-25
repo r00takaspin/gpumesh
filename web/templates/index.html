@@ -134,7 +134,6 @@
       <!-- Tool tabs -->
       <div class="tool-tabs">
         <button class="tool-tab-btn active" data-tab-group="tools" data-tab="continue" onclick="switchTab('tools','continue')">Continue.dev</button>
-        <button class="tool-tab-btn" data-tab-group="tools" data-tab="codex" onclick="switchTab('tools','codex')">Codex CLI</button>
         <button class="tool-tab-btn" data-tab-group="tools" data-tab="aider" onclick="switchTab('tools','aider')">Aider</button>
         <button class="tool-tab-btn" data-tab-group="tools" data-tab="cline" onclick="switchTab('tools','cline')">Cline</button>
         <button class="tool-tab-btn" data-tab-group="tools" data-tab="owui" onclick="switchTab('tools','owui')">Open WebUI</button>
@@ -159,15 +158,6 @@
         </div>
       </div>
 
-      <div class="tab-panel" data-tab-group="tools" data-tab="codex">
-        <div class="card">
-          <div class="prompt">codex invocation</div>
-          <pre class="code-block"><code>$ export OPENAI_BASE_URL="https://gpumesh.io/v1"
-$ export OPENAI_API_KEY="inf_7a3b9c..."
-$ codex exec "list python files"</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
 
       <div class="tab-panel" data-tab-group="tools" data-tab="aider">
         <div class="card">

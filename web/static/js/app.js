@@ -32,21 +32,29 @@ function copyToClipboard(btn) {
 
   if (!text) return;
 
-  navigator.clipboard.writeText(text.trim()).then(() => {
-    flashCopied(btn, codeBlock);
-  }).catch(() => {
-    const ta = document.createElement('textarea');
-    ta.value = text.trim();
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    flashCopied(btn, codeBlock);
-  });
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text.trim()).then(() => {
+      flashCopied(btn, codeBlock);
+    }).catch(() => {
+      fallbackCopy(text, btn, codeBlock);
+    });
+  } else {
+    fallbackCopy(text, btn, codeBlock);
+  }
 }
 
+
+function fallbackCopy(text, btn, codeBlock) {
+  const ta = document.createElement('textarea');
+  ta.value = text.trim();
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  flashCopied(btn, codeBlock);
+}
 function flashCopied(btn, codeBlock) {
   const orig = btn.textContent;
   btn.textContent = 'Copied!';

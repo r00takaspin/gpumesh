@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/r00takaspin/gpumesh/internal/proto"
 )
@@ -96,9 +97,13 @@ func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// HTMX: re-render the consumer tab fragment.
+	// HTMX: re-render the correct fragment based on source page.
 	if r.Header.Get("HX-Request") == "true" {
-		s.handleDashboardConsumer(w, r)
+		if strings.Contains(r.Header.Get("HX-Current-URL"), "/consumer") {
+			s.handleConsumerKeys(w, r)
+		} else {
+			s.handleDashboardConsumer(w, r)
+		}
 		return
 	}
 

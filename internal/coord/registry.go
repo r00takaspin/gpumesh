@@ -276,7 +276,7 @@ func (r *Registry) Snapshot() RegistrySnapshot {
 		}
 		avgLoad := 0.0
 		if count > 0 {
-			avgLoad = sumLoad / float64(count)
+			avgLoad = (sumLoad / float64(count)) * 100
 		}
 		snap.Models[model] = ModelSnapshot{
 			DonorsOnline: count,

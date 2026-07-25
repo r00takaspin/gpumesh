@@ -241,9 +241,22 @@
     .btn-primary:hover { opacity: 0.9; text-decoration: none; }
     .btn-ghost { background: transparent; color: var(--text-dim); }
     .btn-ghost:hover { color: var(--text); background: #21262d; }
-    .btn-sm { font-size: 12px; padding: 4px 12px; }
-    .btn-danger { color: var(--red); }
-    .btn-danger:hover { background: rgba(248,81,73,0.1); }
+    .btn-danger-sm {
+      font-size: 12px; padding: 5px 14px; line-height: 1.4;
+      color: #fff; background: var(--red); border: 1px solid var(--red);
+      border-radius: var(--radius-sm); cursor: pointer;
+      font-family: var(--font); font-weight: 500;
+      transition: opacity 0.1s;
+    }
+    .btn-danger-sm:hover { opacity: 0.85; }
+    .btn-ghost-sm {
+      font-size: 12px; padding: 5px 12px; line-height: 1.4;
+      color: var(--text-dim); background: transparent;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      cursor: pointer; font-family: var(--font); font-weight: 500;
+      transition: all 0.1s;
+    }
+    .btn-ghost-sm:hover { color: var(--text); border-color: #484f58; background: #21262d; }
 
     /* Empty state */
     .empty-state { text-align: center; padding: 40px 0; color: var(--text-dim); font-size: 13px; }
@@ -273,7 +286,7 @@
 {{if not .LoggedIn}}
 <!-- ====== LOGGED OUT ====== -->
 <nav class="topbar">
-  <span class="logo">⚡ GPU Mesh</span>
+  <a href="/" class="logo">⚡ GPU Mesh</a>
   <ul class="nav-links">
     <li><a href="/">Home</a></li>
     <li><a href="/models">Models</a></li>
@@ -355,7 +368,7 @@
 {{else}}
 <!-- ====== LOGGED IN ====== -->
 <nav class="topbar">
-  <span class="logo">⚡ GPU Mesh</span>
+  <a href="/" class="logo">⚡ GPU Mesh</a>
   <ul class="nav-links">
     <li><a href="/consumer" class="active">Consumer</a></li>
     <li><a href="/dashboard">Dashboard</a></li>
@@ -368,9 +381,8 @@
     <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
   </div>
 </nav>
-
 <main>
-  {{if .NewKey}}
+{{if .NewKey}}
   <!-- One-time API key display -->
   <div class="key-strip" id="onetime-key">
     <span style="font-size:11px;color:var(--orange);white-space:nowrap;margin-right:8px">⚠</span>
@@ -382,14 +394,7 @@
   <div id="onetime-warning" class="key-warning">
     ⚠ Copy this key now — it won't be shown again.
   </div>
-  {{else if .HasKeys}}
-  <!-- Normal key strip showing prefix -->
-  <div class="key-strip">
-    <span class="key-label">API key</span>
-    <span class="key-value">{{(index .Keys 0).KeyPrefix}}...</span>
-    <button class="key-copy" onclick="copyText(this, '{{(index .Keys 0).KeyPrefix}}...')">Copy</button>
-  </div>
-  {{end}}
+{{end}}
 
   <!-- Tabs -->
   <div class="consumer-tabs">
@@ -434,12 +439,12 @@ export OPENAI_API_KEY="{{if .HasKeys}}{{(index .Keys 0).KeyPrefix}}...{{else}}in
           <div>
             <div class="key-card-prefix">{{.KeyPrefix}}…</div>
             <div class="key-card-meta">Created {{.CreatedAt.Format "2006-01-02"}} · Scope <span class="model-badge" style="font-size:10px">{{.Scope}}</span></div>
-          </div>
-          <button class="btn-consumer btn-sm btn-danger"
+          <button class="btn-danger-sm"
             hx-delete="/api/keys/{{.ID}}"
             hx-target="#consumer-keys-list"
             hx-swap="innerHTML"
             hx-confirm="Revoke this key?">Revoke</button>
+          </div>
         </div>
       </div>
       {{end}}
@@ -499,18 +504,6 @@ export OPENAI_API_KEY="{{if .HasKeys}}{{(index .Keys 0).KeyPrefix}}...{{else}}in
           </pre>
         </div>
 
-        <!-- Codex CLI -->
-        <div class="tool-row" onclick="toggleTool(this, event)">
-          <div class="tool-row-name"><span class="chevron">▶</span> Codex CLI</div>
-          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-        </div>
-        <div class="tool-snippet">
-          <pre class="code-block"><code>export OPENAI_BASE_URL="{{$.BaseURL}}/v1"
-export OPENAI_API_KEY="{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}"
-codex exec "your prompt"</code>
-            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-          </pre>
-        </div>
 
         <!-- Cline -->
         <div class="tool-row" onclick="toggleTool(this, event)">
@@ -615,6 +608,9 @@ function switchTab(tab, el) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   if (el) el.classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
+  var url = new URL(window.location);
+  url.searchParams.set('tab', tab);
+  history.replaceState(null, '', url);
 }
 function dismissKey() {
   document.getElementById('onetime-key').style.display = 'none';
