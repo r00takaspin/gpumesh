@@ -78,13 +78,14 @@ func NewServer(cfg Config) (*Server, error) {
 	// Public pages.
 	mux.HandleFunc("GET /", s.corsMiddleware(s.handleIndex))
 	mux.HandleFunc("GET /models", s.corsMiddleware(s.handleModelsPage))
-	mux.HandleFunc("GET /leaderboard", s.corsMiddleware(s.handleLeaderboardPage))
 	mux.HandleFunc("GET /status", s.corsMiddleware(s.handleStatusPage))
 
-	// Dashboard (auth required).
-	mux.HandleFunc("GET /dashboard", s.requireAuth(s.handleDashboard))
-	// Consumer page (auth optional, page shows two states).
-	mux.HandleFunc("GET /consumer", s.corsMiddleware(s.handleConsumer))
+	// Use Models (auth optional, page shows two states).
+	mux.HandleFunc("GET /use", s.corsMiddleware(s.handleUse))
+	// Share GPU (auth optional).
+	mux.HandleFunc("GET /share", s.corsMiddleware(s.handleShare))
+	// Redirect old dashboard to /use.
+	mux.HandleFunc("GET /dashboard", s.redirectUse)
 
 	// OAuth.
 	mux.HandleFunc("GET /login", s.handleLoginPage)
@@ -111,17 +112,12 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /api/consumer/stats", s.requireAuth(s.handleConsumerStats))
 	mux.HandleFunc("GET /api/donor/stats", s.requireAuth(s.handleDonorStatsAPI))
 	mux.HandleFunc("GET /api/donor/status", s.requireAuth(s.handleDonorStatus))
-	mux.HandleFunc("GET /leaderboard/data", s.corsMiddleware(s.handleLeaderboardData))
-	mux.HandleFunc("GET /leaderboard/page", s.corsMiddleware(s.handleLeaderboardFragment))
-	mux.HandleFunc("GET /models/data", s.corsMiddleware(s.handleModelsData))
 
-	// HTMX dashboard fragments.
-	mux.HandleFunc("GET /dashboard/consumer", s.requireAuth(s.handleDashboardConsumer))
-	mux.HandleFunc("POST /dashboard/keys", s.requireAuth(s.handleDashboardCreateKey))
-	mux.HandleFunc("GET /dashboard/donor", s.requireAuth(s.handleDashboardDonor))
-	// HTMX consumer fragments.
-	mux.HandleFunc("GET /consumer/keys", s.requireAuth(s.handleConsumerKeys))
-	mux.HandleFunc("POST /consumer/keys", s.requireAuth(s.handleConsumerCreateKey))
+	// HTMX fragments.
+	mux.HandleFunc("GET /use/keys", s.requireAuth(s.handleUseKeys))
+	mux.HandleFunc("POST /use/keys", s.requireAuth(s.handleUseCreateKey))
+	mux.HandleFunc("GET /use/donor", s.requireAuth(s.handleUseDonor))
+	mux.HandleFunc("GET /share/status", s.requireAuth(s.handleShareStatus))
 
 	// Health check.
 	mux.HandleFunc("GET /health", s.handleHealth)
@@ -212,11 +208,11 @@ func (s *Server) handleModelsPage(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "models.html", s.pageDataWithStats(r))
 }
 
-func (s *Server) handleLeaderboardPage(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "leaderboard.html", s.pageDataWithStats(r))
-}
-
 func (s *Server) handleStatusPage(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "status.html", s.pageDataWithStats(r))
+}
+
+func (s *Server) redirectUse(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/use", http.StatusMovedPermanently)
 }
 

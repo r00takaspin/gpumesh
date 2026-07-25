@@ -3,285 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Consumer — GPU Mesh</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <title>Use Models — GPU Mesh</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0d1117; --bg-card: #161b22; --border: #30363d;
-      --text: #c9d1d6; --text-dim: #8b949e; --text-bright: #f0f6fc;
-      --accent: #3fb950; --accent-dim: rgba(63,185,80,0.12);
-      --blue: #58a6ff; --blue-dim: rgba(88,166,255,0.12);
-      --orange: #d2991d; --red: #f85149;
-      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      --font-mono: 'JetBrains Mono', 'SF Mono', 'Cascadia Code', monospace;
-      --radius: 8px; --radius-sm: 6px;
-    }
-    body.consumer-page {
-      background: var(--bg); color: var(--text);
-      font-family: var(--font); min-height: 100vh; line-height: 1.5;
-      -webkit-font-smoothing: antialiased;
-    }
-    .consumer-page .topbar {
-      background: var(--bg-card); border-bottom: 1px solid var(--border);
-      position: sticky; top: 0; z-index: 10;
-    }
-    .consumer-page main {
-      max-width: 720px; margin: 0 auto; padding: 32px 24px 80px;
-    }
-
-    /* Hero */
-    .hero { padding: 48px 0 32px; text-align: center; }
-    .hero-logo {
-      font-family: var(--font-mono); font-size: 13px; line-height: 1.4;
-      color: var(--accent); white-space: pre; margin-bottom: 24px;
-    }
-    .hero-command {
-      font-family: var(--font-mono); font-size: 13px; color: var(--text);
-      margin-bottom: 16px;
-    }
-    .hero h1 {
-      font-family: var(--font); font-size: 28px; font-weight: 600;
-      color: var(--text-bright); margin-bottom: 8px; letter-spacing: -0.02em;
-    }
-    .hero p {
-      font-size: 15px; color: var(--text-dim); max-width: 440px; margin: 0 auto 24px;
-      line-height: 1.6;
-    }
-
-    /* Cards */
-    .consumer-card {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px; margin-bottom: 12px;
-    }
-    .card-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 12px;
-    }
-    .card-title {
-      font-size: 13px; font-weight: 600; color: var(--text);
-      text-transform: uppercase; letter-spacing: 0.04em;
-    }
-
-    /* API Key strip */
-    .key-strip {
-      display: flex; align-items: center; gap: 12px;
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 10px 14px;
-      font-family: var(--font-mono); font-size: 13px;
-      margin-bottom: 16px;
-    }
-    .key-label { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
-    .key-value { color: var(--blue); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-    .key-copy {
-      font-family: var(--font); font-size: 12px; color: var(--text-dim);
-      background: var(--border); border: none; padding: 4px 10px;
-      border-radius: 4px; cursor: pointer; white-space: nowrap;
-    }
-    .key-copy:hover { color: var(--text); }
-    .key-warning { font-size: 11px; color: var(--orange); margin-bottom: 16px; padding: 0 2px; }
-
-    /* Tabs */
-    .consumer-tabs {
-      display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 20px;
-    }
-    .consumer-tab {
-      font-family: var(--font); font-size: 13px; font-weight: 500;
-      color: var(--text-dim); padding: 10px 16px; cursor: pointer;
-      border-bottom: 2px solid transparent; background: none;
-      border-top: none; border-left: none; border-right: none;
-      margin-bottom: -1px; transition: all 0.1s;
-    }
-    .consumer-tab:hover { color: var(--text); }
-    .consumer-tab.active { color: var(--text-bright); border-bottom-color: var(--accent); }
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-
-    /* Model cards */
-    .model-card {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius); overflow: hidden; margin-bottom: 8px;
-      transition: border-color 0.1s;
-    }
-    .model-card:hover { border-color: #484f58; }
-    .model-card-head {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 16px; cursor: pointer;
-    }
-    .model-card-head:hover { background: #21262d; }
-    .model-name {
-      font-family: var(--font-mono); font-size: 14px; font-weight: 500;
-      color: var(--text);
-    }
-    .model-badge {
-      font-size: 11px; font-weight: 500; color: var(--accent);
-      background: var(--accent-dim); padding: 2px 8px; border-radius: 10px;
-    }
-    .model-meta {
-      font-size: 12px; color: var(--text-dim); display: flex; gap: 16px;
-    }
-    .model-configs { display: none; border-top: 1px solid var(--border); padding: 0; }
-    .model-configs.open { display: block; }
-
-    /* Tool row */
-    .tool-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 16px; border-bottom: 1px solid var(--border);
-      cursor: pointer;
-    }
-    .tool-row:last-child { border-bottom: none; }
-    .tool-row:hover { background: #21262d; }
-    .tool-row-name {
-      font-family: var(--font-mono); font-size: 12px; color: var(--text);
-      display: flex; align-items: center; gap: 8px;
-    }
-    .tool-row-name .chevron { color: var(--text-dim); font-size: 10px; transition: transform 0.15s; }
-    .tool-row.open .tool-row-name .chevron { transform: rotate(90deg); }
-    .tool-snippet { display: none; padding: 0 16px 12px 28px; }
-    .tool-row.open + .tool-snippet { display: block; }
-
-    /* Code */
-    pre.code-block {
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 0;
-      overflow-x: auto; color: var(--text); margin: 8px 0 16px 0; position: relative;
-    }
-    pre.code-block code {
-      font-size: 12px; display: block; padding: 10px 40px 10px 12px;
-    }
-    .code-copy-btn {
-      position: absolute; top: 8px; right: 8px; z-index: 1;
-      font-family: var(--font); font-size: 11px; color: var(--text-dim);
-      background: var(--bg-card); border: 1px solid var(--border);
-      padding: 3px 8px; border-radius: 4px; cursor: pointer;
-    }
-    .code-copy-btn:hover { color: var(--text); background: #21262d; }
-
-    /* Oh My Pi inline field */
-    .omp-field {
-      display: flex; align-items: center; gap: 8px; margin-top: 4px;
-    }
-    .omp-field-code {
-      flex: 1; background: var(--bg); border: 1px solid var(--border);
-      border-radius: 4px; padding: 6px 10px;
-      font-family: var(--font-mono); font-size: 12px; color: var(--blue);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-
-    /* Stats */
-    .stat-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
-    }
-    .stat-box {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 16px;
-    }
-    .stat-num {
-      font-family: var(--font-mono); font-size: 22px; font-weight: 600;
-      color: var(--text-bright); margin-bottom: 4px;
-    }
-    .stat-label { font-size: 12px; color: var(--text-dim); }
-
-    /* Steps */
-    .steps {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
-    }
-    .step {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 16px; text-align: center;
-    }
-    .step-num {
-      font-family: var(--font-mono); font-size: 20px; font-weight: 600;
-      color: var(--accent); margin-bottom: 6px;
-    }
-    .step-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
-    .step-desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
-
-    /* Community banner */
-    .community-banner {
-      background: #21262d; border-radius: var(--radius-sm);
-      padding: 10px 14px; margin-bottom: 16px;
-      font-size: 13px; color: var(--text-dim); text-align: center; line-height: 1.5;
-    }
-    .community-banner strong { color: var(--text); }
-
-    /* Footer */
-    .consumer-page footer {
-      text-align: center; padding: 24px; border-top: 1px solid var(--border);
-      font-size: 12px; color: var(--text-dim);
-    }
-    .consumer-page footer a { color: var(--text-dim); text-decoration: none; }
-    .consumer-page footer a:hover { color: var(--text); }
-
-    /* Key list card */
-    .key-card {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 14px 16px; margin-bottom: 8px;
-    }
-    .key-card-row {
-      display: flex; justify-content: space-between; align-items: center;
-    }
-    .key-card-prefix {
-      font-family: var(--font-mono); font-size: 13px; color: var(--blue); margin-bottom: 2px;
-    }
-    .key-card-meta { font-size: 11px; color: var(--text-dim); }
-
-    /* Buttons */
-    .btn-consumer {
-      display: inline-flex; align-items: center; gap: 6px;
-      font-family: var(--font); font-size: 13px; font-weight: 500;
-      padding: 6px 16px; border-radius: var(--radius-sm); cursor: pointer;
-      border: none; text-decoration: none; transition: all 0.1s;
-      line-height: 1.4;
-    }
-    .btn-primary { background: var(--accent); color: #fff; }
-    .btn-primary:hover { opacity: 0.9; text-decoration: none; }
-    .btn-ghost { background: transparent; color: var(--text-dim); }
-    .btn-ghost:hover { color: var(--text); background: #21262d; }
-    .btn-danger-sm {
-      font-size: 12px; padding: 5px 14px; line-height: 1.4;
-      color: #fff; background: var(--red); border: 1px solid var(--red);
-      border-radius: var(--radius-sm); cursor: pointer;
-      font-family: var(--font); font-weight: 500;
-      transition: opacity 0.1s;
-    }
-    .btn-danger-sm:hover { opacity: 0.85; }
-    .btn-ghost-sm {
-      font-size: 12px; padding: 5px 12px; line-height: 1.4;
-      color: var(--text-dim); background: transparent;
-      border: 1px solid var(--border); border-radius: var(--radius-sm);
-      cursor: pointer; font-family: var(--font); font-weight: 500;
-      transition: all 0.1s;
-    }
-    .btn-ghost-sm:hover { color: var(--text); border-color: #484f58; background: #21262d; }
-
-    /* Empty state */
-    .empty-state { text-align: center; padding: 40px 0; color: var(--text-dim); font-size: 13px; }
-    .empty-state strong { color: var(--text); }
-
-    @media (max-width: 600px) {
-      .consumer-page main { padding: 24px 16px; }
-      .stat-grid, .steps { grid-template-columns: 1fr; }
-      .hero h1 { font-size: 22px; }
-    }
-
-    /* ── Pico.css overrides ── */
-    .consumer-page main { --pico-block-spacing-vertical: 0; }
-    .consumer-page .model-card { margin-bottom: 8px; }
-    .consumer-page pre,
-    .consumer-page code { padding: 0; background: none; }
-    .consumer-page .model-configs .tool-row,
-    .consumer-page .model-configs .tool-snippet { margin: 0; padding-left: 16px; padding-right: 16px; }
-    .consumer-page .model-card,
-    .consumer-page .model-configs { --pico-block-spacing-vertical: 0; }
-    .consumer-page button { --pico-block-spacing-vertical: 0; margin: 0; }
-    .consumer-page .key-card-row button { margin: 0; }
-  </style>
 </head>
-<body class="consumer-page">
+<body>
 
 {{if not .LoggedIn}}
 <!-- ====== LOGGED OUT ====== -->
@@ -289,12 +18,13 @@
   <a href="/" class="logo">⚡ GPU Mesh</a>
   <ul class="nav-links">
     <li><a href="/">Home</a></li>
+    <li><a href="/use" class="active">Use Models</a></li>
+    <li><a href="/share">Share GPU</a></li>
     <li><a href="/models">Models</a></li>
-    <li><a href="/leaderboard">Leaderboard</a></li>
     <li><a href="/status">Status</a></li>
   </ul>
   <div class="nav-right">
-    <a href="/auth/github?redirect=/consumer" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
+    <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
   </div>
 </nav>
 
@@ -314,7 +44,7 @@
     </div>
     <h1>Free LLM inference</h1>
     <p>Use any OpenAI-compatible tool with community GPUs. No credit card, no limits. One click to get started.</p>
-    <a href="/auth/github?redirect=/consumer" class="btn-consumer btn-primary">Sign in with GitHub →</a>
+    <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary">Sign in with GitHub →</a>
   </div>
 
   <!-- How it works -->
@@ -370,10 +100,10 @@
 <nav class="topbar">
   <a href="/" class="logo">⚡ GPU Mesh</a>
   <ul class="nav-links">
-    <li><a href="/consumer" class="active">Consumer</a></li>
-    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/">Home</a></li>
+    <li><a href="/use" class="active">Use Models</a></li>
+    <li><a href="/share">Share GPU</a></li>
     <li><a href="/models">Models</a></li>
-    <li><a href="/leaderboard">Leaderboard</a></li>
     <li><a href="/status">Status</a></li>
   </ul>
   <div class="nav-right">
@@ -414,8 +144,6 @@
   </div>
 {{end}}
 
-
-
   <!-- Tabs -->
   <div class="consumer-tabs">
     <button class="consumer-tab{{if eq .Tab "overview"}} active{{end}}" onclick="switchTab('overview', this)">Overview</button>
@@ -444,7 +172,7 @@
 
   <!-- TAB: API Keys -->
   <div class="tab-panel{{if eq .Tab "keys"}} active{{end}}" id="tab-keys">
-    <div id="consumer-keys-list" hx-get="/consumer/keys" hx-trigger="load">
+    <div id="consumer-keys-list" hx-get="/use/keys" hx-trigger="load">
       {{range .Keys}}
       <div class="key-card">
         <div class="key-card-row">
@@ -461,7 +189,7 @@
       </div>
       {{end}}
       <button class="btn-consumer btn-primary btn-sm"
-        hx-post="/consumer/keys"
+        hx-post="/use/keys"
         hx-target="#consumer-keys-list"
         hx-swap="innerHTML">
         + Create new key
@@ -515,7 +243,6 @@
             <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
           </pre>
         </div>
-
 
         <!-- Cline -->
         <div class="tool-row" onclick="toggleTool(this, event)">
@@ -593,9 +320,9 @@ export OPENAI_API_KEY="{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}
             <span style="font-size:11px;color:var(--text-dim);white-space:nowrap">Launch:</span>
             <code class="omp-field-code">omp run "write a hello world" --model {{$m.Name}}</code>
             <button class="btn-consumer btn-sm btn-ghost omp-copy-btn" data-model="{{$m.Name}}" onclick="event.stopPropagation();copyOmpCmd(this)" style="white-space:nowrap">Copy</button>
+          </div>
+        </div>
       </div>
-    </div>
-    </div>
     </div>
     {{end}}
     {{else}}
@@ -614,70 +341,5 @@ export OPENAI_API_KEY="{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}
 
 <script src="/static/js/app.js"></script>
 <script src="https://unpkg.com/htmx.org@2"></script>
-<script>
-function switchTab(tab, el) {
-  document.querySelectorAll('.consumer-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  if (el) el.classList.add('active');
-  document.getElementById('tab-' + tab).classList.add('active');
-  var url = new URL(window.location);
-  url.searchParams.set('tab', tab);
-  history.replaceState(null, '', url);
-}
-function dismissKey() {
-  document.getElementById('onetime-key').style.display = 'none';
-  document.getElementById('onetime-warning').style.display = 'none';
-}
-function dismissTryNow() {
-  var el = document.getElementById('try-now');
-  if (el) { el.style.display = 'none'; localStorage.setItem('try-now-dismissed', '1'); }
-}
-// Check on load: show if not dismissed
-(function() {
-  if (localStorage.getItem('try-now-dismissed') !== '1') {
-    var el = document.getElementById('try-now');
-    if (el) el.style.display = '';
-  }
-})();
-
-
-function toggleModel(head) {
-  head.parentElement.querySelector('.model-configs').classList.toggle('open');
-}
-function toggleTool(row, evt) {
-  row.classList.toggle('open');
-}
-
-function doCopy(btn, text) {
-  var ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  try { document.execCommand('copy'); } catch(e) {}
-  document.body.removeChild(ta);
-  btn.textContent = 'Copied!';
-  setTimeout(function() { btn.textContent = 'Copy'; }, 2000);
-}
-
-function copyCode(btn) {
-  var pre = btn.closest('pre');
-  if (!pre) return;
-  var code = pre.querySelector('code');
-  var text = code ? code.textContent : pre.textContent;
-  doCopy(btn, text.trim());
-}
-function copyText(btn, text) {
-  doCopy(btn, text);
-}
-function copyKey(btn, key) {
-  doCopy(btn, key);
-}
-function copyOmpCmd(btn) {
-  var model = btn.getAttribute('data-model');
-  doCopy(btn, 'omp run "write a hello world" --model ' + model);
-}
-</script>
 </body>
 </html>

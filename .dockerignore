@@ -1,0 +1,16 @@
+.git
+.github
+*.md
+*.db
+*.db-shm
+*.db-wal
+*.db.bak
+data/
+scripts/
+web/templates/
+*.exe
+gpumesh-*
+provider
+provider.exe
+coordinator
+main

@@ -34,7 +34,7 @@ func (s *Server) handleLoginStart(w http.ResponseWriter, r *http.Request) {
 	}
 	state := r.URL.Query().Get("redirect")
 	if state == "" {
-		state = "/dashboard"
+		state = "/use"
 	}
 	http.Redirect(w, r, oauthConfig.AuthCodeURL(state), http.StatusFound)
 }
@@ -96,10 +96,10 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 	})
 	redirect := r.URL.Query().Get("state")
 	if redirect == "" {
-		redirect = "/dashboard"
+		redirect = "/use"
 	}
 	// First login with no keys → auto-create flow.
-	if redirect == "/dashboard" || redirect == "/consumer" {
+	if redirect == "/use" || redirect == "/share" {
 		n, _ := s.store.CountKeys(userID)
 		if n == 0 {
 			redirect = redirect + "?new=1"
@@ -163,27 +163,8 @@ func (s *Server) getGithubLogin(userID int64) string {
 	return login
 }
 
-// handleDashboard renders the dashboard page.
-func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	userID := getUserID(r)
-	pd := s.pageDataWithStats(r)
-
-	// Auto-create first key if requested and user has none.
-	if r.URL.Query().Get("new") == "1" {
-		n, _ := s.store.CountKeys(userID)
-		if n == 0 {
-			rawKey, _, err := s.store.CreateKey(userID, "consumer")
-			if err == nil {
-				pd.NewKey = rawKey
-			}
-		}
-	}
-
-	renderTemplate(w, "dashboard.html", pd)
-}
-
-// handleConsumer renders the consumer page.
-func (s *Server) handleConsumer(w http.ResponseWriter, r *http.Request) {
+// handleUse renders the use models page.
+func (s *Server) handleUse(w http.ResponseWriter, r *http.Request) {
 	pd := s.pageDataWithStats(r)
 
 	// Extract user ID from session (public page, no requireAuth wrapper).
@@ -223,7 +204,13 @@ func (s *Server) handleConsumer(w http.ResponseWriter, r *http.Request) {
 		pd.Keys = keys
 	}
 
-	renderTemplate(w, "consumer.html", pd)
+	renderTemplate(w, "use.html", pd)
+}
+
+// handleShare renders the share GPU page (auth optional).
+func (s *Server) handleShare(w http.ResponseWriter, r *http.Request) {
+	pd := s.pageDataWithStats(r)
+	renderTemplate(w, "share.html", pd)
 }
 
 // handleLoginPage renders the login page with a GitHub OAuth button.

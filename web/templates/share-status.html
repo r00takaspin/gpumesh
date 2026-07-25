@@ -1,0 +1,94 @@
+{{if .Agents}}
+{{range .Agents}}
+<!-- Agent Status -->
+<div class="consumer-card" style="border-color:var(--accent)">
+  <div class="card-title">Agent Status</div>
+  <div class="flex-between mb-1">
+    <span class="mono" style="font-size:0.9rem;font-weight:700">Agent: {{.Description}}</span>
+    <span class="mono text-accent">🟢 ONLINE</span>
+  </div>
+  <div class="mono text-dim" style="font-size:0.75rem;line-height:1.8">
+    Models: {{.ModelCount}} &nbsp;│&nbsp; Load: {{.CurrentLoad}}/{{.MaxConcurrent}} &nbsp;│&nbsp; Uptime: {{.Uptime}}<br>
+    Models: {{.ModelList}}
+  </div>
+</div>
+{{end}}
+{{else}}
+<!-- Onboarding -->
+<div class="consumer-card" style="border-color:var(--accent);border-left:3px solid var(--accent)">
+  <div class="card-title">Get Started</div>
+  <div class="community-banner">
+    Run this command on your GPU machine to start sharing compute.
+  </div>
+  <pre class="code-block"><code>export MESH_TOKEN="{{.TokenPrefix}}..." && gpumesh-provider</code>
+    <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+  </pre>
+  <div class="steps" style="margin-top:12px">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-title">Install Ollama</div>
+      <div class="step-desc">ollama.com</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-title">Pull a model</div>
+      <div class="step-desc">ollama pull llama3.2:3b</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-title">Run the agent</div>
+      <div class="step-desc">Paste the command above</div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+<!-- Donor Token -->
+<div class="consumer-card">
+  <div class="card-title">Donor Token</div>
+  <div class="flex-between">
+    <span class="mono text-accent">{{.TokenPrefix}}****</span>
+    <span>
+      <button class="btn-consumer btn-sm btn-ghost" onclick="copyToClipboard(this)" data-copy="{{.TokenFull}}">Copy</button>
+      <button class="btn-ghost-sm" hx-post="/api/keys/{{.TokenID}}/regenerate" hx-target="closest .consumer-card" hx-swap="outerHTML">Regenerate</button>
+    </span>
+  </div>
+</div>
+
+<!-- Donor Stats -->
+<div class="consumer-card">
+  <div class="card-title">Statistics</div>
+  <div class="stat-grid">
+    <div class="stat-box">
+      <div class="stat-num">{{.Stats.TotalRequests}}</div>
+      <div class="stat-label">Requests served</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">{{.Stats.TotalTokens}}</div>
+      <div class="stat-label">Tokens generated</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">{{.AvgTokensPerSec}}</div>
+      <div class="stat-label">Avg tokens/sec</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num">{{.TotalUptime}}</div>
+      <div class="stat-label">Total uptime</div>
+    </div>
+  </div>
+</div>
+
+<!-- Badge -->
+<div class="consumer-card">
+  <div class="card-title">Badge</div>
+  <div class="badge-card" style="border:none;padding:0">
+    <div class="badge-tier">{{.BadgeEmoji}}</div>
+    <div class="badge-name">{{.Badge}} DONOR</div>
+    <div class="badge-detail">{{.Stats.TotalTokens}} lifetime tokens</div>
+    <progress value="{{.BadgeProgress}}" max="{{.BadgeThreshold}}"></progress>
+    <div class="progress-label">
+      <span>{{.BadgeRemaining}} to {{.BadgeNext}}</span>
+      <span class="text-accent">{{.BadgePercent}}%</span>
+    </div>
+  </div>
+</div>

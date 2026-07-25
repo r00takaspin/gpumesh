@@ -4,43 +4,34 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Authenticating… — GPU Mesh</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-  <meta http-equiv="refresh" content="3;url=/dashboard.html">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <meta http-equiv="refresh" content="3;url=/use">
 </head>
 <body>
   <main>
-    <div class="login-page">
-      <div class="prompt">ssh gpumesh.io --callback</div>
-
-      <div class="card login-card">
-        <div class="callback-status">
-          <span class="callback-dot"></span> Authenticating via GitHub…
-        </div>
-        <div class="callback-log">
-          <span class="mono text-accent">$</span> <span class="mono text-dim">curl -s https://github.com/login/oauth/authorize</span><br>
-          <span class="mono text-accent">&gt;</span> <span class="mono text-dim">code=ab12cd34ef56</span><br>
-          <span class="mono text-accent">$</span> <span class="mono text-dim">curl -s https://gpumesh.io/auth/callback?code=ab12cd…</span><br>
-          <span class="mono text-accent">&gt;</span> <span class="mono text-dim">200 OK — token issued</span><br>
-          <span class="mono text-accent">$</span> <span class="mono text-dim">ssh gpumesh.io --dashboard</span><br>
-          <span class="mono text-accent">&gt;</span> <span class="mono">Connecting…</span><span class="blink"></span>
-        </div>
-        <p class="login-note mt-2">
-          Redirecting to dashboard in 3 seconds…
-        </p>
+    <div class="callback-status">
+      <span class="callback-dot"></span> Authenticating via GitHub…
+      <div class="callback-log">
+        <span class="mono text-accent">$</span> <span class="mono text-dim">curl -s https://github.com/login/oauth/authorize</span><br>
+        <span class="mono text-accent">&gt;</span> <span class="mono text-dim">code=ab12cd34ef56</span><br>
+        <span class="mono text-accent">$</span> <span class="mono text-dim">curl -s https://gpumesh.io/auth/callback?code=ab12cd…</span><br>
+        <span class="mono text-accent">&gt;</span> <span class="mono text-dim">200 OK — token issued</span><br>
+        <span class="mono text-accent">$</span> <span class="mono text-dim">ssh gpumesh.io</span><br>
+        <span class="mono text-accent">&gt;</span> <span class="mono">Connecting…</span><span class="blink"></span>
       </div>
+      <p style="font-size:12px;color:var(--text-dim);margin-top:16px">
+        Redirecting in 3 seconds…
+      </p>
     </div>
   </main>
 
   <footer>
-    <div class="footer-row">
-      <span><a href="https://github.com/r00takaspin/gpumesh">GitHub</a></span>
-      <span>▶ 128 donors online</span>
-      <span>MIT License</span>
-    </div>
+    <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+    &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
   </footer>
 
   <script src="/static/js/app.js"></script>

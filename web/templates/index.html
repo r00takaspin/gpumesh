@@ -6,20 +6,19 @@
   <meta name="description" content="GPU Mesh — Free peer-to-peer LLM inference network. Use any OpenAI-compatible tool with community GPUs. No credit card.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
   <title>GPU Mesh — Free LLM Inference</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
   <nav class="topbar">
-    <span class="logo">⚡ GPU Mesh</span>
+    <a href="/" class="logo">⚡ GPU Mesh</a>
     <ul class="nav-links">
-      <li><a href="/">Home</a></li>
-      <li><a href="/dashboard">Dashboard</a></li>
+      <li><a href="/" class="active">Home</a></li>
+      <li><a href="/use">Use Models</a></li>
+      <li><a href="/share">Share GPU</a></li>
       <li><a href="/models">Models</a></li>
-      <li><a href="/leaderboard">Leaderboard</a></li>
       <li><a href="/status">Status</a></li>
     </ul>
     <div class="nav-right">
@@ -27,450 +26,99 @@
       <span class="nav-user mono text-accent">{{.Login}}</span>
       <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
       {{else}}
-      <a href="/login" class="btn btn--sm nav-login">[Login with GitHub]</a>
+      <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
       {{end}}
     </div>
   </nav>
 
   <main>
     <!-- Hero -->
-    <section class="hero">
-      <div class="ascii-logo">
-  _____ _____  _    _    __  __ ______  _____ _    _ 
+    <div class="hero">
+      <div class="hero-logo">
+  _____ _____  _    _    __  __ ______  _____ _    _
  / ____|  __ \| |  | |  |  \/  |  ____|/ ____| |  | |
 | |  __| |__) | |  | |  | \  / | |__  | (___ | |__| |
 | | |_ |  ___/| |  | |  | |\/| |  __|  \___ \|  __  |
 | |__| | |    | |__| |  | |  | | |____ ____) | |  | |
  \_____|_|     \____/   |_|  |_|______|_____/|_|  |_|
       </div>
-
-      <div class="hero-command">
-        [user@mesh]:~$ free_llm_inference --powered-by community_gpus<span class="blink"></span>
-      </div>
-
-      <p class="tagline">
-        Use any OpenAI-compatible tool. Zero cost. No credit card.
-      </p>
-
+      <h1>Free LLM inference</h1>
+      <p>Use any OpenAI-compatible tool with community GPUs. No credit card, no limits.</p>
       <div class="hero-cta">
-        {{if not .LoggedIn}}
-        <a href="/login" class="btn btn--hero">Get API Key <span class="arrow">&rarr;</span></a>
-        {{else if not .HasKeys}}
-        <a href="/dashboard?new=1" class="btn btn--hero">Get API Key <span class="arrow">&rarr;</span></a>
-        {{else}}
-        <a href="/dashboard" class="btn btn--hero">Dashboard <span class="arrow">&rarr;</span></a>
-        {{end}}
-        <a href="#donor-section" class="btn btn--hero btn--secondary">Become a Donor <span class="arrow">&rarr;</span></a>
+        <a href="/use" class="btn--hero">Use Models <span class="arrow">&rarr;</span></a>
+        <a href="/share" class="btn--hero btn--secondary">Share GPU <span class="arrow">&rarr;</span></a>
       </div>
-    </section>
-
-    <!-- What is this -->
-    <section class="section about-section">
-      <div class="card about-card">
-        <p style="max-width:44rem;margin:0 auto;font-size:0.95rem">
-          <span class="mono text-accent">$ whatis gpumesh</span><br>
-          GPU Mesh is a peer-to-peer network for <strong>free</strong> LLM inference. Community members share idle GPUs; the coordinator matches requests to available compute. No cloud bills, no rate limits, no credit card. For enthusiasts, hobby projects, and anyone who values <strong>free over enterprise-grade</strong>.
-        </p>
-      </div>
-    </section>
-
-
-    <!-- Live Stats -->
-    <div id="live-stats" class="stat-grid" hx-get="/" hx-trigger="every 10s" hx-select="#live-stats" hx-swap="outerHTML">
-      {{if not .StatsError}}
-      <div class="stat-card"><div class="stat-value">▶ {{.ModelsOnline}}</div><div class="stat-label">models online</div></div>
-      <div class="stat-card"><div class="stat-value">▶ {{.DonorsOnline}}</div><div class="stat-label">donors online</div></div>
-      <div class="stat-card"><div class="stat-value">▶ {{.RequestsToday}}</div><div class="stat-label">req today</div></div>
-      {{end}}
     </div>
 
-    <!-- How It Works -->
-    <section class="section">
-      <div class="section-title">HOW IT WORKS</div>
+    <!-- Live Stats -->
+    <div class="stat-grid" id="live-stats" hx-get="/" hx-trigger="every 30s" hx-select="#live-stats" hx-swap="outerHTML">
+      <div class="stat-box">
+        <div class="stat-num">{{.ModelsOnline}}</div>
+        <div class="stat-label">Models online</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">{{.DonorsOnline}}</div>
+        <div class="stat-label">Donors online</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">{{.RequestsToday}}</div>
+        <div class="stat-label">Requests today</div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div class="consumer-card">
+      <div class="card-title">How it works</div>
+      <div class="community-banner">
+        GPU Mesh is powered by <strong>community GPUs</strong>.
+        Enthusiasts share spare compute — you get free inference.
+      </div>
       <div class="steps">
         <div class="step">
-          <div class="step-num">1. SHARE</div>
-          <div class="step-title">Donors run</div>
-          <div class="step-desc">gpumesh-provider</div>
+          <div class="step-num">1</div>
+          <div class="step-title">Share</div>
+          <div class="step-desc">Donors run the agent, Ollama serves models. Anyone can contribute a GPU.</div>
         </div>
-        <div class="step-arrow">──▶</div>
         <div class="step">
-          <div class="step-num">2. MATCH</div>
-          <div class="step-title">Coordinator</div>
-          <div class="step-desc">routes requests</div>
+          <div class="step-num">2</div>
+          <div class="step-title">Match</div>
+          <div class="step-desc">The coordinator routes your request to an available donor with the model you need.</div>
         </div>
-        <div class="step-arrow">──▶</div>
         <div class="step">
-          <div class="step-num">3. USE</div>
-          <div class="step-title">Your tools</div>
-          <div class="step-desc">just work</div>
+          <div class="step-num">3</div>
+          <div class="step-title">Use</div>
+          <div class="step-desc">Your tools just work — OpenAI-compatible API. No config changes needed.</div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <!-- Why GPU Mesh -->
-    <section class="section">
-      <div class="section-title">WHY GPU MESH?</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;max-width:52rem;margin:0 auto">
-        <div class="card" style="text-align:center">
-          <div style="font-size:1.4rem;color:var(--accent);font-weight:700">$0</div>
-          <div class="text-dim" style="margin-top:0.25rem;font-size:0.85rem">Ollama is free locally, but not over the network. OpenRouter charges per token. We don&rsquo;t.</div>
-        </div>
-        <div class="card" style="text-align:center">
-          <div style="font-size:1.4rem;color:var(--accent);font-weight:700">OpenAI API</div>
-          <div class="text-dim" style="margin-top:0.25rem;font-size:0.85rem">Drop-in compatible. No new SDK. Two env vars and your existing tools just work.</div>
-        </div>
-        <div class="card" style="text-align:center">
-          <div style="font-size:1.4rem;color:var(--accent);font-weight:700">P2P</div>
-          <div class="text-dim" style="margin-top:0.25rem;font-size:0.85rem">No data center, no vendor lock-in. Community GPUs, community trust.</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- For Developers -->
-    <section class="section">
-      <div class="section-title">FOR DEVELOPERS</div>
-
-      <!-- Tool tabs -->
-      <div class="tool-tabs">
-        <button class="tool-tab-btn active" data-tab-group="tools" data-tab="continue" onclick="switchTab('tools','continue')">Continue.dev</button>
-        <button class="tool-tab-btn" data-tab-group="tools" data-tab="aider" onclick="switchTab('tools','aider')">Aider</button>
-        <button class="tool-tab-btn" data-tab-group="tools" data-tab="cline" onclick="switchTab('tools','cline')">Cline</button>
-        <button class="tool-tab-btn" data-tab-group="tools" data-tab="owui" onclick="switchTab('tools','owui')">Open WebUI</button>
-        <button class="tool-tab-btn" data-tab-group="tools" data-tab="python" onclick="switchTab('tools','python')">Python SDK</button>
-        <button class="tool-tab-btn" data-tab-group="tools" data-tab="curl" onclick="switchTab('tools','curl')">curl</button>
-        <button class="tool-tab-btn" data-tab-group="tools" data-tab="omp" onclick="switchTab('tools','omp')">Oh My Pi</button>
-      </div>
-
-      <div class="tab-panel active" data-tab-group="tools" data-tab="continue">
-        <div class="card">
-          <div class="prompt">cat ~/.continue/config.json</div>
-          <pre class="code-block"><code>{
-  "models": [{
-    "title": "GPU Mesh (free)",
-    "provider": "openai",
-    "apiBase": "https://gpumesh.io/v1",
-    "apiKey": "inf_7a3b9c...",
-    "model": "llama3.2:3b"
-  }]
-}</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-
-      <div class="tab-panel" data-tab-group="tools" data-tab="aider">
-        <div class="card">
-          <div class="prompt">aider invocation</div>
-          <pre class="code-block"><code>$ export OPENAI_BASE_URL="https://gpumesh.io/v1"
-$ export OPENAI_API_KEY="inf_7a3b9c..."
-$ aider --model openai/llama3.2:3b</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-tab-group="tools" data-tab="cline">
-        <div class="card">
-          <div class="prompt">Cline extension settings</div>
-          <pre class="code-block"><code>{
-  "cline.apiProvider": "openai",
-  "cline.openAiBaseUrl": "https://gpumesh.io/v1",
-  "cline.openAiApiKey": "inf_7a3b9c...",
-  "cline.openAiModel": "llama3.2:3b"
-}</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-tab-group="tools" data-tab="owui">
-        <div class="card">
-          <div class="prompt">Open WebUI connection settings</div>
-          <pre class="code-block"><code>URL: https://gpumesh.io/v1
-Key: inf_7a3b9c...
-Model: llama3.2:3b</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-tab-group="tools" data-tab="python">
-        <div class="card">
-          <div class="prompt">python -c</div>
-          <pre class="code-block"><code>from openai import OpenAI
-
-client = OpenAI(
-    base_url="https://gpumesh.io/v1",
-    api_key="inf_7a3b9c..."
-)
-
-stream = client.chat.completions.create(
-    model="llama3.2:3b",
-    messages=[{"role": "user", "content": "Hello!"}],
-    stream=True
-)
-for chunk in stream:
-    if chunk.choices[0].delta.content:
-        print(chunk.choices[0].delta.content, end="")</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-tab-group="tools" data-tab="curl">
-        <div class="card">
-          <div class="prompt">curl invocation</div>
-          <pre class="code-block"><code>curl -s https://gpumesh.io/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer inf_7a3b9c..." \
-  -d '{"model":"llama3.2:3b","messages":[{"role":"user","content":"Hello!"}]}'</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-tab-group="tools" data-tab="omp">
-        <div class="card">
-          <div class="prompt">omp config</div>
-          <pre class="code-block"><code>$ export OPENAI_BASE_URL="https://gpumesh.io/v1"
-$ export OPENAI_API_KEY="inf_7a3b9c..."</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-        </div>
-      </div>
-
-      <p class="text-center mt-2">
-        <span class="prompt" style="display:inline"></span>
-        {{if not .LoggedIn}}<button class="btn" onclick="location.href='/login'">{{else if not .HasKeys}}<button class="btn" onclick="location.href='/dashboard?new=1'">{{else}}<button class="btn" onclick="location.href='/dashboard'">{{end}}./get-api-key.sh</button>
-      </p>
-
-      <div id="donor-section" class="section-divider"></div>
-      <div class="section-title">SHARE YOUR GPU, EARN REPUTATION</div>
-      <p class="text-center mb-2" style="max-width:38rem;margin-inline:auto">
-        Run the agent, climb the leaderboard, earn badges. Every request you serve builds your reputation in the mesh.
-      </p>
-      {{if not .LoggedIn}}
-      <p class="text-center mb-2">
-        <a href="/login" class="btn">──▶ Login with GitHub to get your donor token</a>
-      </p>
-      {{else}}
-      <p class="text-center mb-2">
-        <a href="/dashboard" class="btn">──▶ Get your donor token from Dashboard</a>
-      </p>
-      {{end}}
-      <div class="steps">
-        <div class="step">
-          <div class="step-num">1. GET TOKEN</div>
-          <div class="step-title">from Dashboard</div>
-          <div class="step-desc">Create a donor-scoped API key</div>
-        </div>
-        <div class="step-arrow">──▶</div>
-        <div class="step">
-          <div class="step-num">2. INSTALL</div>
-          <div class="step-title">Ollama</div>
-          <div class="step-desc">ollama.com</div>
-        </div>
-        <div class="step-arrow">──▶</div>
-        <div class="step">
-          <div class="step-num">3. PULL</div>
-          <div class="step-title">a model</div>
-          <div class="step-desc">ollama pull llama3.2:3b</div>
-        </div>
-        <div class="step-arrow">──▶</div>
-        <div class="step">
-          <div class="step-num">4. RUN</div>
-          <div class="step-title">our agent</div>
-          <div class="step-desc">gpumesh-provider</div>
-        </div>
-      </div>
-      <p class="text-center mt-2 mb-1 text-dim" style="font-size:0.82rem">Choose your platform below:</p>
-      <div class="tool-tabs">
-        <button class="tool-tab-btn active" data-tab-group="install" data-tab="linux-arm64" onclick="switchTab('install','linux-arm64')">Linux arm64</button>
-        <button class="tool-tab-btn" data-tab-group="install" data-tab="linux-amd64" onclick="switchTab('install','linux-amd64')">Linux amd64</button>
-        <button class="tool-tab-btn" data-tab-group="install" data-tab="macos" onclick="switchTab('install','macos')">macOS</button>
-        <button class="tool-tab-btn" data-tab-group="install" data-tab="windows" onclick="switchTab('install','windows')">Windows</button>
-        <button class="tool-tab-btn" data-tab-group="install" data-tab="go" onclick="switchTab('install','go')">Go install</button>
-        <button class="tool-tab-btn" data-tab-group="install" data-tab="docker" onclick="switchTab('install','docker')">Docker</button>
-
-      <div class="tab-panel active" data-tab-group="install" data-tab="linux-arm64">
-        <div class="card">
-          <div class="prompt">curl -sL https://github.com/r00takaspin/gpumesh/releases/latest</div>
-          <pre class="code-block"><code>$ curl -sLO https://github.com/r00takaspin/gpumesh/releases/latest/download/gpumesh-provider_0.1.4_linux_arm64.tar.gz
-$ tar xzf gpumesh-provider_0.1.4_linux_arm64.tar.gz
-$ sudo mv gpumesh-provider /usr/local/bin/
-$ export MESH_TOKEN="inf_xxxxxxxx"
-$ gpumesh-provider</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-          <p class="mono text-dim mt-1" style="font-size:0.68rem">Raspberry Pi 4/5, Orange Pi, Jetson Nano, and other ARM64 SBCs.</p>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-tab-group="install" data-tab="linux-amd64">
-        <div class="card">
-          <div class="prompt">curl -sL https://github.com/r00takaspin/gpumesh/releases/latest</div>
-          <pre class="code-block"><code>$ curl -sLO https://github.com/r00takaspin/gpumesh/releases/latest/download/gpumesh-provider_0.1.4_linux_amd64.tar.gz
-$ tar xzf gpumesh-provider_0.1.4_linux_amd64.tar.gz
-$ sudo mv gpumesh-provider /usr/local/bin/
-$ export MESH_TOKEN="inf_xxxxxxxx"
-$ gpumesh-provider</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-          <p class="mono text-dim mt-1" style="font-size:0.68rem">Any x86_64 box with an NVIDIA/AMD GPU. Works on gaming rigs, workstations, cloud VMs.</p>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-tab-group="install" data-tab="macos">
-        <div class="card">
-          <div class="prompt">curl -sL https://github.com/r00takaspin/gpumesh/releases/latest</div>
-          <pre class="code-block"><code>$ curl -sLO https://github.com/r00takaspin/gpumesh/releases/latest/download/gpumesh-provider_0.1.4_darwin_arm64.tar.gz
-$ tar xzf gpumesh-provider_0.1.4_darwin_arm64.tar.gz
-$ sudo mv gpumesh-provider /usr/local/bin/
-$ sudo xattr -d com.apple.quarantine /usr/local/bin/gpumesh-provider
-$ export MESH_TOKEN="inf_xxxxxxxx"
-$ gpumesh-provider</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-          <p class="mono text-dim mt-1" style="font-size:0.68rem">Apple Silicon (M1/M2/M3/M4). If blocked, allow in <strong>System Settings → Privacy &amp; Security</strong>.</p>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-tab-group="install" data-tab="windows">
-        <div class="card">
-          <div class="prompt">PowerShell</div>
-          <pre class="code-block"><code>PS&gt; curl -sLO https://github.com/r00takaspin/gpumesh/releases/latest/download/gpumesh-provider_0.1.4_windows_amd64.zip
-PS&gt; Expand-Archive gpumesh-provider_0.1.4_windows_amd64.zip -Dest .
-PS&gt; $env:MESH_TOKEN="inf_xxxxxxxx"
-PS&gt; .\gpumesh-provider.exe</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-          <p class="mono text-dim mt-1" style="font-size:0.68rem">Windows 10/11 x64. PowerShell or Windows Terminal recommended.</p>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-tab-group="install" data-tab="go">
-        <div class="card">
-          <div class="prompt">go install</div>
-          <pre class="code-block"><code>$ go install github.com/r00takaspin/gpumesh/cmd/provider@latest
-$ export MESH_TOKEN="inf_xxxxxxxx"
-$ gpumesh-provider</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-          <p class="mono text-dim mt-1" style="font-size:0.68rem">Requires Go 1.22+. Works anywhere Go compiles. No external dependencies.</p>
-        </div>
-      </div>
-
-      <div class="tab-panel" data-tab-group="install" data-tab="docker">
-        <div class="card">
-          <div class="prompt">docker run</div>
-          <pre class="code-block"><code>$ docker run -d \
-    --name gpumesh-provider \
-    --gpus all \
-    -e MESH_TOKEN="inf_xxxxxxxx" \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    ghcr.io/gpumesh/provider:latest</code></pre>
-          <button class="copy-btn" onclick="copyToClipboard(this)">[Copy]</button>
-          <p class="mono text-dim mt-1" style="font-size:0.68rem">Runs in a container. GPU access via --gpus. Auto-updates on restart.</p>
-        </div>
-      </div>
-
-      <p class="text-center mt-2">
-        <span class="prompt" style="display:inline"></span>
-        <a href="/dashboard" class="mono">man gpumesh-donor</a>
-        &nbsp;│&nbsp;
-        <a href="https://github.com/r00takaspin/gpumesh/releases" class="mono">All releases →</a>
-      </p>
-    </section>
-
-    <!-- Community -->
-    <section class="section">
-      <div class="section-title">JOIN THE COMMUNITY</div>
-      <p class="text-center mb-2" style="max-width:36rem;margin-inline:auto">
-        GPU Mesh is in early development. Star the repo, join the discussion, help shape what comes next.
-      </p>
-      <p class="text-center" style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
-        <a href="https://github.com/r00takaspin/gpumesh" class="btn">&#9733; Star on GitHub</a>
-        <a href="https://discord.gg/gpumesh" class="btn btn--secondary">Join Discord</a>
-        <a href="https://github.com/r00takaspin/gpumesh/discussions" class="btn btn--secondary">Discussions</a>
-      </p>
-    </section>
-
-    <!-- Available Models -->
-    <section class="section">
-      <div class="section-title">TOP MODELS RIGHT NOW</div>
-      <div id="top-models" hx-get="/" hx-trigger="every 30s" hx-select="#top-models" hx-swap="outerHTML" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;max-width:52rem;margin:0 auto">
-        {{if .TopModels}}
-        {{range .TopModels}}
-        <div class="card" style="display:flex;justify-content:space-between;align-items:center">
+    <!-- Top Models -->
+    <div class="consumer-card">
+      <div class="card-title">Top models right now</div>
+      {{if .TopModels}}
+      {{range .TopModels}}
+      <div class="model-card">
+        <div class="model-card-head">
           <div>
-            <div class="mono" style="font-weight:600">{{.Name}}</div>
-            <div class="text-dim" style="font-size:0.78rem">{{.Vendor}}</div>
+            <div class="model-name">{{.Name}}</div>
+            <div class="model-meta">{{.DonorCount}} donor{{if ne .DonorCount 1}}s{{end}} · {{.Vendor}}</div>
           </div>
-          <div class="text-accent" style="font-size:0.85rem">▶ {{.DonorCount}} donors</div>
-        </div>
-        {{end}}
-        {{else}}
-        <p class="text-dim" style="grid-column:1/-1;text-align:center">No models online — check back soon</p>
-        {{end}}
-      </div>
-      <p class="text-center mt-2">
-        <a href="/models" class="mono">Browse all models →</a>
-      </p>
-    </section>
-
-    <!-- Leaderboard Preview -->
-    <section class="section">
-      <div class="section-title">TOP DONORS THIS WEEK</div>
-      <div id="top-donors" hx-get="/" hx-trigger="every 30s" hx-select="#top-donors" hx-swap="outerHTML" class="podium">
-        {{if .TopDonors}}
-        {{range $i, $d := .TopDonors}}
-        {{if eq $i 0}}<div class="podium-spot first">{{else if eq $i 1}}<div class="podium-spot second">{{else}}<div class="podium-spot third">{{end}}
-          {{if eq $i 0}}<div class="medal">🥇</div>{{else if eq $i 1}}<div class="medal">🥈</div>{{else}}<div class="medal">🥉</div>{{end}}
-          <div class="name mono">{{$d.Name}}</div>
-          <div class="badge-icon">{{$d.Badge}}</div>
-          <div class="tokens">{{$d.Tokens}} tokens</div>
-        </div>
-        {{end}}
-        {{else}}
-        <p class="text-dim text-center" style="grid-column:1/-1;padding:2rem">No donors this week — be the first!</p>
-        {{end}}
-      </div>
-      <p class="text-center mt-2">
-        <a href="/leaderboard" class="mono">Full leaderboard →</a>
-      </p>
-    </section>
-
-
-    <!-- FAQ -->
-    <section class="section">
-      <div class="section-title">FAQ</div>
-
-      <div class="accordion" onclick="toggleAccordion(this)">
-        <div class="accordion-header">
-          <span class="caret">▶</span> Is it really free?
-        </div>
-        <div class="accordion-body">
-          Yes. Community GPUs, community effort. No catches, no credit card, no usage caps.
+          <div class="model-badge">live</div>
         </div>
       </div>
-
-      <div class="accordion" onclick="toggleAccordion(this)">
-        <div class="accordion-header">
-          <span class="caret">▶</span> Is my data safe?
-        </div>
-        <div class="accordion-body">
-          Your prompts are processed by community GPUs to generate responses, the same way they&rsquo;re processed on OpenAI&rsquo;s or Anthropic&rsquo;s servers. We never store prompts or responses. No persistent logging.
-        </div>
+      {{end}}
+      {{else}}
+      <div class="empty-state">No models online right now. <strong>Be the first donor!</strong></div>
+      {{end}}
+      <div style="text-align:center;margin-top:12px">
+        <a href="/models" style="font-size:13px;color:var(--blue)">Browse all models &rarr;</a>
       </div>
-
-      <div class="accordion" onclick="toggleAccordion(this)">
-        <div class="accordion-header">
-          <span class="caret">▶</span> What models are available?
-        </div>
-        <div class="accordion-body">
-          All Ollama-compatible models that donors have shared. Browse the full catalog at
-          <a href="/models">/models</a>. Common picks: llama3.2, codellama, qwen2.5, mistral.
-        </div>
-      </div>
-    </section>
+    </div>
   </main>
 
   <footer>
-    <div class="footer-row">
-      <span><a href="https://github.com/r00takaspin/gpumesh">GitHub</a></span>
-      <span>▶ {{.DonorsOnline}} donors online</span>
-      <span>MIT License</span>
-    </div>
+    <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+    &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
   </footer>
 
   <script src="/static/js/app.js"></script>

@@ -3,95 +3,179 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="GPU Mesh — Free peer-to-peer LLM inference network. Use any OpenAI-compatible tool with community GPUs. No credit card.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
-  <title>Model Catalog — GPU Mesh</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Model Catalog — GPU Mesh</title>
 </head>
 <body>
   <nav class="topbar">
-    <span class="logo">⚡ GPU Mesh</span>
+    <a href="/" class="logo">⚡ GPU Mesh</a>
     <ul class="nav-links">
       <li><a href="/">Home</a></li>
-      <li><a href="/dashboard">Dashboard</a></li>
+      <li><a href="/use">Use Models</a></li>
+      <li><a href="/share">Share GPU</a></li>
       <li><a href="/models" class="active">Models</a></li>
-      <li><a href="/leaderboard">Leaderboard</a></li>
       <li><a href="/status">Status</a></li>
     </ul>
     <div class="nav-right">
       {{if .LoggedIn}}
       <span class="nav-user mono text-accent">{{.Login}}</span>
-      <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
+      <a href="/logout" class="btn-consumer btn-sm">Logout</a>
       {{else}}
-      <a href="/login" class="btn btn--sm nav-login">[Login with GitHub]</a>
+      <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
       {{end}}
     </div>
   </nav>
 
   <main>
-    <div class="prompt">ls /models/</div>
+    <div class="consumer-card">
+      <div class="card-title">Model Catalog</div>
 
-    <!-- Search -->
-    <div class="flex-between mb-2" style="gap:0.5rem">
-      <span class="mono" style="font-size:0.85rem;white-space:nowrap">$ find . -name "$query"</span>
-      <input type="search" placeholder="Search models..." aria-label="Search models" style="flex:1;max-width:400px">
-      <button class="btn btn--sm">search</button>
-    </div>
-
-
-    <div id="model-list" hx-get="/models" hx-trigger="every 30s" hx-select="#model-list" hx-swap="outerHTML">
-      <p class="text-dim mono mb-2" style="font-size:0.7rem">Updated just now</p>
-
-      {{if .Models}}
-      {{range .Models}}
-      <div class="card">
-        <div class="flex-between mb-1">
-          <span class="mono" style="font-size:0.9rem;font-weight:700">{{.Name}}</span>
-          {{if ge .DonorsOnline 5}}
-          <span class="mono text-accent">🟢 Fast — {{.DonorsOnline}} donors</span>
-          {{else if ge .DonorsOnline 1}}
-          <span class="mono text-warning">🟡 Available — {{.DonorsOnline}} donors</span>
-          {{else}}
-          <span class="mono text-error">🔴 Offline</span>
-          {{end}}
-        </div>
-        <div style="border-top:1px solid var(--border);margin:0.5rem 0"></div>
-        <div class="flex-between mb-1">
-          <span class="mono text-dim" style="font-size:0.75rem">Load</span>
-          {{if gt .DonorsOnline 0}}
-          <span class="mono text-accent" style="font-size:0.75rem">{{printf "%.2f" .Load}}</span>
-          {{else}}
-          <span class="mono text-dim" style="font-size:0.75rem">—</span>
-          {{end}}
-        </div>
-        <progress value="{{.Load}}" max="1"></progress>
-        <div class="mt-1" style="display:flex;gap:0.35rem;flex-wrap:wrap">
-          {{range .Tags}}
-          <span class="tool-tab-btn" style="font-size:0.7rem;cursor:default">{{.}}</span>
-          {{end}}
-        </div>
-        <div class="mt-1">
-          <span class="mono text-dim" style="font-size:0.7rem">Min VRAM: {{.VRAM}}</span>
-        </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:16px">
+        <input type="search" placeholder="Search models..." aria-label="Search models" style="flex:1">
+        <button class="btn-consumer btn-sm btn-primary">search</button>
       </div>
-      {{end}}
-      {{else}}
-      <p class="text-dim" style="text-align:center">No models available right now. Check back later or <a href="/dashboard">become a donor</a>!</p>
-      {{end}}
-    </div>
 
+      <div id="model-list" hx-get="/models" hx-trigger="every 30s" hx-select="#model-list" hx-swap="outerHTML">
+        {{if .Models}}
+        {{range $idx, $m := .Models}}
+        <div class="model-card">
+          <div class="model-card-head" onclick="toggleModel(this)">
+            <div>
+              <div class="model-name">{{$m.Name}}{{if gt $m.DonorsOnline 0}}<span class="model-badge" style="margin-left:8px">available</span>{{else}}<span class="model-badge" style="margin-left:8px;color:var(--text-dim);background:rgba(139,148,158,0.12)">unavailable</span>{{end}}</div>
+              <div class="model-meta" style="margin-top:2px">
+                <span>{{$m.DonorsOnline}} donors</span><span>Load {{printf "%.0f" $m.Load}}%</span><span>{{$m.Vendor}}</span>
+              </div>
+            </div>
+            <span style="font-size:10px;color:var(--text-dim)">▼</span>
+          </div>
+          <div class="model-configs">
+            <!-- Continue.dev -->
+            <div class="tool-row" onclick="toggleTool(this, event)">
+              <div class="tool-row-name"><span class="chevron">▶</span> Continue.dev</div>
+              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+            </div>
+            <div class="tool-snippet">
+              <pre class="code-block"><code>{
+  "models": [{
+    "title": "GPU Mesh (free)",
+    "provider": "openai",
+    "apiBase": "{{$.BaseURL}}/v1",
+    "apiKey": "inf_your_key",
+    "model": "{{$m.Name}}"
+  }]
+}</code>
+                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+              </pre>
+            </div>
+
+            <!-- Aider -->
+            <div class="tool-row" onclick="toggleTool(this, event)">
+              <div class="tool-row-name"><span class="chevron">▶</span> Aider</div>
+              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+            </div>
+            <div class="tool-snippet">
+              <pre class="code-block"><code>aider --openai-api-base {{$.BaseURL}}/v1 \
+     --openai-api-key inf_your_key \
+     --model openai/{{$m.Name}}</code>
+                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+              </pre>
+            </div>
+
+            <!-- Cline -->
+            <div class="tool-row" onclick="toggleTool(this, event)">
+              <div class="tool-row-name"><span class="chevron">▶</span> Cline</div>
+              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+            </div>
+            <div class="tool-snippet">
+              <pre class="code-block"><code>{
+  "cline.apiProvider": "openai",
+  "cline.openAiBaseUrl": "{{$.BaseURL}}/v1",
+  "cline.openAiApiKey": "inf_your_key",
+  "cline.openAiModel": "{{$m.Name}}"
+}</code>
+                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+              </pre>
+            </div>
+
+            <!-- Open WebUI -->
+            <div class="tool-row" onclick="toggleTool(this, event)">
+              <div class="tool-row-name"><span class="chevron">▶</span> Open WebUI</div>
+              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+            </div>
+            <div class="tool-snippet">
+              <pre class="code-block"><code>OPENAI_API_BASE_URL={{$.BaseURL}}/v1
+OPENAI_API_KEY=inf_your_key</code>
+                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+              </pre>
+            </div>
+
+            <!-- curl -->
+            <div class="tool-row" onclick="toggleTool(this, event)">
+              <div class="tool-row-name"><span class="chevron">▶</span> curl</div>
+              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+            </div>
+            <div class="tool-snippet">
+              <pre class="code-block"><code>curl -s {{$.BaseURL}}/v1/chat/completions \
+  -H "Authorization: Bearer inf_your_key" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"{{$m.Name}}","messages":[{"role":"user","content":"Hi!"}]}'</code>
+                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+              </pre>
+            </div>
+
+            <!-- Python SDK -->
+            <div class="tool-row" onclick="toggleTool(this, event)">
+              <div class="tool-row-name"><span class="chevron">▶</span> Python SDK</div>
+              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+            </div>
+            <div class="tool-snippet">
+              <pre class="code-block"><code>from openai import OpenAI
+client = OpenAI(
+    base_url="{{$.BaseURL}}/v1",
+    api_key="inf_your_key"
+)
+client.chat.completions.create(
+    model="{{$m.Name}}",
+    messages=[{"role":"user","content":"Hello!"}],
+    stream=True
+)</code>
+                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+              </pre>
+            </div>
+
+            <!-- Oh My Pi -->
+            <div class="tool-row" onclick="toggleTool(this, event)">
+              <div class="tool-row-name"><span class="chevron">▶</span> Oh My Pi</div>
+              <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
+            </div>
+            <div class="tool-snippet">
+              <pre class="code-block"><code>export OPENAI_BASE_URL="{{$.BaseURL}}/v1"
+export OPENAI_API_KEY="inf_your_key"</code>
+                <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+              </pre>
+              <div class="omp-field">
+                <span style="font-size:11px;color:var(--text-dim);white-space:nowrap">Launch:</span>
+                <code class="omp-field-code">omp run "write a hello world" --model {{$m.Name}}</code>
+                <button class="btn-consumer btn-sm btn-ghost omp-copy-btn" data-model="{{$m.Name}}" onclick="event.stopPropagation();copyOmpCmd(this)" style="white-space:nowrap">Copy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {{end}}
+        {{else}}
+        <div class="empty-state">No models available</div>
+        {{end}}
+      </div>
+    </div>
   </main>
 
   <footer>
-    <div class="footer-row">
-      <span><a href="https://github.com/r00takaspin/gpumesh">GitHub</a></span>
-      <span>▶ {{.DonorsOnline}} donors online</span>
-      <span>MIT License</span>
-    </div>
+    <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+    &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
   </footer>
 
   <script src="/static/js/app.js"></script>

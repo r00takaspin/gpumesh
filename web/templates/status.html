@@ -3,23 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="GPU Mesh — Free peer-to-peer LLM inference network. Use any OpenAI-compatible tool with community GPUs. No credit card.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
-  <title>System Status — GPU Mesh</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>System Status — GPU Mesh</title>
 </head>
 <body>
   <nav class="topbar">
-    <span class="logo">⚡ GPU Mesh</span>
+    <a href="/" class="logo">⚡ GPU Mesh</a>
     <ul class="nav-links">
       <li><a href="/">Home</a></li>
-      <li><a href="/dashboard">Dashboard</a></li>
+      <li><a href="/use">Use Models</a></li>
+      <li><a href="/share">Share GPU</a></li>
       <li><a href="/models">Models</a></li>
-      <li><a href="/leaderboard">Leaderboard</a></li>
       <li><a href="/status" class="active">Status</a></li>
     </ul>
     <div class="nav-right">
@@ -27,44 +25,29 @@
       <span class="nav-user mono text-accent">{{.Login}}</span>
       <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
       {{else}}
-      <a href="/login" class="btn btn--sm nav-login">[Login with GitHub]</a>
+      <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
       {{end}}
     </div>
   </nav>
 
   <main>
-    <div class="prompt">curl -s /status | jq</div>
-
     <div id="status-page" hx-get="/status" hx-trigger="every 15s" hx-select="#status-page" hx-swap="outerHTML">
-      <div class="status-banner {{if gt .DonorsOnline 0}}status-operational{{else}}status-warn{{end}}">
-        {{if gt .DonorsOnline 0}}🟢 ALL SYSTEMS OPERATIONAL{{else}}🟡 DEGRADED — no donors online{{end}}
+      <div class="status-banner{{if gt .DonorsOnline 0}} status-operational{{end}}">
+        {{if gt .DonorsOnline 0}}All systems operational{{else}}Degraded — no donors online{{end}}
       </div>
 
       <div class="stat-grid">
-        <div class="stat-card"><div class="stat-value">▶ {{.DonorsOnline}}</div><div class="stat-label">donors</div></div>
-        <div class="stat-card"><div class="stat-value">▶ {{.ModelsOnline}}</div><div class="stat-label">models</div></div>
-        <div class="stat-card"><div class="stat-value">▶ {{.RequestsToday}}</div><div class="stat-label">req today</div></div>
-        <div class="stat-card"><div class="stat-value">▶ {{.TokensToday}}</div><div class="stat-label">tokens today</div></div>
-      </div>
-
-      <div class="prompt">cat incidents.log</div>
-      <div class="card card-accent">
-        <div class="flex-between mb-1">
-          <span class="mono text-accent" style="font-size:0.85rem;font-weight:700">No incidents reported</span>
-          <span class="mono text-dim" style="font-size:0.7rem">Last 7 days</span>
-        </div>
-        <p class="text-dim" style="font-size:0.8rem">System nominal. All services responding within SLA.</p>
+        <div class="stat-box"><div class="stat-num">{{.DonorsOnline}}</div><div class="stat-label">Donors online</div></div>
+        <div class="stat-box"><div class="stat-num">{{.ModelsOnline}}</div><div class="stat-label">Models online</div></div>
+        <div class="stat-box"><div class="stat-num">{{.RequestsToday}}</div><div class="stat-label">Requests today</div></div>
+        <div class="stat-box"><div class="stat-num">{{.TokensToday}}</div><div class="stat-label">Tokens today</div></div>
       </div>
     </div>
-
   </main>
 
   <footer>
-    <div class="footer-row">
-      <span><a href="https://github.com/r00takaspin/gpumesh">GitHub</a></span>
-      <span>▶ {{.DonorsOnline}} donors online</span>
-      <span>MIT License</span>
-    </div>
+    <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+    &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
   </footer>
 
   <script src="/static/js/app.js"></script>

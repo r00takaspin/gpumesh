@@ -2,10 +2,8 @@ package coord
 
 import (
 	"fmt"
-	"sync/atomic"
 	"log"
 	"net/http"
-	"sort"
 	"time"
 )
 
@@ -103,277 +101,11 @@ func (s *Server) handleDonorStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// --- GET /leaderboard/data ---
 
-func (s *Server) handleLeaderboardData(w http.ResponseWriter, r *http.Request) {
-	period := r.URL.Query().Get("period")
-	limit := 50
+// --- HTMX use fragments ---
 
-	// In MVP, leaderboard is all-time from donor_stats.
-	// Get all active donor connections for online status, plus stats from DB.
-	_ = period
-
-	// Build entries from registry (online donors) plus persistent stats.
-
-	type entry struct {
-		Rank        int    `json:"rank"`
-		GithubLogin string `json:"github_login"`
-		AvatarURL   string `json:"avatar_url"`
-		Tokens      int64  `json:"tokens"`
-		Requests    int64  `json:"requests"`
-		Badge       string `json:"badge"`
-	}
-
-	// Collect all donors from registry and cross-reference with stats.
-	// For MVP we aggregate from the registry session + persistent stats.
-	var entries []entry
-
-	allStats, err := s.store.ListAllDonorStats()
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to load leaderboard"})
-		return
-	}
-
-	seenUsers := map[int64]bool{}
-	for _, ds := range allStats {
-		if seenUsers[ds.UserID] {
-			continue
-		}
-		seenUsers[ds.UserID] = true
-
-		login := s.getGithubLogin(ds.UserID)
-		entries = append(entries, entry{
-			GithubLogin: login,
-			AvatarURL:   fmt.Sprintf("https://github.com/%s.png", login),
-			Tokens:      ds.TotalTokens,
-			Requests:    ds.TotalRequests,
-			Badge:       BadgeForTokens(ds.TotalTokens),
-		})
-	}
-
-	// Sort by tokens descending.
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Tokens > entries[j].Tokens
-	})
-
-	// Apply limit.
-	if len(entries) > limit {
-		entries = entries[:limit]
-	}
-
-	// Assign ranks.
-	for i := range entries {
-		entries[i].Rank = i + 1
-	}
-
-	if entries == nil {
-		entries = []entry{}
-	}
-
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"entries": entries,
-	})
-}
-
-
-// --- GET /leaderboard/page ---
-
-func (s *Server) handleLeaderboardFragment(w http.ResponseWriter, r *http.Request) {
-	period := r.URL.Query().Get("period")
-	limit := 50
-	_ = period
-
-	var entries []LeaderboardEntry
-	seenUsers := map[int64]bool{}
-
-	for _, d := range s.registry.donors {
-		if seenUsers[d.UserID] {
-			continue
-		}
-		seenUsers[d.UserID] = true
-
-		ds, _ := s.store.GetDonorStats(d.UserID)
-		login := s.getGithubLogin(d.UserID)
-		entries = append(entries, LeaderboardEntry{
-			GithubLogin: login,
-			Tokens:      ds.TotalTokens,
-			Requests:    ds.TotalRequests,
-			Badge:       BadgeForTokens(ds.TotalTokens),
-		})
-	}
-
-	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].Tokens > entries[j].Tokens
-	})
-
-	if len(entries) > limit {
-		entries = entries[:limit]
-	}
-
-	for i := range entries {
-		entries[i].Rank = i + 1
-	}
-
-	if entries == nil {
-		entries = []LeaderboardEntry{}
-	}
-
-	renderTemplate(w, "leaderboard-fragment.html", map[string]interface{}{
-		"Entries": entries,
-	})
-}
-
-// handleDashboardCreateKey creates a key and returns the consumer tab HTML with modal.
-func (s *Server) handleDashboardCreateKey(w http.ResponseWriter, r *http.Request) {
-	userID := getUserID(r)
-	if userID == 0 {
-		writeError(w, http.StatusUnauthorized, "not authenticated")
-		return
-	}
-
-	scope := r.URL.Query().Get("scope")
-	if scope == "" {
-		scope = "consumer"
-	}
-
-	rawKey, _, err := s.store.CreateKey(userID, scope)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create key")
-		return
-	}
-
-	// Build the same data as handleDashboardConsumer.
-	keys, _ := s.store.ListKeys(userID)
-	rateLimit := s.limiter.Burst()
-	remaining := rateLimit
-	if len(keys) > 0 {
-		remaining = s.limiter.Remaining(keys[0].KeyHash)
-	}
-	requestsToday := rateLimit - remaining
-
-	apiKey := "inf_xxxxxxxx..."
-	if len(keys) > 0 {
-		apiKey = keys[0].KeyPrefix + "..."
-	}
-
-	pct := 0
-	if rateLimit > 0 {
-		pct = requestsToday * 100 / rateLimit
-	}
-
-	type keyView struct {
-		ID        int64
-		Prefix    string
-		Scope     string
-		CreatedAt string
-	}
-	kv := make([]keyView, len(keys))
-	for i, k := range keys {
-		kv[i] = keyView{
-			ID:        k.ID,
-			Prefix:    k.KeyPrefix,
-			Scope:     k.Scope,
-			CreatedAt: k.CreatedAt.Format("2006-01-02"),
-		}
-	}
-
-	renderTemplate(w, "dashboard-new-key.html", map[string]interface{}{
-		"NewKey":         rawKey,
-		"APIKey":         apiKey,
-		"Keys":           kv,
-		"RateLimit":      rateLimit,
-		"RequestsToday":  requestsToday,
-		"TokensToday":    int64(0),
-		"PercentUsed":    pct,
-	})
-}
-
-// --- GET /models/data ---
-
-func (s *Server) handleModelsData(w http.ResponseWriter, r *http.Request) {
-	snap := s.registry.Snapshot()
-
-	type modelEntry struct {
-		ID           string   `json:"id"`
-		DonorsOnline int      `json:"donors_online"`
-		Load         float64  `json:"load"`
-		Tags         []string `json:"tags"`
-	}
-
-	var models []modelEntry
-	for name, ms := range snap.Models {
-		models = append(models, modelEntry{
-			ID:           name,
-			DonorsOnline: ms.DonorsOnline,
-			Load:         ms.Load,
-			Tags:         []string{"chat"}, // Default tag for MVP.
-		})
-	}
-
-	sort.Slice(models, func(i, j int) bool {
-		return models[i].ID < models[j].ID
-	})
-
-	if models == nil {
-		models = []modelEntry{}
-	}
-
-	writeJSON(w, http.StatusOK, models)
-}
-
-// --- HTMX dashboard fragments ---
-
-func (s *Server) handleDashboardConsumer(w http.ResponseWriter, r *http.Request) {
-	userID := getUserID(r)
-	if userID == 0 {
-		writeError(w, http.StatusUnauthorized, "not authenticated")
-		return
-	}
-
-	keys, _ := s.store.ListKeys(userID)
-	rateLimit := s.limiter.Burst()
-	requestsToday := atomic.LoadInt64(&s.requestsToday)
-
-	apiKey := "inf_xxxxxxxx..."
-	if len(keys) > 0 {
-		apiKey = keys[0].KeyPrefix + "..."
-	}
-
-	pct := 0
-	if rateLimit > 0 {
-		pct = int(requestsToday) * 100 / rateLimit
-	}
-
-	type keyView struct {
-		ID        int64
-		Prefix    string
-		Scope     string
-		CreatedAt string
-	}
-	kv := make([]keyView, len(keys))
-	for i, k := range keys {
-		kv[i] = keyView{
-			ID:        k.ID,
-			Prefix:    k.KeyPrefix,
-			Scope:     k.Scope,
-			CreatedAt: k.CreatedAt.Format("2006-01-02"),
-		}
-	}
-
-	data := map[string]interface{}{
-		"APIKey":        apiKey,
-		"Keys":           kv,
-		"RateLimit":      rateLimit,
-		"RequestsToday":  requestsToday,
-		"TokensToday":    atomic.LoadInt64(&s.tokensToday),
-		"PercentUsed":    pct,
-	}
-
-	renderTemplate(w, "dashboard-consumer.html", data)
-}
-
-func (s *Server) handleDashboardDonor(w http.ResponseWriter, r *http.Request) {
+// handleUseDonor renders the donor tab content for /use.
+func (s *Server) handleUseDonor(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
@@ -407,20 +139,6 @@ func (s *Server) handleDashboardDonor(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Leaderboard position: count users with more tokens.
-	pos := 1
-	total := 1
-	for _, d := range s.registry.donors {
-		if d.UserID == userID {
-			continue
-		}
-		ds, _ := s.store.GetDonorStats(d.UserID)
-		total++
-		if ds.TotalTokens > stats.TotalTokens {
-			pos++
-		}
-	}
-
 	// Badge progress.
 	badgeNext, badgeThreshold := nextBadge(stats.TotalTokens)
 	badgePct := 0
@@ -443,7 +161,7 @@ func (s *Server) handleDashboardDonor(w http.ResponseWriter, r *http.Request) {
 	if tokenPrefix == "" {
 		tokenPrefix = "inf_xxxx"
 	}
-	tokenFull = tokenPrefix + "..." // can't retrieve full key
+	tokenFull = tokenPrefix + "..."
 
 	avg := 0.0
 	if stats.TotalUptimeSec > 0 {
@@ -460,18 +178,100 @@ func (s *Server) handleDashboardDonor(w http.ResponseWriter, r *http.Request) {
 		"BadgeEmoji":        badgeEmoji,
 		"BadgeNext":         badgeNext,
 		"BadgeProgress":     stats.TotalTokens,
-		"BadgeThreshold":    badgeThreshold,
+		"BadgeThreshold":     badgeThreshold,
 		"BadgePercent":      badgePct,
 		"BadgeRemaining":    remaining,
 		"AvgTokensPerSec":   avgTokensPerSec,
 		"TokenPrefix":       tokenPrefix,
 		"TokenFull":         tokenFull,
 		"TokenID":           tokenID,
-		"LeaderboardPos":    pos,
-		"LeaderboardTotal":  total,
 	}
 
-	renderTemplate(w, "dashboard-donor.html", data)
+	renderTemplate(w, "use-donor.html", data)
+}
+
+// handleShareStatus renders the share GPU status fragment.
+func (s *Server) handleShareStatus(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+
+	donors := s.registry.DonorsForUser(userID)
+	stats, _ := s.store.GetDonorStats(userID)
+	badge := BadgeForTokens(stats.TotalTokens)
+	badgeEmoji := badgeEmoji(badge)
+
+	type agentView struct {
+		ProviderID    string
+		Description   string
+		ModelCount    int
+		CurrentLoad   int
+		MaxConcurrent int
+		Uptime        string
+		ModelList     string
+	}
+	agents := make([]agentView, len(donors))
+	for i, d := range donors {
+		agents[i] = agentView{
+			ProviderID:    d.ProviderID,
+			Description:   d.Description,
+			ModelCount:    len(d.Models),
+			CurrentLoad:   d.CurrentLoad,
+			MaxConcurrent: d.MaxConcurrent,
+			Uptime:        formatDuration(time.Since(d.ConnectedAt)),
+			ModelList:     joinModels(d.Models),
+		}
+	}
+
+	badgeNext, badgeThreshold := nextBadge(stats.TotalTokens)
+	badgePct := 0
+	if badgeThreshold > 0 {
+		badgePct = int(stats.TotalTokens * 100 / badgeThreshold)
+	}
+	remaining := badgeThreshold - stats.TotalTokens
+
+	keys, _ := s.store.ListKeys(userID)
+	var tokenPrefix, tokenFull string
+	var tokenID int64
+	for _, k := range keys {
+		if k.Scope == "donor" || k.Scope == "both" {
+			tokenPrefix = k.KeyPrefix
+			tokenID = k.ID
+			break
+		}
+	}
+	if tokenPrefix == "" {
+		tokenPrefix = "inf_xxxx"
+	}
+	tokenFull = tokenPrefix + "..."
+
+	avg := 0.0
+	if stats.TotalUptimeSec > 0 {
+		avg = float64(stats.TotalTokens) / float64(stats.TotalUptimeSec)
+	}
+	avgTokensPerSec := fmt.Sprintf("%.1f", avg)
+	totalUptime := formatDuration(time.Duration(stats.TotalUptimeSec) * time.Second)
+
+	data := map[string]interface{}{
+		"Agents":           agents,
+		"Stats":             stats,
+		"TotalUptime":       totalUptime,
+		"Badge":             badge,
+		"BadgeEmoji":        badgeEmoji,
+		"BadgeNext":         badgeNext,
+		"BadgeProgress":     stats.TotalTokens,
+		"BadgeThreshold":     badgeThreshold,
+		"BadgePercent":      badgePct,
+		"BadgeRemaining":    remaining,
+		"AvgTokensPerSec":   avgTokensPerSec,
+		"TokenPrefix":       tokenPrefix,
+		"TokenFull":         tokenFull,
+		"TokenID":           tokenID,
+	}
+
+	renderTemplate(w, "share-status.html", data)
 }
 
 // --- Helpers ---
@@ -531,10 +331,10 @@ func joinModels(models []string) string {
 	return s
 }
 
-// --- HTMX consumer fragments ---
+// --- HTMX use fragments ---
 
-// handleConsumerKeys renders the API Keys tab content as an HTMX fragment.
-func (s *Server) handleConsumerKeys(w http.ResponseWriter, r *http.Request) {
+// handleUseKeys renders the API Keys tab content as an HTMX fragment.
+func (s *Server) handleUseKeys(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
@@ -556,13 +356,13 @@ func (s *Server) handleConsumerKeys(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: k.CreatedAt.Format("2006-01-02"),
 		}
 	}
-	renderTemplate(w, "consumer-keys.html", map[string]interface{}{
+	renderTemplate(w, "use-keys.html", map[string]interface{}{
 		"Keys": kv,
 	})
 }
 
-// handleConsumerCreateKey creates a new consumer key and returns the API Keys fragment.
-func (s *Server) handleConsumerCreateKey(w http.ResponseWriter, r *http.Request) {
+// handleUseCreateKey creates a new consumer key and returns the API Keys fragment.
+func (s *Server) handleUseCreateKey(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
@@ -589,7 +389,7 @@ func (s *Server) handleConsumerCreateKey(w http.ResponseWriter, r *http.Request)
 			CreatedAt: k.CreatedAt.Format("2006-01-02"),
 		}
 	}
-	renderTemplate(w, "consumer-keys.html", map[string]interface{}{
+	renderTemplate(w, "use-keys.html", map[string]interface{}{
 		"Keys":    kv,
 		"NewKey":  rawKey,
 	})

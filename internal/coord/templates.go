@@ -25,9 +25,8 @@ type PageData struct {
 	RequestsToday int
 	StatsError    bool // true → hide stats block
 	TokensToday   int64
-	// Top models / donors for landing page.
+	// Top models for landing page.
 	TopModels []ModelSummary
-	TopDonors []DonorSummary
 	// Dashboard donor tab.
 	HasDonorScope bool
 	// Models page.
@@ -58,12 +57,6 @@ type ModelData struct {
 }
 
 
-// DonorSummary is a lightweight donor entry for the landing podium.
-type DonorSummary struct {
-	Name   string
-	Tokens int64
-	Badge  string
-}
 
 // vendorForModel derives a vendor name from the model ID prefix.
 func vendorForModel(name string) string {
@@ -247,35 +240,6 @@ func (s *Server) pageDataWithStats(r *http.Request) PageData {
 	pd.DefaultModel = "llama3.2:3b"
 	if len(pd.TopModels) > 0 {
 		pd.DefaultModel = pd.TopModels[0].Name
-	}
-
-
-	// Top donors: top 3 from registry by lifetime tokens.
-	type donorEntry struct {
-		userID int64
-		tokens int64
-	}
-	seen := map[int64]bool{}
-	var donors []donorEntry
-	for _, d := range s.registry.donors {
-		if seen[d.UserID] {
-			continue
-		}
-		seen[d.UserID] = true
-		ds, _ := s.store.GetDonorStats(d.UserID)
-		donors = append(donors, donorEntry{d.UserID, ds.TotalTokens})
-	}
-	sort.Slice(donors, func(i, j int) bool { return donors[i].tokens > donors[j].tokens })
-	if len(donors) > 3 {
-		donors = donors[:3]
-	}
-	pd.TopDonors = make([]DonorSummary, len(donors))
-	for i, d := range donors {
-		pd.TopDonors[i] = DonorSummary{
-			Name:   s.getGithubLogin(d.userID),
-			Tokens: d.tokens,
-			Badge:  BadgeForTokens(d.tokens),
-		}
 	}
 
 	return pd

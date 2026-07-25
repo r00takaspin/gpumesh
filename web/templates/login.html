@@ -3,23 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="GPU Mesh — Free peer-to-peer LLM inference network. Use any OpenAI-compatible tool with community GPUs. No credit card.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
-  <title>Login — GPU Mesh</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <title>Login — GPU Mesh</title>
 </head>
 <body>
   <nav class="topbar">
-    <span class="logo">⚡ GPU Mesh</span>
+    <a href="/" class="logo">⚡ GPU Mesh</a>
     <ul class="nav-links">
       <li><a href="/">Home</a></li>
-      <li><a href="/dashboard">Dashboard</a></li>
+      <li><a href="/use">Use Models</a></li>
+      <li><a href="/share">Share GPU</a></li>
       <li><a href="/models">Models</a></li>
-      <li><a href="/leaderboard">Leaderboard</a></li>
       <li><a href="/status">Status</a></li>
     </ul>
     <div class="nav-right">
@@ -27,29 +25,28 @@
       <span class="nav-user mono text-accent">{{.Login}}</span>
       <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
       {{else}}
-      <a href="/login" class="btn btn--sm nav-login">[Login with GitHub]</a>
+      <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
       {{end}}
     </div>
   </nav>
 
   <main>
     <div class="login-page">
-      <div class="prompt">ssh gpumesh.io</div>
-
-      <div class="card login-card">
+      <div class="consumer-card login-card">
         <div class="login-ascii">
   ___ ___ _   _   __  __        _    
  / __| _ \ | | | |  \/  |___ __| |_  
-| (_ |  _/ |_| | | |\/| / -_|_-< ' \ 
+:| (_ |  _/ |_| | | |\/| / -_|_-< ' \ 
  \___|_|  \___/  |_|  |_\___/__/_||_|
         </div>
 
         <p class="login-tagline">
           One click. No password. No email.
         </p>
+
         {{if .HasOAuth}}
-        <a href="/auth/github" class="btn login-btn">
-          ──▶ Login with GitHub
+        <a href="/auth/github" class="btn-consumer btn-primary">
+          Sign in with GitHub →
         </a>
         {{else}}
         <p class="login-note text-warning">OAuth not configured. Set GITHUB_CLIENT_ID.</p>
@@ -61,10 +58,9 @@
         </p>
       </div>
 
-      <div class="card login-info mt-2">
-        <div class="prompt">man gpumesh-auth</div>
+      <div class="consumer-card login-info mt-2">
+        <div class="card-title">Why GitHub?</div>
         <div class="mono text-dim" style="font-size:0.75rem;line-height:1.8">
-          <strong class="text-accent">Why GitHub?</strong><br>
           GPU Mesh is built by developers, for developers. You already have<br>
           a GitHub account. No new passwords, no email verification, no<br>
           "reset your password" emails. Just click and go.<br><br>
@@ -79,11 +75,8 @@
   </main>
 
   <footer>
-    <div class="footer-row">
-      <span><a href="https://github.com/r00takaspin/gpumesh">GitHub</a></span>
-      <span>▶ {{.DonorsOnline}} donors online</span>
-      <span>MIT License</span>
-    </div>
+    <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+    &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
   </footer>
 
   <script src="/static/js/app.js"></script>

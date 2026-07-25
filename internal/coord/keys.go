@@ -99,10 +99,10 @@ func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 
 	// HTMX: re-render the correct fragment based on source page.
 	if r.Header.Get("HX-Request") == "true" {
-		if strings.Contains(r.Header.Get("HX-Current-URL"), "/consumer") {
-			s.handleConsumerKeys(w, r)
+		if strings.Contains(r.Header.Get("HX-Current-URL"), "/use") {
+			s.handleUseKeys(w, r)
 		} else {
-			s.handleDashboardConsumer(w, r)
+			s.handleUseKeys(w, r)
 		}
 		return
 	}
