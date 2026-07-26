@@ -7,12 +7,13 @@ No new client. No new API. No credit card. Just two environment variables and ev
 ## How It Works
 
 ```
-Continue.dev ──HTTP──┐
-Codex CLI    ──HTTP──┤
-Aider        ──HTTP──┤                    ┌──────────────┐
-Open WebUI   ──HTTP──┼── Coordinator ──WS──│ Donor Agent  │── Ollama
-LangChain    ──HTTP──┤  (Public VPS)   ──WS──│ Donor Agent  │── Ollama
-curl         ──HTTP──┘                    └──────────────┘
+                         ┌──────────────┐
+Continue.dev ──HTTP──┐   │  Coordinator │   ┌──────────────┐
+Codex CLI    ──HTTP──┤   │              │   │ Donor Agent  │── Ollama
+Aider        ──HTTP──┼──▶│ (Public VPS) │──▶│ Donor Agent  │── Ollama
+Open WebUI   ──HTTP──┤   │              │   └──────────────┘
+LangChain    ──HTTP──┤   └──────────────┘
+curl         ──HTTP──┘
 ```
 
 1. **Donors** run `gpumesh-provider` next to their Ollama instance — one command, zero ongoing maintenance.
