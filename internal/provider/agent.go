@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,10 +49,32 @@ type Agent struct {
 	httpClient *http.Client
 }
 
+
+// autoDetectOllama probes for a running Ollama instance.
+// Checks OLLAMA_HOST env var first, then probes localhost:11434 with a 2s timeout.
+// Falls back to cfgURL if nothing is reachable.
+func autoDetectOllama(ctx context.Context, cfgURL string) string {
+	if host := os.Getenv("OLLAMA_HOST"); host != "" {
+		if !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "https://") {
+			host = "http://" + host
+		}
+		return host
+	}
+	client := &http.Client{Timeout: 2 * time.Second}
+	req, err := http.NewRequestWithContext(ctx, "GET", "http://localhost:11434/api/tags", nil)
+	if err != nil {
+		return cfgURL
+	}
+	if resp, err := client.Do(req); err == nil {
+		resp.Body.Close()
+		return "http://localhost:11434"
+	}
+	return cfgURL
+}
 // NewAgent creates a new provider agent.
 func NewAgent(cfg Config) *Agent {
 	if cfg.OllamaURL == "" {
-		cfg.OllamaURL = "http://localhost:11434"
+		cfg.OllamaURL = autoDetectOllama(context.Background(), "http://localhost:11434")
 	}
 	if cfg.MaxConcurrent <= 0 {
 		cfg.MaxConcurrent = 1
@@ -80,6 +103,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		return fmt.Errorf("no token provided. Get one at https://gpumesh.io/dashboard")
 	}
 
+	backoff := a.cfg.ReconnectMin
 	for {
 		select {
 		case <-ctx.Done():
@@ -89,29 +113,25 @@ func (a *Agent) Run(ctx context.Context) error {
 
 		if err := a.connect(ctx); err != nil {
 			log.Printf("\033[31m✗\033[0m connection error: %v", err)
+		} else {
+			// readLoop returned (clean disconnect). Reset backoff and retry immediately.
+			backoff = a.cfg.ReconnectMin
+			continue
 		}
 
-		// Reconnect with backoff.
-		backoff := a.cfg.ReconnectMin + time.Duration(rand.Int64N(int64(a.cfg.ReconnectMin)/4))
-		for {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(backoff):
-			}
-			if err := a.connect(ctx); err == nil {
-				break
-			} else {
-				log.Printf("\033[31m✗\033[0m reconnect error: %v", err)
-			}
-			// Add jitter, then apply cap.
-			jitter := time.Duration(rand.Int64N(int64(backoff) / 4))
-			backoff = backoff*2 + jitter
-			if backoff > a.cfg.ReconnectMax {
-				backoff = a.cfg.ReconnectMax
-			}
+		// Wait with backoff before retrying.
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoff):
 		}
-		// Reset backoff on successful connect (after disconnect).
+
+		// Exponential backoff with jitter, capped at ReconnectMax.
+		jitter := time.Duration(rand.Int64N(int64(backoff) / 4))
+		backoff = backoff*2 + jitter
+		if backoff > a.cfg.ReconnectMax {
+			backoff = a.cfg.ReconnectMax
+		}
 	}
 }
 

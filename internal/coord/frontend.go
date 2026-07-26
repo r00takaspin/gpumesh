@@ -484,13 +484,15 @@ func (s *Server) handleUseCreateKey(w http.ResponseWriter, r *http.Request) {
 		Scope     string
 		CreatedAt string
 	}
-	kv := make([]keyView, len(keys))
-	for i, k := range keys {
-		kv[i] = keyView{
-			ID:        k.ID,
-			Prefix:    k.KeyPrefix,
-			Scope:     k.Scope,
-			CreatedAt: k.CreatedAt.Format("2006-01-02"),
+	kv := make([]keyView, 0, len(keys))
+	for _, k := range keys {
+		if k.Scope == "consumer" || k.Scope == "both" {
+			kv = append(kv, keyView{
+				ID:        k.ID,
+				Prefix:    k.KeyPrefix,
+				Scope:     k.Scope,
+				CreatedAt: k.CreatedAt.Format("2006-01-02"),
+			})
 		}
 	}
 	renderTemplate(w, "use-keys.html", map[string]interface{}{

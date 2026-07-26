@@ -123,6 +123,9 @@ func NewServer(cfg Config) (*Server, error) {
 	// Health check.
 	mux.HandleFunc("GET /health", s.handleHealth)
 
+	// Provider install script.
+	mux.HandleFunc("GET /install-provider.sh", s.handleInstallScript)
+
 	// Static files.
 	staticFS, _ := fs.Sub(web.EmbeddedFS, "static")
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))

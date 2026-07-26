@@ -14,25 +14,85 @@ import (
 
 	"github.com/r00takaspin/gpumesh/internal/provider"
 )
+
 func main() {
-	var cfg provider.Config
-
-	flag.StringVar(&cfg.CoordinatorURL, "coordinator", envOrDefault("MESH_COORDINATOR", "wss://gpumesh.io/ws/provider"), "coordinator WebSocket URL")
-	flag.StringVar(&cfg.Token, "token", os.Getenv("MESH_TOKEN"), "donor authentication token")
-	flag.StringVar(&cfg.OllamaURL, "ollama-url", envOrDefault("MESH_OLLAMA_URL", "http://localhost:11434"), "Ollama base URL")
-	var modelsFlag string
-	flag.StringVar(&modelsFlag, "models", os.Getenv("MESH_MODELS"), "comma-separated model whitelist")
-	flag.StringVar(&cfg.Description, "description", envOrDefault("MESH_DESCRIPTION", hostname()), "public donor description")
-	flag.IntVar(&cfg.MaxConcurrent, "max-concurrent", envOrDefaultInt("MESH_MAX_CONCURRENT", 1), "max concurrent requests")
-
+	// All CLI flags start empty/zero — precedence resolved explicitly below.
+	var (
+		coordinatorFlag string
+		tokenFlag       string
+		ollamaFlag      string
+		modelsFlag      string
+		descFlag        string
+		maxConcFlag     int
+		wizardFlag      bool
+		noWizardFlag    bool
+		configFlag      string
+	)
+	flag.StringVar(&coordinatorFlag, "coordinator", "", "coordinator WebSocket URL")
+	flag.StringVar(&tokenFlag, "token", "", "donor authentication token")
+	flag.StringVar(&ollamaFlag, "ollama-url", "", "Ollama base URL")
+	flag.StringVar(&modelsFlag, "models", "", "comma-separated model whitelist (default: auto-discover)")
+	flag.StringVar(&descFlag, "description", "", "public donor description")
+	flag.IntVar(&maxConcFlag, "max-concurrent", 0, "max concurrent requests")
+	flag.BoolVar(&wizardFlag, "wizard", false, "force interactive wizard")
+	flag.BoolVar(&noWizardFlag, "no-wizard", false, "skip wizard even if config incomplete")
+	flag.StringVar(&configFlag, "config", "", "config file path")
 	flag.Parse()
 
-	// Parse models whitelist from flag or env.
-	if modelsFlag != "" {
-		for _, m := range strings.Split(modelsFlag, ",") {
-			m = strings.TrimSpace(m)
-			if m != "" {
-				cfg.Models = append(cfg.Models, m)
+	// Track explicitly set flags for Layer 3 override.
+	visited := make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) { visited[f.Name] = true })
+
+	// Layer 0: Load config file.
+	configPath := configFlag
+	if configPath == "" {
+		configPath = provider.ConfigFilePath()
+	}
+	cfg, err := provider.LoadConfig(configPath)
+	if err != nil {
+		log.Printf("Warning: could not load config from %s: %v", configPath, err)
+	}
+
+	// Layer 1: Apply hardcoded defaults for any remaining zero values.
+	applyDefaults(&cfg)
+
+	// Layer 2: Override with environment variables.
+	applyEnv(&cfg, modelsFlag)
+
+	// Layer 3: Override with explicitly set CLI flags.
+	if visited["coordinator"] {
+		cfg.CoordinatorURL = coordinatorFlag
+	}
+	if visited["token"] {
+		cfg.Token = tokenFlag
+	}
+	if visited["ollama-url"] {
+		cfg.OllamaURL = ollamaFlag
+	}
+	if visited["models"] {
+		cfg.Models = parseModels(modelsFlag)
+	}
+	if visited["max-concurrent"] {
+		cfg.MaxConcurrent = maxConcFlag
+	}
+	if visited["description"] {
+		cfg.Description = descFlag
+	}
+
+	// Wizard trigger.
+	if wizardFlag && !noWizardFlag {
+		if err := provider.RunWizard(os.Stdin, os.Stdout, &cfg); err != nil {
+			log.Fatalf("wizard: %v", err)
+		}
+	} else if !noWizardFlag {
+		needWizard := cfg.Token == ""
+		if !needWizard {
+			_, err := provider.DiscoverModelsWithURL(cfg.OllamaURL)
+			needWizard = err != nil
+		}
+		if needWizard {
+			if err := provider.RunWizard(os.Stdin, os.Stdout, &cfg); err != nil {
+				log.Fatalf("wizard: %v", err)
 			}
 		}
 	}
@@ -53,6 +113,57 @@ func main() {
 		log.Fatalf("agent: %v", err)
 	}
 }
+
+func applyDefaults(cfg *provider.Config) {
+	if cfg.CoordinatorURL == "" {
+		cfg.CoordinatorURL = "wss://gpumesh.io/ws/provider"
+	}
+	if cfg.OllamaURL == "" {
+		cfg.OllamaURL = "http://localhost:11434"
+	}
+	if cfg.MaxConcurrent <= 0 {
+		cfg.MaxConcurrent = 1
+	}
+	if cfg.Description == "" {
+		cfg.Description = hostname()
+	}
+}
+
+func applyEnv(cfg *provider.Config, modelsFlag string) {
+	if v := os.Getenv("MESH_COORDINATOR"); v != "" {
+		cfg.CoordinatorURL = v
+	}
+	if v := os.Getenv("MESH_TOKEN"); v != "" {
+		cfg.Token = v
+	}
+	if v := os.Getenv("MESH_OLLAMA_URL"); v != "" {
+		cfg.OllamaURL = v
+	}
+	if v := os.Getenv("MESH_MODELS"); v != "" {
+		cfg.Models = parseModels(v)
+	}
+	if v := os.Getenv("MESH_MAX_CONCURRENT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			cfg.MaxConcurrent = n
+		}
+	}
+	if v := os.Getenv("MESH_DESCRIPTION"); v != "" {
+		cfg.Description = v
+	}
+}
+
+func parseModels(s string) []string {
+	var models []string
+	for _, m := range strings.Split(s, ",") {
+		m = strings.TrimSpace(m)
+		if m != "" {
+			models = append(models, m)
+		}
+	}
+	return models
+}
+
+// --- Display helpers ---
 
 const (
 	reset  = "\033[0m"
@@ -80,24 +191,8 @@ func printBanner(cfg provider.Config) {
 	fmt.Print(banner)
 }
 
-func envOrDefault(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
-
-func envOrDefaultInt(key string, def int) int {
-	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			return n
-		}
-	}
-	return def
-}
 func hostname() string {
 	h, _ := os.Hostname()
-	// On macOS, try to detect the model.
 	if model := darwinModel(); model != "" {
 		return model
 	}
