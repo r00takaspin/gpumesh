@@ -6,13 +6,25 @@ No new client. No new API. No credit card. Just two environment variables and ev
 
 ## How It Works
 
-```
-Continue.dev ──HTTP──┐
-Codex CLI    ──HTTP──┤
-Aider        ──HTTP──┤                    ┌──────────────┐
-Open WebUI   ──HTTP──┼── Coordinator ──WS──│ Donor Agent  │── Ollama
-LangChain    ──HTTP──┤  (Public VPS)   ──WS──│ Donor Agent  │── Ollama
-curl         ──HTTP──┘                    └──────────────┘
+```mermaid
+flowchart LR
+    subgraph Consumers["Consumers"]
+        C1[Continue.dev]
+        C2[Codex CLI]
+        C3[Aider]
+        C4[Open WebUI]
+        C5[LangChain]
+        C6[curl]
+    end
+    subgraph Coordinator["Coordinator (Public VPS)"]
+        COORD[GPU Mesh]
+    end
+    subgraph Donors["Donors"]
+        D1[Donor Agent<br/>+ Ollama]
+        D2[Donor Agent<br/>+ Ollama]
+    end
+    Consumers -- "HTTP /v1/chat/completions" --> Coordinator
+    Coordinator -- "WebSocket" --> Donors
 ```
 
 1. **Donors** run `gpumesh-provider` next to their Ollama instance — one command, zero ongoing maintenance.
