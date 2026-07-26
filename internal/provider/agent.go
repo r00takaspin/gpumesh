@@ -313,28 +313,6 @@ func (a *Agent) readLoop(ctx context.Context) error {
 		}
 	}
 }
-// pingLoop sends WebSocket ping frames to keep the connection alive and detect half-open TCP.
-func (a *Agent) pingLoop(ctx context.Context) {
-	ticker := time.NewTicker(proto.HeartbeatInterval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			a.mu.Lock()
-			conn := a.conn
-			a.mu.Unlock()
-			if conn == nil {
-				return
-			}
-			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)); err != nil {
-				return
-			}
-		}
-	}
-}
 
 func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 	// Check capacity.

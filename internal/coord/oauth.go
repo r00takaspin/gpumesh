@@ -99,12 +99,13 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		redirect = "/use"
 	}
 	// First login with no keys → auto-create flow.
-	if redirect == "/use" {
+	switch redirect {
+	case "/use":
 		n, _ := s.store.CountKeysByScope(userID, "consumer")
 		if n == 0 {
 			redirect = redirect + "?new=1"
 		}
-	} else if redirect == "/share" {
+	case "/share":
 		n, _ := s.store.CountKeysByScope(userID, "donor")
 		if n == 0 {
 			redirect = redirect + "?new=1"
@@ -161,11 +162,6 @@ func getUserID(r *http.Request) int64 {
 		return 0
 	}
 	return v.(int64)
-}
-
-func (s *Server) getGithubLogin(userID int64) string {
-	login, _ := s.store.GetUserByID(userID)
-	return login
 }
 
 // handleUse renders the use models page.
