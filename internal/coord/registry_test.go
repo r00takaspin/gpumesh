@@ -162,8 +162,8 @@ func TestSnapshot(t *testing.T) {
 	if llama.DonorsOnline != 2 {
 		t.Fatalf("expected 2 donors for llama, got %d", llama.DonorsOnline)
 	}
-	// Load: p1=1/4=0.25, p2=2/2=1.0 → avg=0.625
-	expectedLoad := 0.625
+	// Load: p1=1/4=0.25, p2=2/2=1.0 → avg=0.625 → ×100 = 62.5
+	expectedLoad := 62.5
 	if llama.Load < expectedLoad-0.01 || llama.Load > expectedLoad+0.01 {
 		t.Fatalf("expected load ~%f, got %f", expectedLoad, llama.Load)
 	}

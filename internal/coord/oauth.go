@@ -41,10 +41,8 @@ func (s *Server) handleLoginStart(w http.ResponseWriter, r *http.Request) {
 
 // handleGitHubCallback handles the OAuth callback from GitHub.
 func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
-	log.Printf("OAUTH: callback started, code=%s, state=%s", r.URL.Query().Get("code")[:8]+"...", r.URL.Query().Get("state"))
 	if oauthConfig == nil {
 		initOAuthConfig(s.baseURL)
-		log.Printf("OAUTH: init config, clientID=%s, redirectURL=%s", oauthConfig.ClientID, oauthConfig.RedirectURL)
 	}
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -53,15 +51,14 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	token, err := oauthConfig.Exchange(context.Background(), code)
 	if err != nil {
-		log.Printf("OAUTH: exchange error: %v", err)
+		log.Printf("oauth exchange error: %v", err)
 		http.Error(w, "auth failed", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("OAUTH: token ok")
 	client := oauthConfig.Client(context.Background(), token)
 	resp, err := client.Get("https://api.github.com/user")
 	if err != nil {
-		log.Printf("OAUTH: github user fetch error: %v", err)
+		log.Printf("github user fetch error: %v", err)
 		http.Error(w, "failed to get user info", http.StatusInternalServerError)
 		return
 	}
@@ -72,21 +69,19 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		Login string `json:"login"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&ghUser); err != nil {
-		log.Printf("OAUTH: decode error: %v", err)
+		log.Printf("github user decode error: %v", err)
 		http.Error(w, "failed to parse user info", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("OAUTH: github user: id=%d login=%s", ghUser.ID, ghUser.Login)
 	userID, err := s.store.UpsertUser(ghUser.ID, ghUser.Login)
 	if err != nil {
-		log.Printf("OAUTH: upsert user error: %v", err)
+		log.Printf("upsert user error: %v", err)
 		http.Error(w, "failed to save user", http.StatusInternalServerError)
 		return
 	}
-	log.Printf("OAUTH: userID=%d", userID)
 	sessionToken, err := s.store.CreateSession(userID)
 	if err != nil {
-		log.Printf("OAUTH: create session error: %v", err)
+		log.Printf("create session error: %v", err)
 		http.Error(w, "failed to create session", http.StatusInternalServerError)
 		return
 	}
@@ -99,24 +94,22 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   86400,
 		SameSite: http.SameSiteLaxMode,
 	})
-	log.Printf("OAUTH: session created, cookie set")
 	redirect := r.URL.Query().Get("state")
 	if redirect == "" {
 		redirect = "/use"
 	}
-	n, _ := s.store.CountKeysByScope(userID, "consumer")
-	log.Printf("OAUTH: redirect=%s, consumer_keys=%d", redirect, n)
+	// First login with no keys → auto-create flow.
 	if redirect == "/use" {
+		n, _ := s.store.CountKeysByScope(userID, "consumer")
 		if n == 0 {
 			redirect = redirect + "?new=1"
 		}
 	} else if redirect == "/share" {
-		dn, _ := s.store.CountKeysByScope(userID, "donor")
-		if dn == 0 {
+		n, _ := s.store.CountKeysByScope(userID, "donor")
+		if n == 0 {
 			redirect = redirect + "?new=1"
 		}
 	}
-	log.Printf("OAUTH: redirecting to %s", redirect)
 	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
