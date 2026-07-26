@@ -110,6 +110,7 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 			redirect = redirect + "?new=1"
 		}
 	}
+	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
 // handleLogout clears the session cookie.
