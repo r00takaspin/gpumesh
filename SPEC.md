@@ -981,7 +981,7 @@ curl -sSfL https://gpumesh.io/install.sh | bash
 go install github.com/r00takaspin/gpumesh/cmd/provider@latest
 
 # Вариант 2: GitHub Releases (без Go)
-curl -sSfL "https://github.com/r00takaspin/gpumesh/releases/latest/download/gpumesh-provider_$(uname -s)_$(uname -m).tar.gz" | tar xz
+curl -sSfL "https://github.com/r00takaspin/gpumesh/releases/latest/download/gpumesh-provider_0.1.4_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz
 sudo mv gpumesh-provider /usr/local/bin/
 ```
 
