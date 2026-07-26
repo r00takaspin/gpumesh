@@ -7,7 +7,6 @@
 *.db.bak
 data/
 scripts/
-web/templates/
 *.exe
 gpumesh-*
 provider
