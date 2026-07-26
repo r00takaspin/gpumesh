@@ -41,7 +41,7 @@
         <div class="steps" style="grid-template-columns:repeat(4,1fr);margin-top:12px">
           <div class="step"><div class="step-num">1</div><div class="step-title">Install Ollama</div><div class="step-desc"><code>curl -fsSL https://ollama.com/install.sh | sh</code></div></div>
           <div class="step"><div class="step-num">2</div><div class="step-title">Pull a model</div><div class="step-desc"><code>ollama pull llama3.2:3b</code></div></div>
-          <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>go install github.com/r00takaspin/gpumesh/cmd/provider@latest</code></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>curl -sSfL https://gpumesh.net/install-provider.sh | sh</code></div></div>
           <div class="step"><div class="step-num">4</div><div class="step-title">Run</div><div class="step-desc">Paste the command above</div></div>
         </div>
       </div>
@@ -51,7 +51,7 @@
         <div class="steps" style="grid-template-columns:repeat(4,1fr);margin-top:12px">
           <div class="step"><div class="step-num">1</div><div class="step-title">Install Ollama</div><div class="step-desc"><code>curl -fsSL https://ollama.com/install.sh | sh</code></div></div>
           <div class="step"><div class="step-num">2</div><div class="step-title">Pull a model</div><div class="step-desc"><code>ollama pull llama3.2:3b</code></div></div>
-          <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>go install github.com/r00takaspin/gpumesh/cmd/provider@latest</code></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>curl -sSfL https://gpumesh.net/install-provider.sh | sh</code></div></div>
           <div class="step"><div class="step-num">4</div><div class="step-title">Run</div><div class="step-desc">Paste the command above</div></div>
         </div>
         <div class="text-dim" style="font-size:11px;margin-top:8px">No Go? Download from <a href="https://github.com/r00takaspin/gpumesh/releases/latest">GitHub Releases</a> &rarr; pick <code>linux_arm64.tar.gz</code></div>
@@ -62,7 +62,7 @@
         <div class="steps" style="grid-template-columns:repeat(4,1fr);margin-top:12px">
           <div class="step"><div class="step-num">1</div><div class="step-title">Install Ollama</div><div class="step-desc"><code>brew install ollama</code> or <a href="https://ollama.com/download/mac">download</a></div></div>
           <div class="step"><div class="step-num">2</div><div class="step-title">Pull a model</div><div class="step-desc"><code>ollama pull llama3.2:3b</code></div></div>
-          <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>go install github.com/r00takaspin/gpumesh/cmd/provider@latest</code></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>curl -sSfL https://gpumesh.net/install-provider.sh | sh</code></div></div>
           <div class="step"><div class="step-num">4</div><div class="step-title">Run</div><div class="step-desc">Paste the command above</div></div>
         </div>
         <div class="text-dim" style="font-size:11px;margin-top:8px">Works on both Apple Silicon and Intel Macs. Requires <a href="https://go.dev/dl/">Go</a> &ge; 1.21.</div>
@@ -73,7 +73,7 @@
         <div class="steps" style="grid-template-columns:repeat(4,1fr);margin-top:12px">
           <div class="step"><div class="step-num">1</div><div class="step-title">Start Ollama</div><div class="step-desc"><code>docker run -d --gpus all -p 11434:11434 --name ollama ollama/ollama</code></div></div>
           <div class="step"><div class="step-num">2</div><div class="step-title">Pull a model</div><div class="step-desc"><code>docker exec -it ollama ollama pull llama3.2:3b</code></div></div>
-          <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>go install github.com/r00takaspin/gpumesh/cmd/provider@latest</code></div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-title">Install provider</div><div class="step-desc"><code>curl -sSfL https://gpumesh.net/install-provider.sh | sh</code></div></div>
           <div class="step"><div class="step-num">4</div><div class="step-title">Run</div><div class="step-desc">Paste the command above</div></div>
         </div>
         <div class="text-dim" style="font-size:11px;margin-top:8px">Provider runs on host and connects to Ollama at <code>localhost:11434</code>. <code>--gpus all</code> requires nvidia-container-toolkit.</div>
