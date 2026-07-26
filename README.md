@@ -11,7 +11,6 @@ No new client. No new API. No credit card. Just two environment variables and ev
 Continue.dev ──HTTP──┐   │              │   ┌──────────────┐
 Codex CLI    ──HTTP──┤   │  Coordinator │   │              │
 Aider        ──HTTP──┼──▶│              │──▶│ Donor Agent  │── Ollama
-Open WebUI   ──HTTP──┤   │ (Public VPS) │   │              │
 LangChain    ──HTTP──┤   │              │   │ Donor Agent  │── Ollama
 curl         ──HTTP──┘   │              │   └──────────────┘
                          └──────────────┘
