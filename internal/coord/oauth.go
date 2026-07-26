@@ -230,7 +230,7 @@ func (s *Server) handleShare(w http.ResponseWriter, r *http.Request) {
 	if userID != 0 {
 		// Auto-create donor key if none exists (first visit after OAuth).
 		if r.URL.Query().Get("new") == "1" {
-			n, _ := s.store.CountKeys(userID)
+			n, _ := s.store.CountKeysByScope(userID, "donor")
 			if n == 0 {
 				rawKey, _, err := s.store.CreateKey(userID, "donor")
 				if err == nil {

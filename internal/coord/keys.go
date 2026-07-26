@@ -1,7 +1,6 @@
 package coord
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -141,11 +140,11 @@ func (s *Server) handleRegenerateKey(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to create key")
 		return
 	}
-
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Trigger", "refreshStats")
-		ctx := context.WithValue(r.Context(), ctxKeyNewToken, rawKey)
-		s.handleShareSetup(w, r.WithContext(ctx))
+		renderTemplate(w, "share-token-modal.html", map[string]interface{}{
+			"Token": rawKey,
+		})
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]interface{}{

@@ -1,0 +1,17 @@
+<div id="token-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;display:flex;align-items:center;justify-content:center">
+  <div class="consumer-card" style="max-width:520px;width:90%;margin:0;border-color:var(--accent)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div class="card-title" style="margin:0">🔑 Your donor token</div>
+      <button onclick="document.getElementById('token-modal').remove();htmx.ajax('GET','/share/setup',{target:'#share-setup'});htmx.ajax('GET','/share/donor-stats',{target:'#share-stats'})"
+        style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1">✕</button>
+    </div>
+    <div class="key-strip" style="margin-bottom:8px">
+      <span style="font-size:11px;color:var(--orange);margin-right:8px">⚠</span>
+      <span class="key-label">Token</span>
+      <span class="key-value" style="font-size:0.85rem">{{.Token}}</span>
+      <button class="key-copy" onclick="copyKey(this,'{{.Token}}')">Copy</button>
+    </div>
+    <div style="font-size:11px;color:var(--orange);margin-bottom:12px;padding:0 2px">
+      ⚠ Copy this token now — it won't be shown again.
+    </div>
+</div>

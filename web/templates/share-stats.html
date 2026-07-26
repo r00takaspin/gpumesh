@@ -1,4 +1,4 @@
-<div id="share-stats" hx-get="/share/donor-stats" hx-trigger="load, refreshStats from:body, every 60s" hx-swap="outerHTML">
+<div id="share-stats" hx-get="/share/donor-stats" hx-trigger="refreshStats from:body, every 60s" hx-swap="outerHTML">
 <!-- Donor Stats -->
 <div class="consumer-card">
   <div class="card-title">Statistics</div>
@@ -63,8 +63,8 @@
 
 <button class="btn-consumer btn-primary btn-sm"
   hx-post="/share/tokens"
-  hx-target="#share-setup"
-  hx-swap="outerHTML"
+  hx-target="main"
+  hx-swap="beforeend"
   style="margin:12px 0 16px 0">
   + Generate token
 </button>

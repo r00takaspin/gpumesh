@@ -1,4 +1,19 @@
 <div id="share-setup" hx-get="/share/setup" hx-trigger="every 5s" hx-swap="outerHTML" hx-include="[name='os-tab-share']:checked">
+{{if not .HasToken}}
+<div class="consumer-card" style="border-color:var(--orange);border-left:3px solid var(--orange);margin-bottom:16px">
+  <div class="card-title">⚠ No donor token</div>
+  <div class="community-banner" style="margin-bottom:12px">
+    You need a donor token to connect your provider. Generate one, then copy the run command below.
+  </div>
+  <button class="btn-consumer btn-primary"
+    hx-post="/share/tokens"
+    hx-target="main"
+    hx-swap="beforeend">
+    + Generate donor token
+  </button>
+</div>
+{{end}}
+
 <details class="consumer-card" style="border-color:var(--accent);border-left:3px solid var(--accent)" open>
   <summary class="card-title" style="cursor:pointer;margin-bottom:0">
     {{if .HasDonors}}🟢 Provider connected · Setup instructions{{else}}Get Started{{end}}
@@ -6,6 +21,7 @@
   <div class="community-banner" style="margin-top:12px">
     Install Ollama, pull a model, and run the provider on your GPU machine.
   </div>
+
 
   <div class="os-tabs">
     <input type="radio" name="os-tab-share" id="os-linux-amd64-share" value="linux-amd64" class="os-tab-input"{{if or (not .ActiveTab) (eq .ActiveTab "linux-amd64")}} checked{{end}}>
@@ -30,23 +46,12 @@ ollama pull llama3.2:3b</code></pre>
       <h4 style="margin:12px 0 8px 0;font-size:13px">2. Install the provider</h4>
       <pre class="code-block" style="margin-bottom:8px"><code>curl -sSfL https://gpumesh.net/install-provider.sh | sh</code></pre>
 
-      {{if .NewTokenFull}}
-      <div class="key-strip" style="margin-bottom:8px">
-        <span style="font-size:11px;color:var(--orange);white-space:nowrap;margin-right:8px">⚠</span>
-        <span class="key-label">Your token</span>
-        <span class="key-value">{{.NewTokenFull}}</span>
-        <button class="key-copy" onclick="copyKey(this, '{{.NewTokenFull}}')">Copy</button>
-      </div>
-      <div style="font-size:11px;color:var(--orange);margin-bottom:8px;padding:0 2px">
-        ⚠ Copy this token now — it won't be shown again.
-      </div>
-      {{end}}
 
       <pre class="code-block" style="margin-bottom:8px"><code>export MESH_COORDINATOR="{{.CoordinatorURL}}"
-export MESH_TOKEN="{{if .NewTokenFull}}{{.NewTokenFull}}{{else}}{{.Token}}{{end}}"
+export MESH_TOKEN="{{.Token}}"
 gpumesh-provider</code></pre>
       <button class="btn-consumer btn-sm" style="margin-bottom:8px"
-        onclick="navigator.clipboard.writeText('export MESH_COORDINATOR=&quot;{{.CoordinatorURL}}&quot;\nexport MESH_TOKEN=&quot;{{if .NewTokenFull}}{{.NewTokenFull}}{{else}}{{.Token}}{{end}}&quot;\ngpumesh-provider')">
+        onclick="navigator.clipboard.writeText('export MESH_COORDINATOR=&quot;{{.CoordinatorURL}}&quot;\nexport MESH_TOKEN=&quot;{{.Token}}&quot;\ngpumesh-provider')">
         📋 Copy command
       </button>
 
@@ -71,17 +76,6 @@ ollama pull llama3.2:3b</code></pre>
       <h4 style="margin:12px 0 8px 0;font-size:13px">2. Install the provider</h4>
       <pre class="code-block" style="margin-bottom:8px"><code>curl -sSfL https://gpumesh.net/install-provider.sh | sh</code></pre>
 
-      {{if .NewTokenFull}}
-      <div class="key-strip" style="margin-bottom:8px">
-        <span style="font-size:11px;color:var(--orange);white-space:nowrap;margin-right:8px">⚠</span>
-        <span class="key-label">Your token</span>
-        <span class="key-value">{{.NewTokenFull}}</span>
-        <button class="key-copy" onclick="copyKey(this, '{{.NewTokenFull}}')">Copy</button>
-      </div>
-      <div style="font-size:11px;color:var(--orange);margin-bottom:8px;padding:0 2px">
-        ⚠ Copy this token now — it won't be shown again.
-      </div>
-      {{end}}
 
       <pre class="code-block" style="margin-bottom:8px"><code>export MESH_COORDINATOR="{{.CoordinatorURL}}"
 export MESH_TOKEN="{{if .NewTokenFull}}{{.NewTokenFull}}{{else}}{{.Token}}{{end}}"
@@ -113,17 +107,6 @@ ollama pull llama3.2:3b</code></pre>
       <h4 style="margin:12px 0 8px 0;font-size:13px">2. Install the provider</h4>
       <pre class="code-block" style="margin-bottom:8px"><code>curl -sSfL https://gpumesh.net/install-provider.sh | sh</code></pre>
 
-      {{if .NewTokenFull}}
-      <div class="key-strip" style="margin-bottom:8px">
-        <span style="font-size:11px;color:var(--orange);white-space:nowrap;margin-right:8px">⚠</span>
-        <span class="key-label">Your token</span>
-        <span class="key-value">{{.NewTokenFull}}</span>
-        <button class="key-copy" onclick="copyKey(this, '{{.NewTokenFull}}')">Copy</button>
-      </div>
-      <div style="font-size:11px;color:var(--orange);margin-bottom:8px;padding:0 2px">
-        ⚠ Copy this token now — it won't be shown again.
-      </div>
-      {{end}}
 
       <pre class="code-block" style="margin-bottom:8px"><code>export MESH_COORDINATOR="{{.CoordinatorURL}}"
 export MESH_TOKEN="{{if .NewTokenFull}}{{.NewTokenFull}}{{else}}{{.Token}}{{end}}"
@@ -155,17 +138,6 @@ gpumesh-provider</code></pre>
         Download from <a href="https://github.com/r00takaspin/gpumesh/releases/latest">GitHub Releases</a> → pick <code>windows_amd64.zip</code>.
       </div>
 
-      {{if .NewTokenFull}}
-      <div class="key-strip" style="margin-bottom:8px">
-        <span style="font-size:11px;color:var(--orange);white-space:nowrap;margin-right:8px">⚠</span>
-        <span class="key-label">Your token</span>
-        <span class="key-value">{{.NewTokenFull}}</span>
-        <button class="key-copy" onclick="copyKey(this, '{{.NewTokenFull}}')">Copy</button>
-      </div>
-      <div style="font-size:11px;color:var(--orange);margin-bottom:8px;padding:0 2px">
-        ⚠ Copy this token now — it won't be shown again.
-      </div>
-      {{end}}
 
       <pre class="code-block" style="margin-bottom:8px"><code>set MESH_COORDINATOR={{.CoordinatorURL}}
 set MESH_TOKEN={{if .NewTokenFull}}{{.NewTokenFull}}{{else}}{{.Token}}{{end}}

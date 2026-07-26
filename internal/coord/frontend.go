@@ -1,7 +1,6 @@
 package coord
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -204,7 +203,6 @@ func (s *Server) handleUseDonor(w http.ResponseWriter, r *http.Request) {
 
 	renderTemplate(w, "use-donor.html", data)
 }
-const ctxKeyNewToken contextKey = "newToken"
 
 // handleShareSetup renders the share setup/onboarding block.
 func (s *Server) handleShareSetup(w http.ResponseWriter, r *http.Request) {
@@ -236,12 +234,10 @@ func (s *Server) handleShareSetup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	newTokenFull, _ := r.Context().Value(ctxKeyNewToken).(string)
 
 	data := map[string]interface{}{
 		"CoordinatorURL": coordURL,
 		"Token":          token,
-		"NewTokenFull":   newTokenFull,
 		"HasDonors":      len(donors) > 0,
 		"HasToken":       token != "",
 		"ActiveTab":      r.URL.Query().Get("os-tab-share"),
@@ -358,7 +354,7 @@ func (s *Server) handleShareDonorStats(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "share-stats.html", data)
 }
 
-// handleShareCreateToken creates a new donor token and re-renders the setup fragment.
+// handleShareCreateToken creates a new donor token and renders a modal with it.
 func (s *Server) handleShareCreateToken(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
@@ -370,9 +366,22 @@ func (s *Server) handleShareCreateToken(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, "failed to create token")
 		return
 	}
+
+	// Build coordinator URL.
+	coordURL := s.baseURL
+	if strings.Contains(coordURL, "localhost") || strings.Contains(coordURL, "127.0.0.1") {
+		coordURL = "ws://" + strings.TrimPrefix(strings.TrimPrefix(coordURL, "https://"), "http://") + "/ws/provider"
+	} else if strings.HasPrefix(coordURL, "https://") {
+		coordURL = "wss://" + strings.TrimPrefix(coordURL, "https://") + "/ws/provider"
+	} else {
+		coordURL = "ws://" + strings.TrimPrefix(coordURL, "http://") + "/ws/provider"
+	}
+
 	w.Header().Set("HX-Trigger", "refreshStats")
-	ctx := context.WithValue(r.Context(), ctxKeyNewToken, rawKey)
-	s.handleShareSetup(w, r.WithContext(ctx))
+	renderTemplate(w, "share-token-modal.html", map[string]interface{}{
+		"Token":          rawKey,
+		"CoordinatorURL": coordURL,
+	})
 }
 
 // --- Helpers ---

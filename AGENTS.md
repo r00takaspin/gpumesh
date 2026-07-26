@@ -21,11 +21,16 @@ All changes to this repository **MUST** align with `SPEC.md` — the authoritati
 
 SPEC wins. If SPEC is ambiguous, default to the interpretation that preserves existing behaviour.
 
-## Git Operations
+## Git & Deploy Operations
 
-- **NEVER** `git commit`, `git push`, or `git push dokku` without explicit user approval.
-- Make changes to files, but wait for the user to say "commit", "push", "deploy", or similar before touching git.
-- Before deploying: ALWAYS build and test locally first (`go build ./...`, `go vet ./...`, smoke-test affected endpoints).
+- **NEVER** `git commit`, `git push`, `git push dokku` without explicit user approval: "commit", "push", "deploy", "залей", "деплой".
+- Make changes to files, but wait for the user's command before touching git.
+- Before deploying: ALWAYS build (`go build ./...`) and vet (`go vet ./...`).
+- On deploy: push to origin first, then push to dokku.
+- After deploy: verify `/health` returns OK before reporting done.
+- **NEVER** restart nginx or manually edit `/etc/nginx/` on the VPS — use `dokku proxy:build-config gpumesh`.
+- **NEVER** manually kill/rename Docker containers — use `dokku ps:rebuild gpumesh`.
+- If Dokku gets stuck: `dokku ps:rebuild gpumesh` is the nuke-from-orbit fix.
 
 ## Local Development
 
