@@ -25,7 +25,7 @@ curl         ──HTTP──┘   │              │   └──────�
 ### Consumer (use models)
 
 ```bash
-export OPENAI_BASE_URL="https://gpumesh.io/v1"
+export OPENAI_BASE_URL="https://gpumesh.net/v1"
 export OPENAI_API_KEY="inf_xxxxxxxx"
 ```
 
@@ -47,7 +47,7 @@ client = OpenAI(base_url=os.environ["OPENAI_BASE_URL"], api_key=os.environ["OPEN
 #### Linux & macOS
 
 ```bash
-curl -sSfL https://gpumesh.io/install-provider.sh | sh
+curl -sSfL https://gpumesh.net/install-provider.sh | sh
 gpumesh-provider
 ```
 
@@ -56,7 +56,7 @@ The setup wizard will guide you through configuration on first run.
 #### Windows (PowerShell)
 
 ```powershell
-Invoke-WebRequest -Uri https://gpumesh.io/static/gpumesh-provider.exe -OutFile gpumesh-provider.exe
+Invoke-WebRequest -Uri https://gpumesh.net/static/gpumesh-provider.exe -OutFile gpumesh-provider.exe
 .\gpumesh-provider.exe
 ```
 

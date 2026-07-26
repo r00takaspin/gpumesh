@@ -98,7 +98,7 @@ func main() {
 	}
 
 	if cfg.Token == "" {
-		log.Fatal("No token. Get one at https://gpumesh.io/dashboard")
+		log.Fatal("No token. Get one at https://gpumesh.net/dashboard")
 	}
 
 	agent := provider.NewAgent(cfg)
@@ -116,7 +116,7 @@ func main() {
 
 func applyDefaults(cfg *provider.Config) {
 	if cfg.CoordinatorURL == "" {
-		cfg.CoordinatorURL = "wss://gpumesh.io/ws/provider"
+		cfg.CoordinatorURL = "wss://gpumesh.net/ws/provider"
 	}
 	if cfg.OllamaURL == "" {
 		cfg.OllamaURL = "http://localhost:11434"

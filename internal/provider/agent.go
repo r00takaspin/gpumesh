@@ -100,7 +100,7 @@ func NewAgent(cfg Config) *Agent {
 // Run connects to the coordinator and starts the request processing loop.
 func (a *Agent) Run(ctx context.Context) error {
 	if a.cfg.Token == "" {
-		return fmt.Errorf("no token provided. Get one at https://gpumesh.io/dashboard")
+		return fmt.Errorf("no token provided. Get one at https://gpumesh.net/dashboard")
 	}
 
 	backoff := a.cfg.ReconnectMin

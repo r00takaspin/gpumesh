@@ -199,7 +199,7 @@ Consumer                     Coordinator                        Donor
 
 | Флаг | Переменная окружения | По умолчанию | Описание |
 |---|---|---|---|
-| `--coordinator` | `MESH_COORDINATOR` | `wss://gpumesh.io/ws/provider` | WS URL координатора |
+| `--coordinator` | `MESH_COORDINATOR` | `wss://gpumesh.net/ws/provider` | WS URL координатора |
 | `--token` | `MESH_TOKEN` | — | Токен аутентификации донора |
 | `--ollama-url` | `MESH_OLLAMA_URL` | авто-детект | Базовый URL Ollama (авто-детект: `OLLAMA_HOST` → `localhost:11434`) |
 | `--models` | `MESH_MODELS` | (все обнаруженные) | Белый список моделей. Comma-separated: `llama3.2:3b,codellama:7b` |
@@ -213,7 +213,7 @@ Consumer                     Coordinator                        Donor
 
 ```json
 {
-  "coordinator_url": "wss://gpumesh.io/ws/provider",
+  "coordinator_url": "wss://gpumesh.net/ws/provider",
   "token": "inf_xxxxxxxx",
   "ollama_url": "http://localhost:11434",
   "models": ["llama3.2:3b", "codellama:7b"],
@@ -279,7 +279,7 @@ Consumer                     Coordinator                        Donor
 | Метод | Путь | Аутентификация | Описание |
 |---|---|---|---|
 | `GET` | `/health` | Нет | Liveness/readiness probe |
-| `GET` | `/install-provider.sh` | Нет | Универсальный скрипт установки провайдера. `curl -sSfL https://gpumesh.io/install-provider.sh \| sh`. Download base настраивается через `MESH_INSTALL_SCRIPT_DOWNLOAD_BASE`.
+| `GET` | `/install-provider.sh` | Нет | Универсальный скрипт установки провайдера. `curl -sSfL https://gpumesh.net/install-provider.sh \| sh`. Download base настраивается через `MESH_INSTALL_SCRIPT_DOWNLOAD_BASE`.
 | `POST` | `/api/report` | API-ключ | Жалоба на ответ донора: `{"request_id": "...", "reason": "spam"}` |
 | `GET` | `/api/consumer/stats` | GitHub OAuth | Статистика потребителя: requests/tokens сегодня, остаток лимита |
 | `GET` | `/api/donor/status` | GitHub OAuth | Живой статус агентов донора (online, models, load) |
@@ -419,7 +419,7 @@ registry = {
 
 #### 6.1.1 Примеры быстрого старта для всех инструментов
 
-Каждый таб в секции «For Developers» содержит готовый к копированию блок с `OPENAI_BASE_URL="https://gpumesh.io/v1"` и плейсхолдером `$API_KEY`. На дашборде (после логина) плейсхолдер заменяется на реальный ключ пользователя.
+Каждый таб в секции «For Developers» содержит готовый к копированию блок с `OPENAI_BASE_URL="https://gpumesh.net/v1"` и плейсхолдером `$API_KEY`. На дашборде (после логина) плейсхолдер заменяется на реальный ключ пользователя.
 
 **Список инструментов и их конфигурация:**
 
@@ -431,7 +431,7 @@ registry = {
   "models": [{
     "title": "GPU Mesh (free)",
     "provider": "openai",
-    "apiBase": "https://gpumesh.io/v1",
+    "apiBase": "https://gpumesh.net/v1",
     "apiKey": "$API_KEY",
     "model": "llama3.2:3b"
   }]
@@ -441,7 +441,7 @@ registry = {
 ##### Codex CLI (OpenAI)
 
 ```bash
-export OPENAI_BASE_URL="https://gpumesh.io/v1"
+export OPENAI_BASE_URL="https://gpumesh.net/v1"
 export OPENAI_API_KEY="$API_KEY"
 codex exec "add a DELETE /todos/:id endpoint"
 ```
@@ -449,7 +449,7 @@ codex exec "add a DELETE /todos/:id endpoint"
 ##### Aider
 
 ```bash
-aider --openai-api-base https://gpumesh.io/v1 \
+aider --openai-api-base https://gpumesh.net/v1 \
       --openai-api-key $API_KEY \
       --model openai/llama3.2:3b
 ```
@@ -460,7 +460,7 @@ aider --openai-api-base https://gpumesh.io/v1 \
 // VS Code settings.json or Cline config
 {
   "cline.apiProvider": "openai",
-  "cline.openAiBaseUrl": "https://gpumesh.io/v1",
+  "cline.openAiBaseUrl": "https://gpumesh.net/v1",
   "cline.openAiApiKey": "$API_KEY",
   "cline.openAiModel": "llama3.2:3b"
 }
@@ -470,7 +470,7 @@ aider --openai-api-base https://gpumesh.io/v1 \
 
 ```text
 Admin Panel → Settings → Connections
-  OpenAI API URL:  https://gpumesh.io/v1
+  OpenAI API URL:  https://gpumesh.net/v1
   API Key:         $API_KEY
 ```
 После сохранения модели из GPU Mesh появятся в выпадающем списке моделей.
@@ -481,7 +481,7 @@ Admin Panel → Settings → Connections
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="https://gpumesh.io/v1",
+    base_url="https://gpumesh.net/v1",
     api_key="$API_KEY"
 )
 
@@ -497,7 +497,7 @@ for chunk in response:
 ##### curl
 
 ```bash
-curl -s https://gpumesh.io/v1/chat/completions \
+curl -s https://gpumesh.net/v1/chat/completions \
   -H "Authorization: Bearer $API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -510,7 +510,7 @@ curl -s https://gpumesh.io/v1/chat/completions \
 ##### Oh My Pi (AI Coding Harness)
 
 ```bash
-export OPENAI_BASE_URL="https://gpumesh.io/v1"
+export OPENAI_BASE_URL="https://gpumesh.net/v1"
 export OPENAI_API_KEY="$API_KEY"
 # Oh My Pi automatically picks up OPENAI_* env vars.
 # Start a session and select any model from the GPU Mesh catalog.
@@ -536,7 +536,7 @@ export OPENAI_API_KEY="$API_KEY"
 | # | Компонент | Описание | HTMX |
 |---|---|---|---|
 | 1 | **Welcome** | «Hello, {github_login}». Кнопка Logout | — |
-| 2 | **Quickstart** | Заголовок «Start in 30 seconds». Две строки для копирования: `export OPENAI_BASE_URL="https://gpumesh.io/v1"` и `export OPENAI_API_KEY="<ваш ключ>"`. Ключ подставляется динамически если есть хотя бы один. Кнопка копирования | — |
+| 2 | **Quickstart** | Заголовок «Start in 30 seconds». Две строки для копирования: `export OPENAI_BASE_URL="https://gpumesh.net/v1"` и `export OPENAI_API_KEY="<ваш ключ>"`. Ключ подставляется динамически если есть хотя бы один. Кнопка копирования | — |
 | 3 | **API Keys** | Таблица ключей. Колонки: Prefix (первые 8 символов), Scope, Created, Actions (кнопка Revoke). Кнопка «Create New Key» над таблицей. При создании — модальное окно с полным ключом + предупреждение «Copy now — shown only once» + кнопка копирования | Нет |
 | 4 | **Create Key Modal** | Оверлей: показывает полный ключ (`inf_7a3b...`), кнопка копирования, предупреждение «This key will not be shown again». После закрытия — таблица обновляется HTMX | `hx-post`, обновление таблицы через `HX-Trigger` |
 | 5 | **Revoke confirmation** | Диалог «Are you sure? Any tool using this key will stop working.» с кнопками Confirm/Cancel | `hx-delete`, строка удаляется из DOM |
@@ -996,7 +996,7 @@ checksum:
 Однострочная установка с автоматическим детектом OS/arch:
 
 ```bash
-curl -sSfL https://gpumesh.io/install.sh | bash
+curl -sSfL https://gpumesh.net/install.sh | bash
 ```
 
 Скрипт делает:
@@ -1067,7 +1067,7 @@ dokku config:set gpumesh \
   DATABASE_URL=/data/gpumesh.db \
   GITHUB_CLIENT_ID=... \
   GITHUB_CLIENT_SECRET=... \
-  MESH_DOMAIN=gpumesh.io
+  MESH_DOMAIN=gpumesh.net
 
 # 6. Let's Encrypt
 dokku letsencrypt:enable gpumesh
