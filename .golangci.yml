@@ -2,32 +2,8 @@ version: "2"
 
 linters:
   enable:
-    - errcheck
     - staticcheck
     - unused
-
-  exclusions:
-    rules:
-      # fmt.Fprint* in wizards/CLI — intentional
-      - path: internal/provider/wizard\.go
-        linters: [errcheck]
-        text: "fmt\\.Fprint"
-      # defer resp.Body.Close() — common Go idiom
-      - path: internal/
-        linters: [errcheck]
-        text: "Body\\.Close"
-      # WebSocket writes — best-effort
-      - path: internal/
-        linters: [errcheck]
-        text: "conn\\.(WriteJSON|SetReadDeadline|Close)"
-      # fmt.Fprintf to http.ResponseWriter in SSE streaming — best-effort
-      - path: internal/coord/
-        linters: [errcheck]
-        text: "fmt\\.Fprintf"
-      # WebSocket SendWS in coordinator — best-effort
-      - path: internal/coord/
-        linters: [errcheck]
-        text: "SendWS"
 
 issues:
   max-issues-per-linter: 0
