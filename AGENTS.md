@@ -20,3 +20,17 @@ All changes to this repository **MUST** align with `SPEC.md` — the authoritati
 ### When in Doubt
 
 SPEC wins. If SPEC is ambiguous, default to the interpretation that preserves existing behaviour.
+
+## Git Operations
+
+- **NEVER** `git commit`, `git push`, or `git push dokku` without explicit user approval.
+- Make changes to files, but wait for the user to say "commit", "push", "deploy", or similar before touching git.
+- Before deploying: ALWAYS build and test locally first (`go build ./...`, `go vet ./...`, smoke-test affected endpoints).
+
+## Local Development
+
+- `.env` contains local OAuth credentials and `MESH_BASE_URL`.
+- Start server: `export $(grep -v '^#' .env | grep -v '^$' | xargs) && nohup go run ./cmd/coordinator > /tmp/coordinator.log 2>&1 &` (MUST use `nohup` — bare `&` dies with bash)
+- **AFTER starting: MUST verify** with `curl -s http://192.168.0.102:8080/health` returns `OK` before telling user it's ready.
+- Access at `http://192.168.0.102:8080` (not localhost — OAuth callback is registered for this IP).
+- Existing DB is `data/gpumesh.db` — use it, not `/tmp/` temp DB.

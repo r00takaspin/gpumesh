@@ -99,13 +99,17 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		redirect = "/use"
 	}
 	// First login with no keys → auto-create flow.
-	if redirect == "/use" || redirect == "/share" {
-		n, _ := s.store.CountKeys(userID)
+	if redirect == "/use" {
+		n, _ := s.store.CountKeysByScope(userID, "consumer")
+		if n == 0 {
+			redirect = redirect + "?new=1"
+		}
+	} else if redirect == "/share" {
+		n, _ := s.store.CountKeysByScope(userID, "donor")
 		if n == 0 {
 			redirect = redirect + "?new=1"
 		}
 	}
-	http.Redirect(w, r, redirect, http.StatusFound)
 }
 
 // handleLogout clears the session cookie.
@@ -190,7 +194,7 @@ func (s *Server) handleUse(w http.ResponseWriter, r *http.Request) {
 	if userID != 0 {
 		// Auto-create consumer key if none exists.
 		if r.URL.Query().Get("new") == "1" {
-			n, _ := s.store.CountKeys(userID)
+			n, _ := s.store.CountKeysByScope(userID, "consumer")
 			if n == 0 {
 				rawKey, _, err := s.store.CreateKey(userID, "consumer")
 				if err == nil {
