@@ -41,16 +41,32 @@ client = OpenAI(base_url=os.environ["OPENAI_BASE_URL"], api_key=os.environ["OPEN
 
 ### Donor (share your GPU)
 
-```bash
-# Install
-go install github.com/r00takaspin/gpumesh/cmd/provider@latest
+**Prerequisites:** [Ollama](https://ollama.com) installed with at least one model pulled.
 
-# Run
-export MESH_TOKEN="inf_xxxxxxxx"
+#### Linux & macOS
+
+```bash
+curl -sSfL https://gpumesh.io/install-provider.sh | sh
 gpumesh-provider
 ```
 
-The agent auto-discovers your Ollama models, registers them with the coordinator, and starts serving requests. Earn reputation badges (Bronze → Silver → Gold → Platinum) and climb the public leaderboard.
+The setup wizard will guide you through configuration on first run.
+
+#### Windows (PowerShell)
+
+```powershell
+Invoke-WebRequest -Uri https://gpumesh.io/static/gpumesh-provider.exe -OutFile gpumesh-provider.exe
+.\gpumesh-provider.exe
+```
+
+#### From source (any platform)
+
+```bash
+go install github.com/r00takaspin/gpumesh/cmd/provider@latest
+gpumesh-provider
+```
+
+The agent auto-detects your Ollama instance, discovers available models, and starts serving requests. Configuration is persisted to `~/.gpumesh.json`. Earn reputation badges (Bronze → Silver → Gold → Platinum) and climb the public leaderboard.
 
 ## Features
 

@@ -181,25 +181,48 @@ Consumer                     Coordinator                        Donor
 ### 4.1 Порядок запуска
 
 ```
-1. Прочитать конфиг (URL координатора, токен, URL Ollama, max_concurrent)
-2. Если нет токена → вывести "No token. Get one at https://gpumesh.io/dashboard" и выйти с ошибкой
-3. Подключить WS к координатору
-4. Обнаружить локальные модели: GET http://localhost:11434/api/tags
-5. Отправить register с обнаруженными моделями
-6. Запустить heartbeat-тикер (интервал 30с)
-7. Войти в цикл обработки запросов
+1. Загрузить конфиг из ~/.gpumesh.json (если существует)
+2. Применить переменные окружения (MESH_*)
+3. Применить CLI-флаги (если заданы явно)
+4. Авто-детект Ollama: проверить OLLAMA_HOST, затем localhost:11434
+5. Если токен пуст или Ollama недоступен — запустить интерактивный wizard
+6. Открыть WebSocket к координатору (экспоненциальный реконнект: 1с → 60с)
+7. Запросить список моделей у Ollama (POST /api/tags), отфильтровать по белому списку
+8. Отправить register координатору (модели, max_concurrent, описание, hardware)
+9. Запустить heartbeat-тикер (интервал 30с)
+10. Войти в цикл обработки запросов
 ```
 
 ### 4.2 Конфигурация
+
+Приоритет (от высшего к низшему): CLI-флаги > переменные окружения > `~/.gpumesh.json` > встроенные значения по умолчанию.
 
 | Флаг | Переменная окружения | По умолчанию | Описание |
 |---|---|---|---|
 | `--coordinator` | `MESH_COORDINATOR` | `wss://gpumesh.io/ws/provider` | WS URL координатора |
 | `--token` | `MESH_TOKEN` | — | Токен аутентификации донора |
-| `--ollama-url` | `MESH_OLLAMA_URL` | `http://localhost:11434` | Базовый URL Ollama |
-| `--models` | `MESH_MODELS` | (все обнаруженные) | Белый список моделей для шаринга. Comma-separated: `llama3.2:3b,codellama:7b` |
+| `--ollama-url` | `MESH_OLLAMA_URL` | авто-детект | Базовый URL Ollama (авто-детект: `OLLAMA_HOST` → `localhost:11434`) |
+| `--models` | `MESH_MODELS` | (все обнаруженные) | Белый список моделей. Comma-separated: `llama3.2:3b,codellama:7b` |
 | `--description` | `MESH_DESCRIPTION` | hostname | Публичное описание (напр. "RTX 4090, US-East") |
+| `--max-concurrent` | `MESH_MAX_CONCURRENT` | `1` | Максимум одновременных запросов |
+| `--wizard` | — | `false` | Принудительный запуск мастера настройки |
+| `--no-wizard` | — | `false` | Пропустить мастер даже при неполном конфиге |
+| `--config` | `MESH_CONFIG` | `~/.gpumesh.json` | Путь к файлу конфигурации |
 
+Конфиг-файл (`~/.gpumesh.json`):
+
+```json
+{
+  "coordinator_url": "wss://gpumesh.io/ws/provider",
+  "token": "inf_xxxxxxxx",
+  "ollama_url": "http://localhost:11434",
+  "models": ["llama3.2:3b", "codellama:7b"],
+  "max_concurrent": 2,
+  "description": "RTX 4090, US-East"
+}
+```
+
+Сохраняется автоматически после прохождения мастера настройки.
 ### 4.3 Обработка запроса
 
 ```
@@ -256,6 +279,7 @@ Consumer                     Coordinator                        Donor
 | Метод | Путь | Аутентификация | Описание |
 |---|---|---|---|
 | `GET` | `/health` | Нет | Liveness/readiness probe |
+| `GET` | `/install-provider.sh` | Нет | Универсальный скрипт установки провайдера. `curl -sSfL https://gpumesh.io/install-provider.sh \| sh`. Download base настраивается через `MESH_INSTALL_SCRIPT_DOWNLOAD_BASE`.
 | `POST` | `/api/report` | API-ключ | Жалоба на ответ донора: `{"request_id": "...", "reason": "spam"}` |
 | `GET` | `/api/consumer/stats` | GitHub OAuth | Статистика потребителя: requests/tokens сегодня, остаток лимита |
 | `GET` | `/api/donor/status` | GitHub OAuth | Живой статус агентов донора (online, models, load) |
@@ -270,7 +294,18 @@ Consumer                     Coordinator                        Donor
 |---|---|---|
 | `/ws/provider` | Токен донора | Подключение агента донора |
 
-### 5.3 Реестр (структура данных в памяти)
+### 5.3 Конфигурация координатора
+
+| Переменная окружения | По умолчанию | Описание |
+|---|---|---|
+| `MESH_ADDR` | `:8080` | Адрес HTTP-сервера |
+| `MESH_DB` | `data/gpumesh.db` | Путь к SQLite-базе |
+| `MESH_BASE_URL` | `http://localhost:8080` | Внешний URL координатора |
+| `MESH_RATE_LIMIT` | `100` | Лимит запросов в час на API-ключ |
+| `MESH_AFFINITY_TTL` | `120` | TTL sticky-аффинити consumer→donor (секунды) |
+| `MESH_INSTALL_SCRIPT_DOWNLOAD_BASE` | `https://github.com/r00takaspin/gpumesh/releases/latest/download` | Базовый URL для загрузки бинарников в `/install-provider.sh` |
+
+### 5.4 Реестр (структура данных в памяти)
 
 ```
 registry = {
