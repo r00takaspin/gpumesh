@@ -60,25 +60,25 @@ func (s *Server) handleWSProvider(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Read initial register message.
-	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	_, raw, err := conn.ReadMessage()
 	if err != nil {
 		log.Printf("ws: read register error: %v", err)
-		conn.Close()
+		_ = conn.Close()
 		return
 	}
 
 	var env proto.Envelope
 	if err := json.Unmarshal(raw, &env); err != nil || env.Type != proto.TypeRegister {
 		log.Printf("ws: expected register, got type=%q err=%v", env.Type, err)
-		conn.Close()
+		_ = conn.Close()
 		return
 	}
 
 	var reg proto.RegisterMsg
 	if err := json.Unmarshal(raw, &reg); err != nil {
 		log.Printf("ws: invalid register: %v", err)
-		conn.Close()
+		_ = conn.Close()
 		return
 	}
 
@@ -100,12 +100,12 @@ func (s *Server) handleWSProvider(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		log.Printf("ws: send registered error: %v", err)
 		s.registry.Unregister(providerID)
-		conn.Close()
+		_ = conn.Close()
 		return
 	}
 
 	// Disable read deadline for message loop.
-	conn.SetReadDeadline(time.Time{})
+	_ = conn.SetReadDeadline(time.Time{})
 	// Read loop in a goroutine; wait for it to finish.
 	readDone := make(chan struct{})
 	go func() {
@@ -130,7 +130,7 @@ func (s *Server) handleWSProvider(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) readLoop(donor *Donor) {
-	defer donor.WSConn.Close()
+	defer func() { _ = donor.WSConn.Close() }()
 
 	for {
 		_, raw, err := donor.WSConn.ReadMessage()
@@ -158,7 +158,7 @@ func (s *Server) readLoop(donor *Donor) {
 			}
 			s.registry.UpdateHeartbeat(donor.ProviderID)
 			// Send ack (best-effort).
-			donor.SendWS(proto.HeartbeatAckMsg{Type: proto.TypeHeartbeatAck})
+			_ = donor.SendWS(proto.HeartbeatAckMsg{Type: proto.TypeHeartbeatAck})
 
 		case proto.TypeChunk:
 			var msg proto.ChunkMsg
@@ -219,7 +219,7 @@ func (s *Server) relayChunk(providerID string, msg proto.ChunkMsg) {
 	// Count each chunk as one token for session stats.
 	s.registry.AddTokens(providerID, 1)
 	atomic.AddInt64(&s.tokensToday, 1)
-	s.store.UpdateDonorStats(donor.UserID, 0, 1, 0)
+	_ = s.store.UpdateDonorStats(donor.UserID, 0, 1, 0)
 }
 
 func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
@@ -234,7 +234,7 @@ func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
 		CompletionTokens int `json:"completion_tokens"`
 	}
 	if len(msg.Usage) > 0 {
-		json.Unmarshal(msg.Usage, &usage)
+		_ = json.Unmarshal(msg.Usage, &usage)
 	}
 
 	donor.mu.Lock()
@@ -255,7 +255,7 @@ func (s *Server) relayResponse(providerID string, msg proto.ResponseMsg) {
 	if usage.CompletionTokens > 0 {
 		s.registry.AddTokens(providerID, usage.CompletionTokens)
 		atomic.AddInt64(&s.tokensToday, int64(usage.CompletionTokens))
-		s.store.UpdateDonorStats(donor.UserID, 1, int64(usage.CompletionTokens), 0)
+		_ = s.store.UpdateDonorStats(donor.UserID, 1, int64(usage.CompletionTokens), 0)
 	}
 }
 func (s *Server) relayError(providerID string, msg proto.ErrorMsg) {

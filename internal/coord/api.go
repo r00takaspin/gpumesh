@@ -192,7 +192,7 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 	// Increment load (decremented on all exit paths below).
 	if !s.registry.IncrementLoad(donor.ProviderID) {
 		donor.UnregisterChunkChannel(requestID)
-		fmt.Fprintf(w, "data: {\"error\":\"donor overloaded\"}\n\n")
+		_, _ = fmt.Fprintf(w, "data: {\"error\":\"donor overloaded\"}\n\n")
 		flusher.Flush()
 		return
 	}
@@ -209,7 +209,7 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 	if err := donor.SendWS(requestMsg); err != nil {
 		log.Printf("chat: send request error: %v", err)
 		s.registry.DecrementLoad(donor.ProviderID)
-		fmt.Fprintf(w, "data: {\"error\":\"donor unavailable\"}\n\n")
+		_, _ = fmt.Fprintf(w, "data: {\"error\":\"donor unavailable\"}\n\n")
 		flusher.Flush()
 		return
 	}
@@ -233,7 +233,9 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 		select {
 		case <-totalCtx.Done():
 			// Send cancel to donor.
-			donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
+			if err := donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID}); err != nil {
+				log.Printf("send cancel: %v", err)
+			}
 			if firstTokenReceived {
 				// SPEC §3.7: return generated tokens with finish_reason "length".
 				finalChunk := map[string]interface{}{
@@ -250,7 +252,7 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 					},
 				}
 				data, _ := json.Marshal(finalChunk)
-				fmt.Fprintf(w, "data: %s\n\n", data)
+				_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 				flusher.Flush()
 			}
 			s.sendSSEDone(w, flusher)
@@ -259,22 +261,26 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 
 		case <-r.Context().Done():
 			// Consumer disconnected.
-			donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
+			if err := donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID}); err != nil {
+				log.Printf("send cancel: %v", err)
+			}
 			s.registry.DecrementLoad(donor.ProviderID)
 			return
 
 		case <-ttftTimer.C:
 			// TTFT timeout.
-			donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
-			fmt.Fprintf(w, "data: {\"error\":\"timeout waiting for first token\"}\n\n")
+			if err := donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID}); err != nil {
+				log.Printf("send cancel: %v", err)
+			}
+			_, _ = fmt.Fprintf(w, "data: {\"error\":\"timeout waiting for first token\"}\n\n")
 			flusher.Flush()
 			s.registry.DecrementLoad(donor.ProviderID)
 			return
 
 		case <-interTokenTimer.C:
 			// Inter-token timeout.
-			donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
-			fmt.Fprintf(w, "data: {\"error\":\"inter-token timeout\"}\n\n")
+			_ = donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
+			_, _ = fmt.Fprintf(w, "data: {\"error\":\"inter-token timeout\"}\n\n")
 			flusher.Flush()
 			s.registry.DecrementLoad(donor.ProviderID)
 			return
@@ -282,13 +288,13 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 		case cr, ok := <-ch:
 			if !ok {
 				// Channel closed (donor disconnected).
-				fmt.Fprintf(w, "data: {\"error\":\"donor disconnected\"}\n\n")
+				_, _ = fmt.Fprintf(w, "data: {\"error\":\"donor disconnected\"}\n\n")
 				flusher.Flush()
 				s.registry.DecrementLoad(donor.ProviderID)
 				return
 			}
 			if cr.Err != "" {
-				fmt.Fprintf(w, "data: {\"error\":%q}\n\n", cr.Err)
+				_, _ = fmt.Fprintf(w, "data: {\"error\":%q}\n\n", cr.Err)
 				flusher.Flush()
 				s.registry.DecrementLoad(donor.ProviderID)
 				return
@@ -327,11 +333,11 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 				chunk["choices"].([]map[string]interface{})[0]["finish_reason"] = "stop"
 			}
 			data, _ := json.Marshal(chunk)
-			fmt.Fprintf(w, "data: %s\n\n", data)
+			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
 			flusher.Flush()
 
 			if cr.Done {
-				fmt.Fprintf(w, "data: [DONE]\n\n")
+			_, _ = fmt.Fprintf(w, "data: [DONE]\n\n")
 				flusher.Flush()
 				s.registry.DecrementLoad(donor.ProviderID)
 				return
@@ -411,7 +417,7 @@ func (s *Server) sendNonStreamingRequest(ctx context.Context, donor *Donor, req 
 
 	select {
 	case <-totalCtx.Done():
-		donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
+		_ = donor.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
 		return nil, fmt.Errorf("timeout")
 
 	case cr, ok := <-ch:
@@ -443,7 +449,7 @@ func (s *Server) sendNonStreamingRequest(ctx context.Context, donor *Donor, req 
 }
 
 func (s *Server) sendSSEDone(w http.ResponseWriter, flusher http.Flusher) {
-	fmt.Fprintf(w, "data: [DONE]\n\n")
+	_, _ = fmt.Fprintf(w, "data: [DONE]\n\n")
 	flusher.Flush()
 }
 
@@ -471,7 +477,7 @@ func buildOptions(req *proto.ChatCompletionRequest) json.RawMessage {
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {

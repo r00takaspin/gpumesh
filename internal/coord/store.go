@@ -153,7 +153,7 @@ func (s *Store) ListKeys(userID int64) ([]APIKey, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list keys: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var keys []APIKey
 	for rows.Next() {
@@ -263,7 +263,7 @@ func (s *Store) ListAllDonorStats() ([]DonorStats, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list all donor stats: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []DonorStats
 	for rows.Next() {

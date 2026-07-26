@@ -154,7 +154,7 @@ func (s *Server) ListenAndServe() error {
 				return
 			case <-ticker.C:
 				for _, d := range s.registry.AllDonors() {
-					s.store.UpdateDonorStats(d.UserID, 0, 0, 60)
+					_ = s.store.UpdateDonorStats(d.UserID, 0, 0, 60)
 				}
 			}
 		}
@@ -169,7 +169,7 @@ func (s *Server) ListenAndServe() error {
 		cancel()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
-		s.srv.Shutdown(shutdownCtx)
+		_ = s.srv.Shutdown(shutdownCtx)
 	}()
 
 	log.Printf("coordinator listening on %s", s.addr)
@@ -202,7 +202,7 @@ func (s *Server) handleCORS(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	_, _ = w.Write([]byte("OK"))
 }
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "index.html", s.pageDataWithStats(r))

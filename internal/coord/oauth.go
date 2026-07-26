@@ -62,7 +62,7 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to get user info", http.StatusInternalServerError)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var ghUser struct {
 		ID    int64  `json:"id"`
@@ -118,7 +118,7 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("gpumesh_session")
 	if err == nil {
-		s.store.DeleteSession(cookie.Value)
+		_ = s.store.DeleteSession(cookie.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "gpumesh_session",

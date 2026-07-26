@@ -66,7 +66,7 @@ func autoDetectOllama(ctx context.Context, cfgURL string) string {
 		return cfgURL
 	}
 	if resp, err := client.Do(req); err == nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return "http://localhost:11434"
 	}
 	return cfgURL
@@ -148,7 +148,7 @@ func (a *Agent) connect(ctx context.Context) error {
 				return nil, err
 			}
 			if tcp, ok := conn.(*net.TCPConn); ok {
-				tcp.SetKeepAlivePeriod(30 * time.Second)
+			_ = tcp.SetKeepAlivePeriod(30 * time.Second)
 			}
 			return conn, nil
 		},
@@ -169,7 +169,7 @@ func (a *Agent) connect(ctx context.Context) error {
 		models = a.cfg.Models
 	}
 	if len(models) == 0 {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("no models available")
 	}
 
@@ -183,21 +183,21 @@ func (a *Agent) connect(ctx context.Context) error {
 		Description:   a.cfg.Description,
 		Hardware:      detectHardware(),
 	}); err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("register: %w", err)
 	}
 
 	// Read registered response.
-	conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	_ = conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	_, raw, err := conn.ReadMessage()
 	if err != nil {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("read registered: %w", err)
 	}
 
 	var reg proto.RegisteredMsg
 	if err := json.Unmarshal(raw, &reg); err != nil || reg.Type != proto.TypeRegistered {
-		conn.Close()
+		_ = conn.Close()
 		return fmt.Errorf("unexpected registration response: %s", raw)
 	}
 
@@ -229,7 +229,7 @@ func (a *Agent) heartbeatLoop(ctx context.Context) {
 			}
 			if err := conn.WriteJSON(proto.HeartbeatMsg{Type: proto.TypeHeartbeat}); err != nil {
 				log.Printf("heartbeat write error, closing: %v", err)
-				conn.Close()
+				_ = conn.Close()
 				a.mu.Lock()
 				if a.conn == conn {
 					a.conn = nil
@@ -246,7 +246,7 @@ func (a *Agent) readLoop(ctx context.Context) error {
 	defer func() {
 		a.mu.Lock()
 		if a.conn != nil {
-			a.conn.Close()
+			_ = a.conn.Close()
 			a.conn = nil
 		}
 		a.mu.Unlock()
@@ -257,7 +257,7 @@ func (a *Agent) readLoop(ctx context.Context) error {
 		<-ctx.Done()
 		a.mu.Lock()
 		if a.conn != nil {
-			a.conn.Close()
+			_ = a.conn.Close()
 		}
 		a.mu.Unlock()
 	}()
@@ -270,7 +270,7 @@ func (a *Agent) readLoop(ctx context.Context) error {
 			return nil
 		}
 
-		conn.SetReadDeadline(time.Now().Add(proto.HeartbeatTimeout))
+		_ = conn.SetReadDeadline(time.Now().Add(proto.HeartbeatTimeout))
 
 		_, raw, err := conn.ReadMessage()
 		if err != nil {
@@ -323,7 +323,7 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 		conn := a.conn
 		a.mu.Unlock()
 		if conn != nil {
-			conn.WriteJSON(proto.ErrorMsg{
+			_ = conn.WriteJSON(proto.ErrorMsg{
 				Type:      proto.TypeError,
 				RequestID: msg.RequestID,
 				Code:      proto.ErrOverloaded,
@@ -365,7 +365,7 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 			if reqCtx.Err() == context.Canceled {
 				return // request cancelled, don't send error
 			}
-			conn.WriteJSON(proto.ErrorMsg{
+			_ = conn.WriteJSON(proto.ErrorMsg{
 				Type:      proto.TypeError,
 				RequestID: msg.RequestID,
 				Code:      code,
@@ -374,7 +374,7 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 		}
 		return
 	}
-	defer ollamaResp.Body.Close()
+	defer func() { _ = ollamaResp.Body.Close() }()
 	log.Printf("handleRequest: ollama responded status=%d", ollamaResp.StatusCode)
 
 	if msg.Stream {
@@ -514,7 +514,7 @@ func (a *Agent) discoverModels() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ollama /api/tags: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var result struct {
 		Models []struct {

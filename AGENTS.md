@@ -23,11 +23,12 @@ SPEC wins. If SPEC is ambiguous, default to the interpretation that preserves ex
 
 ## Git & Deploy Operations
 
-- **🚫 NEVER `git commit` WITHOUT EXPLICIT USER APPROVAL.**
-  Acceptable triggers: "commit", "закоммить", "коммит".
-- **🚫 NEVER `git push` (origin OR dokku) WITHOUT EXPLICIT USER APPROVAL.**
-  Acceptable triggers: "push", "deploy", "залей", "деплой", "в прод".
-- `git push dokku` = PRODUCTION (gpumesh.net). User MUST explicitly confirm before pushing to dokku.
+> **🚫 ЗАПРЕЩЕНО БЕЗ ЯВНОГО РАЗРЕШЕНИЯ:**
+> - `git commit` — жди слов: «commit», «закоммить», «коммит»
+> - `git push` (origin или dokku) — жди слов: «push», «deploy», «залей», «деплой», «в прод»
+> - Ты НЕ решаешь сам когда коммитить/пушить. Даже если сделал правку и кажется очевидным — СПРОСИ.
+> - `git push dokku` = PRODUCTION (gpumesh.net). Спрашивай ОТДЕЛЬНО.
+
 - Make changes to files, but wait for the user's command before touching git.
 - Before deploying: ALWAYS build (`go build ./...`) and vet (`go vet ./...`).
 - On deploy: push to origin first, then push to dokku.
