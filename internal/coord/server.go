@@ -115,7 +115,9 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /use/keys", s.requireAuth(s.handleUseKeys))
 	mux.HandleFunc("POST /use/keys", s.requireAuth(s.handleUseCreateKey))
 	mux.HandleFunc("GET /use/donor", s.requireAuth(s.handleUseDonor))
-	mux.HandleFunc("GET /share/status", s.requireAuth(s.handleShareStatus))
+	mux.HandleFunc("GET /share/setup", s.requireAuth(s.handleShareSetup))
+	mux.HandleFunc("GET /share/models", s.requireAuth(s.handleShareModels))
+	mux.HandleFunc("GET /share/donor-stats", s.requireAuth(s.handleShareDonorStats))
 	mux.HandleFunc("POST /share/tokens", s.requireAuth(s.handleShareCreateToken))
 
 	// Health check.

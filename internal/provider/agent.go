@@ -161,6 +161,7 @@ func (a *Agent) connect(ctx context.Context) error {
 		Models:        models,
 		MaxConcurrent: a.cfg.MaxConcurrent,
 		Description:   a.cfg.Description,
+		Hardware:      detectHardware(),
 	}); err != nil {
 		conn.Close()
 		return fmt.Errorf("register: %w", err)

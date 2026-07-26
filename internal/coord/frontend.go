@@ -5,8 +5,25 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 )
+
+// donorView is the shared view model for donor agent cards.
+type donorView struct {
+	ProviderID      string
+	Description     string
+	Hardware        string
+	ModelCount      int
+	CurrentLoad     int
+	MaxConcurrent   int
+	Uptime          string
+	ModelList       string
+	SessionRequests int
+	SessionTokens   int
+	TokPerSec       string
+}
 
 
 // --- GET /api/consumer/stats ---
@@ -104,25 +121,27 @@ func (s *Server) handleUseDonor(w http.ResponseWriter, r *http.Request) {
 	badge := BadgeForTokens(stats.TotalTokens)
 	badgeEmoji := badgeEmoji(badge)
 
-	type agentView struct {
-		ProviderID    string
-		Description   string
-		ModelCount    int
-		CurrentLoad   int
-		MaxConcurrent int
-		Uptime        string
-		ModelList     string
-	}
-	agents := make([]agentView, len(donors))
+	agents := make([]donorView, len(donors))
 	for i, d := range donors {
-		agents[i] = agentView{
-			ProviderID:    d.ProviderID,
-			Description:   d.Description,
-			ModelCount:    len(d.Models),
-			CurrentLoad:   d.CurrentLoad,
-			MaxConcurrent: d.MaxConcurrent,
-			Uptime:        formatDuration(time.Since(d.ConnectedAt)),
-			ModelList:     joinModels(d.Models),
+		uptime := time.Since(d.ConnectedAt)
+		var tokPerSec string
+		if uptime.Seconds() > 0 && d.SessionTokens > 0 {
+			tokPerSec = fmt.Sprintf("%.1f", float64(d.SessionTokens)/uptime.Seconds())
+		} else {
+			tokPerSec = "—"
+		}
+		agents[i] = donorView{
+			ProviderID:      d.ProviderID,
+			Description:     d.Description,
+			Hardware:        d.Hardware,
+			ModelCount:      len(d.Models),
+			CurrentLoad:     d.CurrentLoad,
+			MaxConcurrent:   d.MaxConcurrent,
+			Uptime:          formatDuration(uptime),
+			ModelList:       joinModels(d.Models),
+			SessionRequests: d.SessionRequests,
+			SessionTokens:   d.SessionTokens,
+			TokPerSec:       tokPerSec,
 		}
 	}
 
@@ -187,10 +206,92 @@ func (s *Server) handleUseDonor(w http.ResponseWriter, r *http.Request) {
 }
 const ctxKeyNewToken contextKey = "newToken"
 
+// handleShareSetup renders the share setup/onboarding block.
+func (s *Server) handleShareSetup(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
 
+	donors := s.registry.DonorsForUser(userID)
 
-// handleShareStatus renders the share GPU status fragment.
-func (s *Server) handleShareStatus(w http.ResponseWriter, r *http.Request) {
+	// Build coordinator WebSocket URL.
+	coordURL := s.baseURL
+	if strings.Contains(coordURL, "localhost") || strings.Contains(coordURL, "127.0.0.1") {
+		coordURL = "ws://" + strings.TrimPrefix(strings.TrimPrefix(coordURL, "https://"), "http://") + "/ws/provider"
+	} else if strings.HasPrefix(coordURL, "https://") {
+		coordURL = "wss://" + strings.TrimPrefix(coordURL, "https://") + "/ws/provider"
+	} else {
+		coordURL = "ws://" + strings.TrimPrefix(coordURL, "http://") + "/ws/provider"
+	}
+
+	// Find the first donor-scoped key for the run command.
+	keys, _ := s.store.ListKeys(userID)
+	var token string
+	for _, k := range keys {
+		if k.Scope == "donor" || k.Scope == "both" {
+			token = k.KeyPrefix + "..."
+			break
+		}
+	}
+
+	newTokenFull, _ := r.Context().Value(ctxKeyNewToken).(string)
+
+	data := map[string]interface{}{
+		"CoordinatorURL": coordURL,
+		"Token":          token,
+		"NewTokenFull":   newTokenFull,
+		"HasDonors":      len(donors) > 0,
+		"HasToken":       token != "",
+		"ActiveTab":      r.URL.Query().Get("os-tab-share"),
+	}
+
+	renderTemplate(w, "share-setup.html", data)
+}
+
+// handleShareModels renders the donor model/hardware status cards.
+func (s *Server) handleShareModels(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	donors := s.registry.DonorsForUser(userID)
+	sort.Slice(donors, func(i, j int) bool { return donors[i].Description < donors[j].Description })
+	agents := make([]donorView, len(donors))
+	for i, d := range donors {
+		uptime := time.Since(d.ConnectedAt)
+		var tokPerSec string
+		if uptime.Seconds() > 0 && d.SessionTokens > 0 {
+			tokPerSec = fmt.Sprintf("%.1f", float64(d.SessionTokens)/uptime.Seconds())
+		} else {
+			tokPerSec = "—"
+		}
+		agents[i] = donorView{
+			ProviderID:      d.ProviderID,
+			Description:     d.Description,
+			Hardware:        d.Hardware,
+			ModelCount:      len(d.Models),
+			CurrentLoad:     d.CurrentLoad,
+			MaxConcurrent:   d.MaxConcurrent,
+			Uptime:          formatDuration(uptime),
+			ModelList:       joinModels(d.Models),
+			SessionRequests: d.SessionRequests,
+			SessionTokens:   d.SessionTokens,
+			TokPerSec:       tokPerSec,
+		}
+	}
+
+	data := map[string]interface{}{
+		"Agents": agents,
+	}
+
+	renderTemplate(w, "share-models.html", data)
+}
+
+// handleShareDonorStats renders stats + badge + token list (collapsed by default).
+func (s *Server) handleShareDonorStats(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
@@ -199,30 +300,15 @@ func (s *Server) handleShareStatus(w http.ResponseWriter, r *http.Request) {
 
 	donors := s.registry.DonorsForUser(userID)
 	stats, _ := s.store.GetDonorStats(userID)
+
+	// Only render if there's activity or donors connected.
+	if len(donors) == 0 && stats.TotalRequests == 0 {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	badge := BadgeForTokens(stats.TotalTokens)
 	badgeEmoji := badgeEmoji(badge)
-
-	type agentView struct {
-		ProviderID    string
-		Description   string
-		ModelCount    int
-		CurrentLoad   int
-		MaxConcurrent int
-		Uptime        string
-		ModelList     string
-	}
-	agents := make([]agentView, len(donors))
-	for i, d := range donors {
-		agents[i] = agentView{
-			ProviderID:    d.ProviderID,
-			Description:   d.Description,
-			ModelCount:    len(d.Models),
-			CurrentLoad:   d.CurrentLoad,
-			MaxConcurrent: d.MaxConcurrent,
-			Uptime:        formatDuration(time.Since(d.ConnectedAt)),
-			ModelList:     joinModels(d.Models),
-		}
-	}
 
 	badgeNext, badgeThreshold := nextBadge(stats.TotalTokens)
 	badgePct := 0
@@ -231,7 +317,7 @@ func (s *Server) handleShareStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	remaining := badgeThreshold - stats.TotalTokens
 
-	// Collect all donor/both keys for the token list.
+	// Collect donor keys for the token list.
 	type donorKeyView struct {
 		ID        int64
 		KeyPrefix string
@@ -249,14 +335,6 @@ func (s *Server) handleShareStatus(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	tokenPrefix := "inf_xxxx"
-	if len(donorKeys) > 0 {
-		tokenPrefix = donorKeys[0].KeyPrefix
-	}
-	tokenFull := tokenPrefix + "..."
-
-	newTokenFull, _ := r.Context().Value(ctxKeyNewToken).(string)
-
 	avg := 0.0
 	if stats.TotalUptimeSec > 0 {
 		avg = float64(stats.TotalTokens) / float64(stats.TotalUptimeSec)
@@ -265,27 +343,23 @@ func (s *Server) handleShareStatus(w http.ResponseWriter, r *http.Request) {
 	totalUptime := formatDuration(time.Duration(stats.TotalUptimeSec) * time.Second)
 
 	data := map[string]interface{}{
-		"Agents":           agents,
-		"Stats":             stats,
-		"TotalUptime":       totalUptime,
-		"Badge":             badge,
-		"BadgeEmoji":        badgeEmoji,
-		"BadgeNext":         badgeNext,
-		"BadgeProgress":     stats.TotalTokens,
-		"BadgeThreshold":     badgeThreshold,
-		"BadgePercent":      badgePct,
-		"BadgeRemaining":    remaining,
-		"AvgTokensPerSec":   avgTokensPerSec,
-		"TokenPrefix":       tokenPrefix,
-		"TokenFull":         tokenFull,
-		"DonorKeys":         donorKeys,
-		"NewTokenFull":      newTokenFull,
+		"Stats":           stats,
+		"TotalUptime":     totalUptime,
+		"Badge":           badge,
+		"BadgeEmoji":      badgeEmoji,
+		"BadgeNext":       badgeNext,
+		"BadgeProgress":   stats.TotalTokens,
+		"BadgeThreshold":  badgeThreshold,
+		"BadgePercent":    badgePct,
+		"BadgeRemaining":  remaining,
+		"AvgTokensPerSec": avgTokensPerSec,
+		"DonorKeys":       donorKeys,
 	}
 
-	renderTemplate(w, "share-status.html", data)
+	renderTemplate(w, "share-stats.html", data)
 }
 
-// handleShareCreateToken creates a new donor token and re-renders the share status.
+// handleShareCreateToken creates a new donor token and re-renders the setup fragment.
 func (s *Server) handleShareCreateToken(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
@@ -297,8 +371,9 @@ func (s *Server) handleShareCreateToken(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, "failed to create token")
 		return
 	}
+	w.Header().Set("HX-Trigger", "refreshStats")
 	ctx := context.WithValue(r.Context(), ctxKeyNewToken, rawKey)
-	s.handleShareStatus(w, r.WithContext(ctx))
+	s.handleShareSetup(w, r.WithContext(ctx))
 }
 
 // --- Helpers ---

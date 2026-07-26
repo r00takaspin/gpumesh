@@ -48,6 +48,7 @@ type RegisterMsg struct {
 	Models        []string `json:"models"`
 	MaxConcurrent int      `json:"max_concurrent"`
 	Description   string   `json:"description"`
+	Hardware      string   `json:"hardware,omitempty"`
 }
 
 // HeartbeatMsg is sent periodically by the donor.

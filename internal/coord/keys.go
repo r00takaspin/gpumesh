@@ -101,7 +101,7 @@ func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 	// HTMX: re-render the correct fragment based on source page.
 	if r.Header.Get("HX-Request") == "true" {
 		if strings.Contains(r.Header.Get("HX-Current-URL"), "/share") {
-			s.handleShareStatus(w, r)
+			s.handleShareDonorStats(w, r)
 		} else {
 			s.handleUseKeys(w, r)
 		}
@@ -143,8 +143,9 @@ func (s *Server) handleRegenerateKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Trigger", "refreshStats")
 		ctx := context.WithValue(r.Context(), ctxKeyNewToken, rawKey)
-		s.handleShareStatus(w, r.WithContext(ctx))
+		s.handleShareSetup(w, r.WithContext(ctx))
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]interface{}{

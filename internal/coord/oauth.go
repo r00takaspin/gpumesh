@@ -210,6 +210,31 @@ func (s *Server) handleUse(w http.ResponseWriter, r *http.Request) {
 // handleShare renders the share GPU page (auth optional).
 func (s *Server) handleShare(w http.ResponseWriter, r *http.Request) {
 	pd := s.pageDataWithStats(r)
+
+	// Extract user ID from session (public page, no requireAuth wrapper).
+	var userID int64
+	if cookie, err := r.Cookie("gpumesh_session"); err == nil {
+		uid, err := s.store.ValidateSession(cookie.Value)
+		if err == nil && uid != 0 {
+			userID = uid
+		}
+	}
+
+	pd.BaseURL = s.baseURL
+
+	if userID != 0 {
+		// Auto-create donor key if none exists (first visit after OAuth).
+		if r.URL.Query().Get("new") == "1" {
+			n, _ := s.store.CountKeys(userID)
+			if n == 0 {
+				rawKey, _, err := s.store.CreateKey(userID, "donor")
+				if err == nil {
+					pd.NewKey = rawKey
+				}
+			}
+		}
+	}
+
 	renderTemplate(w, "share.html", pd)
 }
 

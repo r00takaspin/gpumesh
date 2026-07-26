@@ -84,6 +84,7 @@ func (s *Server) handleWSProvider(w http.ResponseWriter, r *http.Request) {
 	donor.Models = reg.Models
 	donor.MaxConcurrent = reg.MaxConcurrent
 	donor.Description = reg.Description
+	donor.Hardware = reg.Hardware
 	if donor.MaxConcurrent <= 0 {
 		donor.MaxConcurrent = 1
 	}

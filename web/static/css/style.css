@@ -459,6 +459,10 @@ input[type="text"]:focus, input[type="search"]:focus { border-color: var(--accen
 #os-linux-arm64-use:checked ~ #content-linux-arm64-use,
 #os-macos-use:checked ~ #content-macos-use,
 #os-docker-use:checked ~ #content-docker-use { display: block; }
+#os-linux-amd64-share:checked ~ #content-linux-amd64-share,
+#os-linux-arm64-share:checked ~ #content-linux-arm64-share,
+#os-macos-share:checked ~ #content-macos-share,
+#os-windows-share:checked ~ #content-windows-share { display: block; }
 /* === Responsive === */
 @media (max-width: 768px) {
   main { padding: 24px 16px; }
@@ -474,4 +478,35 @@ input[type="text"]:focus, input[type="search"]:focus { border-color: var(--accen
   main { padding: 24px 16px; }
   .stat-grid, .steps { grid-template-columns: 1fr; }
   .hero h1 { font-size: 22px; }
+}
+
+.spinner {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.code-block {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.code-block code {
+  background: none;
+  padding: 0;
+  color: var(--text);
 }

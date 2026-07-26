@@ -16,6 +16,7 @@ type Donor struct {
 	MaxConcurrent int
 	CurrentLoad   int
 	Description   string
+	Hardware      string
 	ConnectedAt   time.Time
 	LastHeartbeat time.Time
 	BackendOK       bool

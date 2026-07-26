@@ -88,9 +88,16 @@
 </nav>
 
 <main>
-  <div id="share-status" hx-get="/share/status" hx-trigger="load, every 15s">
-    <div class="empty-state">Loading agent status...</div>
+  <!-- PHASE 1: Setup (always visible, content changes by state) -->
+  <div id="share-setup" hx-get="/share/setup" hx-trigger="load, every 5s" hx-swap="outerHTML">
+    <div class="empty-state">Loading setup...</div>
   </div>
+
+  <!-- PHASE 2: Live models panel (only when provider connected, HTMX-polled) -->
+  <div id="share-models" hx-get="/share/models" hx-trigger="load, every 10s" hx-swap="outerHTML"></div>
+
+  <!-- PHASE 3: Stats + Badge + Tokens (only when has activity) -->
+  <div id="share-stats" hx-get="/share/donor-stats" hx-trigger="load, refreshStats from:body, every 60s" hx-swap="outerHTML"></div>
 </main>
 
 <footer>
