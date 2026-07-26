@@ -1,4 +1,4 @@
-<div id="share-setup"{{if not .HasDonors}} hx-get="/share/setup" hx-trigger="every 5s" hx-swap="outerHTML" hx-include="[name='os-tab-share']:checked"{{end}}>
+<div id="share-setup" hx-get="/share/setup" hx-trigger="every 5s" hx-swap="outerHTML" hx-include="[name='os-tab-share']:checked">
 <details class="consumer-card" style="border-color:var(--accent);border-left:3px solid var(--accent)" open>
   <summary class="card-title" style="cursor:pointer;margin-bottom:0">
     {{if .HasDonors}}🟢 Provider connected · Setup instructions{{else}}Get Started{{end}}
