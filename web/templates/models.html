@@ -33,9 +33,9 @@
     <div class="consumer-card">
       <div class="card-title">Model Catalog</div>
 
-      <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:16px">
-        <input type="search" placeholder="Search models..." aria-label="Search models" style="flex:1">
-        <button class="btn-consumer btn-sm btn-primary">search</button>
+      <div style="margin-bottom:16px">
+        <input type="search" placeholder="Search models..." aria-label="Search models" style="width:100%"
+          oninput="document.querySelectorAll('.model-card').forEach(c=>c.style.display=c.querySelector('.model-name').textContent.toLowerCase().includes(this.value.toLowerCase())?'':'none')">
       </div>
 
       <div id="model-list" hx-get="/models" hx-trigger="every 30s" hx-select="#model-list" hx-swap="outerHTML">
