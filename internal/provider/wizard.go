@@ -132,7 +132,7 @@ func RunWizard(stdin io.Reader, stdout io.Writer, cfg *Config) error {
 `+wzGreen+`⬡`+wzReset+` Ollama URL:  `+wzDim+cfg.OllamaURL+wzReset+`
 `+wzGreen+`⬡`+wzReset+` Models:      `+wzBold+modelsSummary(cfg.Models)+wzReset+`
 `+wzYellow+`⚡`+wzReset+` Token:       `+wzDim+maskToken(cfg.Token)+wzReset+`
-`+wzYellow+`⚡`+wzReset+` Concurrent:  `+wzDim+"%d"+wzReset+`
+`+wzYellow+`⚡`+wzReset+` Concurrent:  `+wzDim+fmt.Sprintf("%d", cfg.MaxConcurrent)+wzReset+`
 `+wzYellow+`⚡`+wzReset+` Description: `+wzDim+cfg.Description+wzReset+`
 `)
 
