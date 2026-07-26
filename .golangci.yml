@@ -8,26 +8,26 @@ linters:
 
   exclusions:
     rules:
-      # fmt.Fprint* to stdout/stderr in wizards/CLI — intentional, no recovery path
+      # fmt.Fprint* in wizards/CLI — intentional
       - path: internal/provider/wizard\.go
         linters: [errcheck]
         text: "fmt\\.Fprint"
-      # defer resp.Body.Close() — common Go idiom, no recovery path
-      - path: internal/provider/
+      # defer resp.Body.Close() — common Go idiom
+      - path: internal/
         linters: [errcheck]
         text: "Body\\.Close"
-      # defer resp.Body.Close() — same
-      - path: internal/provider/
+      # WebSocket writes — best-effort
+      - path: internal/
         linters: [errcheck]
-        text: "ollamaResp\\.Body\\.Close"
-      # WebSocket writes in provider — best-effort
-      - path: internal/provider/
+        text: "conn\\.(WriteJSON|SetReadDeadline|Close)"
+      # fmt.Fprintf to http.ResponseWriter in SSE streaming — best-effort
+      - path: internal/coord/
         linters: [errcheck]
-        text: "conn\\.(WriteJSON|SetReadDeadline)"
-      # WebSocket close in provider — cleanup path
-      - path: internal/provider/agent\.go
+        text: "fmt\\.Fprintf"
+      # WebSocket SendWS in coordinator — best-effort
+      - path: internal/coord/
         linters: [errcheck]
-        text: "a\\.conn\\.Close"
+        text: "SendWS"
 
 issues:
   max-issues-per-linter: 0
