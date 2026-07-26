@@ -155,25 +155,3 @@ MIT — see [LICENSE](LICENSE) for details.
 
 MVP — under active development.
 
-## Local Development
-
-```bash
-# One command: serve frontend + expose to internet
-./scripts/dev.sh
-```
-
-The script starts a Python HTTP server on port 3000 (from `web/`) and tunnels it
-via [localhost.run](https://localhost.run). The tunnel URL is printed to stdout.
-
-Press `Ctrl+C` to stop both server and tunnel.
-
-**URL structure:** symlinks in `web/` (`index.html -> templates/index.html`, etc.)
-make all pages accessible at the root path (`/index.html`, `/dashboard.html`).
-Static assets resolve from `/static/`.
-
-**Managed services** (via `omp`):
-
-| Service | Port | Command |
-|---|---|---|
-| `web-ui` | 3000 | `python3 -m http.server 3000 --bind 0.0.0.0 --directory web/` |
-| `tunnel` | — | `ssh -R 80:localhost:3000 localhost.run` |
