@@ -143,12 +143,14 @@ POST /v1/chat/completions    — Chat completion (стриминг и не-ст�
 
 ```
 Вход: имя модели
+0. Если точное совпадение не найдено — отрезать префикс провайдера (всё до первого `/`), повторить поиск.
+   Нужно для совместимости с LiteLLM/Aider, которые шлют `openai/llama3.2:latest`.
 1. Запросить реестр: все доноры с model == запрошенная модель AND backend_ok == true
 2. Если пусто → 503, тело: {"error": "Модель недоступна", "available_models": ["llama3.2:3b", ...]}
 3. Отсортировать по: current_load / max_concurrent по возрастанию (наименее загруженные сначала)
 4. Выбрать первого донора с current_load < max_concurrent
 5. Если все доноры на максимуме → 503, тело: {"error": "Все доноры заняты", "retry_after_seconds": 30}
-6. Отправить запрос → донору
+6. Отправить запрос → донору (с очищенным именем модели)
 7. При ошибке/таймауте донора: для стриминга — закрыть SSE (потребитель повторит запрос); для не-стриминга — прозрачно переиграть на другом доноре (до 3 попыток), только после исчерпания попыток вернуть 502.
 ```
 
@@ -279,6 +281,7 @@ Consumer                     Coordinator                        Donor
 | Метод | Путь | Аутентификация | Описание |
 |---|---|---|---|
 | `GET` | `/health` | Нет | Liveness/readiness probe |
+| `POST` | `/share/tokens` | GitHub OAuth | Создать донорский токен. Возвращает HTML-фрагмент модального окна с полным токеном и кнопкой копирования |
 | `GET` | `/install-provider.sh` | Нет | Универсальный скрипт установки провайдера. `curl -sSfL https://gpumesh.net/install-provider.sh \| sh`. Download base настраивается через `MESH_INSTALL_SCRIPT_DOWNLOAD_BASE`.
 | `POST` | `/api/report` | API-ключ | Жалоба на ответ донора: `{"request_id": "...", "reason": "spam"}` |
 | `GET` | `/api/consumer/stats` | GitHub OAuth | Статистика потребителя: requests/tokens сегодня, остаток лимита |
@@ -518,77 +521,12 @@ export OPENAI_API_KEY="$API_KEY"
 
 ---
 
-### 6.2 Личный кабинет (`/dashboard`)
+### 6.2 Личный кабинет
 
-**URL:** `/dashboard`  
-**Доступ:** GitHub OAuth (сессионная cookie)  
-**Цель:** Управление ключами, просмотр статистики, настройка донора
-
-#### Структура
-
-Страница с двумя табами: **Consumer** (активен по умолчанию) и **Donor**. Переключение через HTMX — каждый таб загружает свой фрагмент с сервера.
----
-
-#### 6.2.1 Таб «Consumer»
-
-#### Компоненты
-
-| # | Компонент | Описание | HTMX |
-|---|---|---|---|
-| 1 | **Welcome** | «Hello, {github_login}». Кнопка Logout | — |
-| 2 | **Quickstart** | Заголовок «Start in 30 seconds». Две строки для копирования: `export OPENAI_BASE_URL="https://gpumesh.net/v1"` и `export OPENAI_API_KEY="<ваш ключ>"`. Ключ подставляется динамически если есть хотя бы один. Кнопка копирования | — |
-| 3 | **API Keys** | Таблица ключей. Колонки: Prefix (первые 8 символов), Scope, Created, Actions (кнопка Revoke). Кнопка «Create New Key» над таблицей. При создании — модальное окно с полным ключом + предупреждение «Copy now — shown only once» + кнопка копирования | Нет |
-| 4 | **Create Key Modal** | Оверлей: показывает полный ключ (`inf_7a3b...`), кнопка копирования, предупреждение «This key will not be shown again». После закрытия — таблица обновляется HTMX | `hx-post`, обновление таблицы через `HX-Trigger` |
-| 5 | **Revoke confirmation** | Диалог «Are you sure? Any tool using this key will stop working.» с кнопками Confirm/Cancel | `hx-delete`, строка удаляется из DOM |
-| 6 | **Usage Stats** | Карточки: Requests today `/` Rate limit, Tokens today. Rate limit показывается как progress bar «67/100». Данные: `GET /api/consumer/stats` | Polling 60s |
-| 7 | **Tool Configs** | Аккордеон с теми же 8 инструментами что в §6.1.1, но с **реальным ключом пользователя** вместо `$API_KEY`. Порядок: Continue.dev, Codex CLI, Aider, Cline, Open WebUI, Python SDK, curl, Oh My Pi | — |
-
-#### Состояния
-
-| Компонент | Нормальное | Пустое | Загрузка | Ошибка |
-|---|---|---|---|---|
-| API Keys | Таблица с ключами | «No API keys yet. Create one to start.» + кнопка Create | Спиннер | «Failed to load keys. Retry?» |
-| Create Key | Модальное окно с ключом | — | Спиннер на кнопке | «Failed to create key. Try again.» |
-| Usage Stats | Числа + progress bar | «No usage yet» с нулями | Спиннер | Скрыть карточки |
-| Tool Configs | Код с реальным ключом | Код с плейсхолдером `$API_KEY` | — | — |
+**`/dashboard`** редиректит (302) на `/use` — страницу потребителя. Исторически был отдельной страницей, теперь унифицирован с `/use`.
 
 ---
 
-#### 6.2.2 Таб «Donor»
-
-Отображается **только** если у пользователя есть хотя бы один API-ключ со scope `donor` или `both`.
-
-#### Компоненты
-
-| # | Компонент | Описание | HTMX |
-|---|---|---|---|
-| 1 | **Setup (если не настроен)** | Заголовок «Share your GPU». Инструкция из 3 шагов: ① Install Ollama, ② Pull a model, ③ Run agent. One-liner с подставленным донорским токеном (сервер генерирует если нет). Кнопка копирования | — |
-| 2 | **Donor Token** | Поле с токеном (первые 8 + маска), кнопка копирования. Кнопка «Regenerate» (инвалидирует старый, создаёт новый) | `hx-post` на regenerate |
-| 3 | **Agent Status** | Карточка: статус (🟢 Online / 🔴 Offline), моделей расшарено, текущая нагрузка `1/2`, uptime текущей сессии. Если несколько агентов — по карточке на каждый `provider_id`. Данные: `GET /api/donor/status` | Polling 15s |
-| 4 | **Agent Status — Offline** | Карточка серая, статус 🔴 Offline, «Last seen: 5 min ago». Кнопка «Copy run command» для перезапуска | — |
-| 5 | **Agent Status — Empty** | Если ни разу не подключался: «Waiting for agent… Run this command: …» | — |
-| 6 | **Donor Stats** | Карточки: Requests served (lifetime), Tokens generated (lifetime), Avg tokens/sec, Total uptime. Данные: `GET /api/donor/stats` | Polling 60s |
-| 7 | **Badge** | Иконка бейджа: 🥉 Bronze / 🥈 Silver / 🥇 Gold / 💎 Platinum. Прогресс-бар до следующего уровня (напр. «12,340 / 50,000 tokens to Gold») | — |
-| 8 | **My Leaderboard Position** | Мини-карточка: «You are #42 of 230 donors this week». Ссылка «View full leaderboard →» | Polling 60s |
-
-#### Пороги бейджей (lifetime tokens)
-
-| Бейдж | Токенов |
-|---|---|
-| 🥉 Bronze | 1,000+ |
-| 🥈 Silver | 10,000+ |
-| 🥇 Gold | 100,000+ |
-| 💎 Platinum | 1,000,000+ |
-
-#### Состояния
-
-| Компонент | Нормальное | Пустое/не настроен | Загрузка | Ошибка |
-|---|---|---|---|---|
-| Agent Status | Зелёная карточка | Секция Setup (см. выше) | Спиннер | «Unable to fetch status» |
-| Donor Stats | Числа | «No data yet» | Спиннер | Скрыть |
-| Badge | Бейдж + прогресс | «No badge yet. Serve 1,000 tokens to earn Bronze.» | — | — |
-
----
 
 ### 6.2a Consumer Page (`/consumer`)
 
@@ -685,6 +623,52 @@ export OPENAI_API_KEY="$API_KEY"
 - **Табы:** переключение через JavaScript `switchTab()`, активный таб определяется query-параметром `?tab=models|keys|overview`.
 - **Раскрытие tool rows:** CSS-класс `.open` на `.tool-row` показывает следующий `.tool-snippet`.
 - **Копирование:** `navigator.clipboard.writeText()` с визуальной обратной связью «Copied!» на 2 секунды.
+
+
+### 6.2b Share GPU Page (`/share`)
+
+**URL:** `/share`
+**Доступ:** Публичный (два состояния: logged-out и logged-in)
+**Цель:** Онбординг доноров — получить токен, скопировать команду, запустить провайдера.
+
+Страница имеет два состояния: logged-out (публичный лендинг) и logged-in (рабочий дашборд донора).
+
+---
+
+#### 6.2b.1 Состояние «Logged Out»
+
+##### Компоненты
+
+| # | Компонент | Описание |
+|---|---|---|
+| 1 | **Hero** | ASCII-логотип. Заголовок «Share your GPU». Подзаголовок: «Run the agent, serve LLM requests, earn reputation in the mesh.» CTA-кнопка «Sign in with GitHub →» |
+| 2 | **How it works** | Три шага: ① Install Ollama, ② Pull a model, ③ Run the agent |
+
+---
+
+#### 6.2b.2 Состояние «Logged In»
+
+Страница состоит из трёх HTMX-фрагментов, которые загружаются асинхронно и обновляются поллингом.
+
+##### Компоненты
+
+| # | Компонент | Эндпоинт | Поллинг | Описание |
+|---|---|---|---|---|
+| 1 | **Setup + Token** | `GET /share/setup` | 5s | Основной блок. Если у пользователя нет донорского токена — баннер «⚠ No donor token» с кнопкой «+ Generate donor token». Если есть — OS-табы с инструкцией по установке и командой запуска (с префиксом токена). При клике на Generate открывается модальное окно с полным токеном и кнопкой копирования. |
+| 2 | **Agent Status** | `GET /share/models` | 10s | Карточки агентов: 🟢 ONLINE / 🔴 Offline, hardware, models, load, uptime. Если агентов нет — секция скрыта. |
+| 3 | **Stats + Badge + Tokens** | `GET /share/donor-stats` | 60s + refreshStats event | Карточки статистики (lifetime), бейдж с прогресс-баром, список донорских токенов с кнопками Revoke, и кнопка «+ Generate token» (создаёт токен через модальное окно). |
+
+##### Модальное окно генерации токена
+
+| Эндпоинт | Описание |
+|---|---|
+| `POST /share/tokens` | Создаёт донорский токен, возвращает HTML-фрагмент модального окна (`share-token-modal.html`) с полным токеном и кнопкой `[Copy]`. Окно фиксированное (overlay), закрывается по ✕. При закрытии триггерит обновление Setup и Stats через `htmx.ajax`. |
+
+##### Технические детали
+
+- **Авто-создание токена:** при первом заходе через OAuth с `redirect=/share` и отсутствии донорских ключей (`CountKeysByScope(userID, "donor") == 0`) автоматически создаётся токен. Отображается в модальном окне.
+- **Revoke:** `DELETE /api/keys/:id` с `hx-target="#share-stats"`. Ответ рендерит обновлённый `share-stats.html` без `hx-trigger="load"` во избежание рекурсии.
+- **Предупреждение «No donor token»:** отображается внутри `share-setup.html` когда `HasToken == false`. Заменяется на нормальный Setup после создания токена и закрытия модального окна.
 
 ### 6.3 Каталог моделей (`/models`)
 
@@ -793,16 +777,16 @@ export OPENAI_API_KEY="$API_KEY"
                          │
                     GitHub OAuth
                          │
-                         ▼
-              ┌─────────────────┐
-              │   /dashboard    │
-              │  ┌───────────┐  │
-              │  │ Consumer  │  │ ← default tab
-              │  ├───────────┤  │
-              │  │ Donor     │  │ ← visible if has donor key
-              │  └───────────┘  │
-              └─────────────────┘
+              ┌──────────┴──────────┐
+              ▼                     ▼
+         /use (Consumer)      /share (Donor)
+    ┌─────────────────┐    ┌─────────────────┐
+    │ Overview         │    │ Setup + Token   │
+    │ API Keys         │    │ Agent Status    │
+    │ Models           │    │ Stats + Badge   │
+    └─────────────────┘    └─────────────────┘
 ```
+
 
 ### 6.8 Новые API-эндпоинты для фронтенда
 
@@ -812,11 +796,12 @@ export OPENAI_API_KEY="$API_KEY"
 |---|---|---|---|
 | `GET` | `/api/consumer/stats` | GitHub OAuth | Статистика потребителя: `{"requests_today": N, "tokens_today": N, "rate_limit": 100, "rate_remaining": 67}` |
 | `GET` | `/api/donor/status` | GitHub OAuth | Живой статус агентов: `{"agents": [{"provider_id": "...", "online": true, "models": [...], "load": "1/2", "uptime": "2h 15m"}]}` |
-| `POST` | `/api/keys/:id/regenerate` | GitHub OAuth | Перевыпустить донорский токен (старый инвалидируется, возвращается новый полный ключ) |
+| `POST` | `/api/keys/:id/regenerate` | GitHub OAuth | Перевыпустить донорский токен (старый инвалидируется, возвращается новый полный ключ в модальном окне) |
 | `GET` | `/leaderboard/data` | Нет | Данные таблицы лидеров: `?period=weekly&limit=50` → `{"entries": [{"rank": 1, "github_login": "...", "avatar_url": "...", "tokens": N, "requests": N, "badge": "gold"}]}` |
 | `GET` | `/models/data` | Нет | Данные каталога моделей: `[{"id": "llama3.2:3b", "donors_online": 12, "load": 0.3, "tags": ["chat"]}]` |
-| `GET` | `/dashboard/consumer` | GitHub OAuth | HTML-фрагмент таба Consumer (для HTMX-навигации) |
-| `GET` | `/dashboard/donor` | GitHub OAuth | HTML-фрагмент таба Donor (для HTMX-навигации) |
+| `GET` | `/share/setup` | GitHub OAuth | HTMX-фрагмент: блок Setup + предупреждение/токен. Поллинг 5s |
+| `GET` | `/share/models` | GitHub OAuth | HTMX-фрагмент: карточки агентов донора. Поллинг 10s |
+| `GET` | `/share/donor-stats` | GitHub OAuth | HTMX-фрагмент: статистика, бейдж, список токенов. Поллинг 60s. Слушает `refreshStats` event |
 
 ---
 
