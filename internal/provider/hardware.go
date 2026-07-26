@@ -64,13 +64,15 @@ func formatUint(n uint64) string {
 	return string(buf[i:])
 }
 
-// detectGPU tries nvidia-smi, then /sys/class/drm/, then macOS system_profiler.
+// detectGPU tries nvidia-smi, then wmic (Windows), then /sys/class/drm/ (Linux), then macOS system_profiler.
 func detectGPU() string {
 	switch runtime.GOOS {
 	case "linux":
 		return detectGPULinux()
 	case "darwin":
 		return detectGPUDarwin()
+	case "windows":
+		return detectGPUWindows()
 	default:
 		return ""
 	}
@@ -110,6 +112,41 @@ func detectGPUDarwin() string {
 		if strings.HasPrefix(trimmed, "Chipset Model:") {
 			return strings.TrimSpace(strings.TrimPrefix(trimmed, "Chipset Model:"))
 		}
+	}
+	return ""
+}
+
+// detectGPUWindows detects GPU on Windows using wmic.
+func detectGPUWindows() string {
+	// Try nvidia-smi first (may be in PATH for NVIDIA users).
+	if out, err := exec.Command("nvidia-smi",
+		"--query-gpu=name,memory.total",
+		"--format=csv,noheader,nounits").Output(); err == nil {
+		line := strings.TrimSpace(string(out))
+		if line != "" {
+			fields := strings.SplitN(line, ",", 2)
+			if len(fields) == 2 {
+				name := strings.TrimSpace(fields[0])
+				memMB := strings.TrimSpace(fields[1])
+				if mb, ok := parseUint(memMB); ok && mb > 0 {
+					return name + " " + formatUint(mb/1024) + "GB"
+				}
+				return name
+			}
+		}
+	}
+	// Fall back to wmic for AMD/Intel GPUs.
+	out, err := exec.Command("wmic", "path", "win32_videocontroller", "get", "name").Output()
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.EqualFold(trimmed, "name") {
+			continue
+		}
+		return trimmed
 	}
 	return ""
 }
