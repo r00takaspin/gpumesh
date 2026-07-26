@@ -302,10 +302,9 @@ func (s *Server) handleShareDonorStats(w http.ResponseWriter, r *http.Request) {
 	stats, _ := s.store.GetDonorStats(userID)
 
 	// Only render if there's activity or donors connected.
-	if len(donors) == 0 && stats.TotalRequests == 0 {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
+	// Always render — token management UI must be visible even with no stats.
+	_ = donors
+	_ = stats
 
 	badge := BadgeForTokens(stats.TotalTokens)
 	badgeEmoji := badgeEmoji(badge)
