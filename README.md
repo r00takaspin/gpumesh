@@ -55,8 +55,10 @@ The setup wizard will guide you through configuration on first run.
 
 #### Windows (PowerShell)
 
+Download from [GitHub Releases](https://github.com/r00takaspin/gpumesh/releases/latest):
+
 ```powershell
-Invoke-WebRequest -Uri https://gpumesh.net/static/gpumesh-provider.exe -OutFile gpumesh-provider.exe
+Invoke-WebRequest -Uri https://github.com/r00takaspin/gpumesh/releases/latest/download/gpumesh-provider_windows_amd64.exe -OutFile gpumesh-provider.exe
 .\gpumesh-provider.exe
 ```
 
