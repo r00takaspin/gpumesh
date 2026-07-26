@@ -12,18 +12,38 @@ import (
 	"time"
 )
 
+const (
+	wzReset  = "\033[0m"
+	wzBold   = "\033[1m"
+	wzDim    = "\033[2m"
+	wzGreen  = "\033[32m"
+	wzYellow = "\033[33m"
+	wzBlue   = "\033[36m"
+	wzRed    = "\033[31m"
+)
+
 // RunWizard runs the first-run interactive configuration wizard.
 // It guides the user through Ollama URL setup, model selection, and token entry.
 func RunWizard(stdin io.Reader, stdout io.Writer, cfg *Config) error {
 	scanner := bufio.NewScanner(stdin)
 
+	// Header.
+	fmt.Fprint(stdout, wzBold+wzGreen+`
+   ┌──────────────────────────────────┐
+   │     GPU MESH — setup wizard      │
+   └──────────────────────────────────┘`+wzReset+`
+
+`+wzDim+`   configure your donor agent`+wzReset+`
+
+`)
+
 	// 1. Ollama check.
-	fmt.Fprintf(stdout, "Checking Ollama at %s...\n", cfg.OllamaURL)
+	fmt.Fprintf(stdout, wzGreen+"⬡"+wzReset+" Checking Ollama at "+wzDim+"%s"+wzReset+"...\n", cfg.OllamaURL)
 	models, err := DiscoverModelsWithURL(cfg.OllamaURL)
 	if err != nil {
-		fmt.Fprintf(stdout, "Ollama not reachable at %s\n", cfg.OllamaURL)
+		fmt.Fprintf(stdout, wzRed+"✗"+wzReset+" Ollama not reachable at "+wzDim+"%s"+wzReset+"\n", cfg.OllamaURL)
 		for range 3 {
-			fmt.Fprintf(stdout, "Enter Ollama URL [http://localhost:11434]: ")
+			prompt(stdout, "Enter Ollama URL", "http://localhost:11434")
 			if !scanner.Scan() {
 				return fmt.Errorf("input interrupted")
 			}
@@ -36,7 +56,7 @@ func RunWizard(stdin io.Reader, stdout io.Writer, cfg *Config) error {
 				cfg.OllamaURL = input
 				break
 			}
-			fmt.Fprintf(stdout, "Still not reachable: %v\n", err)
+			fmt.Fprintf(stdout, wzRed+"✗"+wzReset+" Still not reachable: "+wzDim+"%v"+wzReset+"\n", err)
 		}
 		if err != nil {
 			return fmt.Errorf("could not reach Ollama after 3 attempts")
@@ -44,12 +64,12 @@ func RunWizard(stdin io.Reader, stdout io.Writer, cfg *Config) error {
 	}
 
 	// 2. Model selection.
-	fmt.Fprintf(stdout, "\nFound %d model(s):\n", len(models))
+	fmt.Fprintf(stdout, "\n"+wzGreen+"⬡"+wzReset+" Found "+wzBold+"%d"+wzReset+" model(s):\n", len(models))
 	for i, m := range models {
-		fmt.Fprintf(stdout, "  %d. %s\n", i+1, m)
+		fmt.Fprintf(stdout, "  "+wzDim+"%d."+wzReset+" %s\n", i+1, m)
 	}
 
-	fmt.Fprintf(stdout, "\nShare all models? [Y/n]: ")
+	prompt(stdout, "Share all models", "Y")
 	if !scanner.Scan() {
 		return fmt.Errorf("input interrupted")
 	}
@@ -57,7 +77,7 @@ func RunWizard(stdin io.Reader, stdout io.Writer, cfg *Config) error {
 	if shareAll == "" || strings.EqualFold(shareAll, "y") || strings.EqualFold(shareAll, "yes") {
 		cfg.Models = models
 	} else {
-		fmt.Fprintf(stdout, "Enter numbers to share (e.g. 1,3,5) or 'all': ")
+		prompt(stdout, "Enter numbers to share (e.g. 1,3,5) or 'all'", "all")
 		if !scanner.Scan() {
 			return fmt.Errorf("input interrupted")
 		}
@@ -69,21 +89,33 @@ func RunWizard(stdin io.Reader, stdout io.Writer, cfg *Config) error {
 				s = strings.TrimSpace(s)
 				idx, err := strconv.Atoi(s)
 				if err != nil || idx < 1 || idx > len(models) {
-					fmt.Fprintf(stdout, "Invalid selection: %s\n", s)
+					fmt.Fprintf(stdout, wzYellow+"!"+wzReset+" Invalid selection: "+wzDim+"%s"+wzReset+"\n", s)
 					continue
 				}
 				cfg.Models = append(cfg.Models, models[idx-1])
 			}
 			if len(cfg.Models) == 0 {
-				fmt.Fprintf(stdout, "No valid models selected. Sharing all models.\n")
+				fmt.Fprintf(stdout, wzYellow+"!"+wzReset+" No valid models selected. Sharing all models.\n")
 				cfg.Models = models
 			}
 		}
 	}
 
-	// 3. Token check.
+	// 3. Coordinator URL.
+	fmt.Fprintf(stdout, "\n"+wzBlue+"⌬"+wzReset+" Coordinator URL ["+wzDim+"%s"+wzReset+"]: ", cfg.CoordinatorURL)
+	if !scanner.Scan() {
+		return fmt.Errorf("input interrupted")
+	}
+	if u := strings.TrimSpace(scanner.Text()); u != "" {
+		if !strings.HasPrefix(u, "ws://") && !strings.HasPrefix(u, "wss://") {
+			u = "wss://" + u
+		}
+		cfg.CoordinatorURL = u
+	}
+
+	// 4. Token.
 	if cfg.Token == "" {
-		fmt.Fprintf(stdout, "\nNo token configured. Enter token [or press Enter to skip]: ")
+		fmt.Fprintf(stdout, "\n"+wzYellow+"⚡"+wzReset+" No token configured. Enter token ["+wzDim+"optional"+wzReset+"]: ")
 		if !scanner.Scan() {
 			return fmt.Errorf("input interrupted")
 		}
@@ -93,47 +125,49 @@ func RunWizard(stdin io.Reader, stdout io.Writer, cfg *Config) error {
 		}
 	}
 
-	// 3.5. Coordinator URL.
-	fmt.Fprintf(stdout, "\nCoordinator URL [%s]: ", cfg.CoordinatorURL)
-	if !scanner.Scan() {
-		return fmt.Errorf("input interrupted")
-	}
-	if u := strings.TrimSpace(scanner.Text()); u != "" {
-		// Auto-detect scheme if missing.
-		if !strings.HasPrefix(u, "ws://") && !strings.HasPrefix(u, "wss://") {
-			u = "wss://" + u
-		}
-		cfg.CoordinatorURL = u
-	}
+	// 5. Summary.
+	fmt.Fprint(stdout, `
+`+wzBold+`--- Configuration Summary ---`+wzReset+`
+`+wzBlue+`⌬`+wzReset+` Coordinator: `+wzDim+cfg.CoordinatorURL+wzReset+`
+`+wzGreen+`⬡`+wzReset+` Ollama URL:  `+wzDim+cfg.OllamaURL+wzReset+`
+`+wzGreen+`⬡`+wzReset+` Models:      `+wzBold+modelsSummary(cfg.Models)+wzReset+`
+`+wzYellow+`⚡`+wzReset+` Token:       `+wzDim+maskToken(cfg.Token)+wzReset+`
+`+wzYellow+`⚡`+wzReset+` Concurrent:  `+wzDim+"%d"+wzReset+`
+`+wzYellow+`⚡`+wzReset+` Description: `+wzDim+cfg.Description+wzReset+`
+`)
 
-	// 4. Summary and confirmation.
-	fmt.Fprintf(stdout, "\n--- Configuration Summary ---\n")
-	fmt.Fprintf(stdout, "Coordinator: %s\n", cfg.CoordinatorURL)
-	fmt.Fprintf(stdout, "Ollama URL:  %s\n", cfg.OllamaURL)
-	fmt.Fprintf(stdout, "Models:      %v\n", cfg.Models)
-	fmt.Fprintf(stdout, "Token:       %s\n", maskToken(cfg.Token))
-	fmt.Fprintf(stdout, "Max concurrent: %d\n", cfg.MaxConcurrent)
-	fmt.Fprintf(stdout, "Description: %s\n", cfg.Description)
-	fmt.Fprintf(stdout, "-----------------------------\n")
-	fmt.Fprintf(stdout, "\nProceed with this configuration? [Y/n]: ")
+	prompt(stdout, "Proceed with this configuration", "Y")
 	if !scanner.Scan() {
 		return fmt.Errorf("input interrupted")
 	}
 	proceed := strings.TrimSpace(scanner.Text())
 	if proceed != "" && !strings.EqualFold(proceed, "y") && !strings.EqualFold(proceed, "yes") {
-		fmt.Fprintf(stdout, "Configuration cancelled. Re-run to try again.\n")
+		fmt.Fprintf(stdout, wzYellow+"!"+wzReset+" Configuration cancelled. Re-run to try again.\n")
 		os.Exit(0)
 	}
 
 	// Save config.
 	configPath := ConfigFilePath()
 	if err := SaveConfig(configPath, *cfg); err != nil {
-		fmt.Fprintf(stdout, "Warning: could not save config: %v\n", err)
+		fmt.Fprintf(stdout, wzRed+"✗"+wzReset+" Could not save config: %v\n", err)
 	} else {
-		fmt.Fprintf(stdout, "\nConfiguration saved to %s\n", configPath)
+		fmt.Fprintf(stdout, "\n"+wzGreen+"✓"+wzReset+" Configuration saved to "+wzDim+"%s"+wzReset+"\n\n", configPath)
 	}
 
 	return nil
+}
+
+// prompt prints a styled prompt with a default value hint.
+func prompt(w io.Writer, label, def string) {
+	fmt.Fprintf(w, "\n"+wzBold+"→"+wzReset+" %s ["+wzDim+"%s"+wzReset+"]: ", label, def)
+}
+
+// modelsSummary formats the model list for display.
+func modelsSummary(models []string) string {
+	if len(models) == 0 {
+		return "(none)"
+	}
+	return strings.Join(models, ", ")
 }
 
 // DiscoverModelsWithURL fetches available models from a specific Ollama URL.
