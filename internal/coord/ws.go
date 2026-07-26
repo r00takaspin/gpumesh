@@ -55,6 +55,7 @@ func (s *Server) handleWSProvider(w http.ResponseWriter, r *http.Request) {
 		ProviderID:  providerID,
 		UserID:      key.UserID,
 		WSConn:      conn,
+		TokenHash:   hash,
 		Description: "",
 	}
 
@@ -148,6 +149,13 @@ func (s *Server) readLoop(donor *Donor) {
 
 		switch env.Type {
 		case proto.TypeHeartbeat:
+			// Re-validate token — close connection if revoked.
+			if donor.TokenHash != "" {
+				if k, _ := s.store.FindKeyByHash(donor.TokenHash); k == nil {
+					log.Printf("ws: token revoked, disconnecting provider_id=%s", donor.ProviderID)
+					return
+				}
+			}
 			s.registry.UpdateHeartbeat(donor.ProviderID)
 			// Send ack (best-effort).
 			donor.SendWS(proto.HeartbeatAckMsg{Type: proto.TypeHeartbeatAck})

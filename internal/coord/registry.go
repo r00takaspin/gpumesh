@@ -18,6 +18,7 @@ type Donor struct {
 	Description   string
 	Hardware      string
 	ConnectedAt   time.Time
+	TokenHash     string // for re-validating on heartbeat
 	LastHeartbeat time.Time
 	BackendOK       bool
 	BackendFailedAt time.Time // when BackendOK was set to false
