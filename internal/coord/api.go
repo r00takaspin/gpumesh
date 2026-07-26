@@ -87,8 +87,8 @@ func (s *Server) handleAPIChatCompletions(w http.ResponseWriter, r *http.Request
 	if len(donors) == 0 {
 		// Try stripping a provider prefix (e.g. "openai/llama3.2" → "llama3.2")
 		if idx := strings.IndexByte(req.Model, '/'); idx >= 0 {
-			stripped := req.Model[idx+1:]
-			donors = s.registry.FindDonorsForModel(stripped)
+			req.Model = req.Model[idx+1:]
+			donors = s.registry.FindDonorsForModel(req.Model)
 		}
 	}
 	if len(donors) == 0 {
