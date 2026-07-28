@@ -514,7 +514,8 @@ func (s *Server) requireAPIKey(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		if key == nil {
-			log.Printf("auth: invalid key from %s path=%s token_prefix=%q len=%d hash=%s", r.RemoteAddr, r.URL.Path, token[:min(len(token), 12)], len(token), keyHash[:16])
+			log.Printf("auth: invalid key from %s path=%s token_prefix=%q len=%d hash=%s raw_auth=%q",
+				r.RemoteAddr, r.URL.Path, token[:min(len(token), 12)], len(token), keyHash[:16], authHeader[:min(len(authHeader), 60)])
 			writeError(w, http.StatusUnauthorized, "invalid API key")
 			return
 		}
