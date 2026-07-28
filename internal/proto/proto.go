@@ -29,9 +29,9 @@ const (
 
 // Timeout constants (§3.7 SPEC).
 const (
-	TTFTTimeout          = 15 * time.Second // Time To First Token
-	InterTokenTimeout    = 10 * time.Second // pause between chunks
-	TotalRequestTimeout  = 120 * time.Second
+	TTFTTimeout          = 120 * time.Second // Time To First Token (cold model load can take 60-90s)
+	InterTokenTimeout    = 30 * time.Second  // pause between chunks
+	TotalRequestTimeout  = 300 * time.Second
 	HeartbeatInterval    = 30 * time.Second
 	HeartbeatTimeout     = 90 * time.Second
 	HeartbeatMonitorTick = 15 * time.Second
