@@ -29,9 +29,9 @@ const (
 
 // Timeout constants (§3.7 SPEC).
 const (
-	TTFTTimeout          = 120 * time.Second // Time To First Token (cold model load can take 60-90s)
-	InterTokenTimeout    = 30 * time.Second  // pause between chunks
-	TotalRequestTimeout  = 300 * time.Second
+	TTFTTimeout          = 90 * time.Second  // covers cold model load (27B ~55s) + headroom
+	InterTokenTimeout    = 30 * time.Second  // slow models / chain-of-thought
+	TotalRequestTimeout  = 180 * time.Second // cold start + generation up to ~2000 tokens
 	HeartbeatInterval    = 30 * time.Second
 	HeartbeatTimeout     = 90 * time.Second
 	HeartbeatMonitorTick = 15 * time.Second
