@@ -495,7 +495,13 @@ func generateRequestID() string {
 func (s *Server) requireAPIKey(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			log.Printf("auth: no Authorization header from %s path=%s", r.RemoteAddr, r.URL.Path)
+			writeError(w, http.StatusUnauthorized, "missing Authorization header")
+			return
+		}
 		if !strings.HasPrefix(authHeader, "Bearer ") {
+			log.Printf("auth: malformed Authorization from %s path=%s prefix=%q", r.RemoteAddr, r.URL.Path, authHeader[:min(len(authHeader), 20)])
 			writeError(w, http.StatusUnauthorized, "missing Authorization header")
 			return
 		}
@@ -503,11 +509,12 @@ func (s *Server) requireAPIKey(next http.HandlerFunc) http.HandlerFunc {
 		keyHash := hashKey(token)
 		key, err := s.store.FindKeyByHash(keyHash)
 		if err != nil {
-			log.Printf("api key lookup error: %v", err)
+			log.Printf("auth: lookup error from %s: %v", r.RemoteAddr, err)
 			writeError(w, http.StatusInternalServerError, "internal error")
 			return
 		}
 		if key == nil {
+			log.Printf("auth: invalid key from %s path=%s token_prefix=%q len=%d hash=%s", r.RemoteAddr, r.URL.Path, token[:min(len(token), 12)], len(token), keyHash[:16])
 			writeError(w, http.StatusUnauthorized, "invalid API key")
 			return
 		}
