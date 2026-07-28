@@ -46,7 +46,16 @@ type Agent struct {
 	providerID string
 	done       chan struct{}
 
+	writeMu    sync.Mutex // serialises writes to conn (gorilla/websocket not concurrent-safe)
 	httpClient *http.Client
+}
+
+// writeWS serialises a JSON message to the coordinator over the WebSocket connection.
+// gorilla/websocket requires at most one concurrent writer.
+func (a *Agent) writeWS(conn *websocket.Conn, v interface{}) error {
+	a.writeMu.Lock()
+	defer a.writeMu.Unlock()
+	return conn.WriteJSON(v)
 }
 
 
@@ -227,7 +236,7 @@ func (a *Agent) heartbeatLoop(ctx context.Context) {
 			if conn == nil {
 				return
 			}
-			if err := conn.WriteJSON(proto.HeartbeatMsg{Type: proto.TypeHeartbeat}); err != nil {
+			if err := a.writeWS(conn, proto.HeartbeatMsg{Type: proto.TypeHeartbeat}); err != nil {
 				log.Printf("heartbeat write error, closing: %v", err)
 				_ = conn.Close()
 				a.mu.Lock()
@@ -323,7 +332,7 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 		conn := a.conn
 		a.mu.Unlock()
 		if conn != nil {
-			_ = conn.WriteJSON(proto.ErrorMsg{
+			_ = a.writeWS(conn, proto.ErrorMsg{
 				Type:      proto.TypeError,
 				RequestID: msg.RequestID,
 				Code:      proto.ErrOverloaded,
@@ -365,7 +374,7 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 			if reqCtx.Err() == context.Canceled {
 				return // request cancelled, don't send error
 			}
-			_ = conn.WriteJSON(proto.ErrorMsg{
+			_ = a.writeWS(conn, proto.ErrorMsg{
 				Type:      proto.TypeError,
 				RequestID: msg.RequestID,
 				Code:      code,
@@ -412,7 +421,7 @@ func (a *Agent) handleStreamingResponse(requestID string, body io.Reader) {
 			return
 		}
 
-		if err := conn.WriteJSON(proto.ChunkMsg{
+		if err := a.writeWS(conn, proto.ChunkMsg{
 			Type:      proto.TypeChunk,
 			RequestID: requestID,
 			Content:   chunk.Message.Content,
@@ -461,7 +470,7 @@ func (a *Agent) handleNonStreamingResponse(requestID, model string, body io.Read
 		return
 	}
 
-	if err := conn.WriteJSON(proto.ResponseMsg{
+	if err := a.writeWS(conn, proto.ResponseMsg{
 		Type:      proto.TypeResponse,
 		RequestID: requestID,
 		Content:   ollamaResp.Message.Content,
