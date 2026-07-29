@@ -1,5 +1,7 @@
 # GPU Mesh — Free LLM Inference, Powered by Community GPUs
 
+> **New to GPU Mesh?** → [What is GPU Mesh?](https://gpumesh.net/about) — plain-language explanation, no jargon.
+
 GPU Mesh is a peer-to-peer network for **distributed LLM inference**. GPU owners ("donors") share their idle compute resources, and anyone can use them — for free — through a standard **OpenAI-compatible API**.
 
 No new client. No new API. No credit card. Just two environment variables and every OpenAI-compatible tool you already use (Continue.dev, Aider, Codex CLI, Cline, Open WebUI, LangChain, any SDK) just works.

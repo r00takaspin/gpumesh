@@ -78,6 +78,7 @@ func NewServer(cfg Config) (*Server, error) {
 	// Public pages.
 	mux.HandleFunc("GET /", s.corsMiddleware(s.handleIndex))
 	mux.HandleFunc("GET /models", s.corsMiddleware(s.handleModelsPage))
+	mux.HandleFunc("GET /about", s.corsMiddleware(s.handleAbout))
 
 	// Use Models (auth optional, page shows two states).
 	mux.HandleFunc("GET /use", s.corsMiddleware(s.handleUse))
@@ -210,6 +211,10 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleModelsPage(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "models.html", s.pageDataWithStats(r))
+}
+
+func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
+	renderTemplate(w, "about.html", s.pageDataWithStats(r))
 }
 
 
