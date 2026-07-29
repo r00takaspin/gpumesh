@@ -56,6 +56,7 @@ func (s *Server) handleAPIModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAPIChatCompletions(w http.ResponseWriter, r *http.Request) {
+	log.Printf("CHAT: handler called, model from body will be parsed next")
 	// Auth already done by requireAPIKey middleware; key hash is in context.
 	keyHash, _ := r.Context().Value(ctxKeyAPIKeyHash).(string)
 
@@ -76,6 +77,10 @@ func (s *Server) handleAPIChatCompletions(w http.ResponseWriter, r *http.Request
 	}
 	if req.Model == "" {
 		writeError(w, http.StatusBadRequest, "model is required")
+		return
+	}
+	if len(req.Messages) == 0 || req.Messages[0] != '[' || string(req.Messages) == "[]" {
+		writeError(w, http.StatusBadRequest, "messages must be a non-empty array")
 		return
 	}
 
@@ -543,6 +548,10 @@ func (s *Server) handleReport(w http.ResponseWriter, r *http.Request) {
 	}
 	if report.RequestID == "" {
 		writeError(w, http.StatusBadRequest, "request_id is required")
+		return
+	}
+	if report.Reason == "" {
+		writeError(w, http.StatusBadRequest, "reason is required")
 		return
 	}
 

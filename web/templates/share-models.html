@@ -1,4 +1,4 @@
-<div id="share-models" hx-get="/share/models" hx-trigger="every 10s" hx-swap="outerHTML">
+<div id="share-models" data-testid="share-models" hx-get="/share/models" hx-trigger="every 10s" hx-swap="outerHTML">
 {{if .Agents}}
 {{range .Agents}}
 <div class="consumer-card" style="border-color:var(--accent)">

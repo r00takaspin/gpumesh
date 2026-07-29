@@ -97,6 +97,19 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /v1/models", s.corsMiddleware(s.requireAPIKey(s.handleAPIModels)))
 	mux.HandleFunc("POST /v1/chat/completions", s.corsMiddleware(s.requireAPIKey(s.handleAPIChatCompletions)))
 	mux.HandleFunc("OPTIONS /v1/", s.handleCORS)
+	// Return 404 for unknown /v1/ and /api/ paths.
+	mux.HandleFunc("GET /v1/", s.corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, "not found")
+	}))
+	mux.HandleFunc("POST /v1/", s.corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, "not found")
+	}))
+	mux.HandleFunc("GET /api/", s.corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, "not found")
+	}))
+	mux.HandleFunc("POST /api/", s.corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, "not found")
+	}))
 	mux.HandleFunc("GET /ws/provider", s.handleWSProvider)
 	// API key management (auth required).
 	mux.HandleFunc("POST /api/keys", s.requireAuth(s.handleCreateKey))
@@ -123,6 +136,13 @@ func NewServer(cfg Config) (*Server, error) {
 
 	// Health check.
 	mux.HandleFunc("GET /health", s.handleHealth)
+
+	// Test mode endpoints (only active when TEST_MODE=true).
+	mux.HandleFunc("GET /test/session", testModeOnly(s.handleTestSession))
+	mux.HandleFunc("GET /test/session-token", testModeOnly(s.handleTestSessionToken))
+	mux.HandleFunc("GET /test/error", testModeOnly(s.handleTestError))
+	mux.HandleFunc("POST /test/reset-rate-limit", testModeOnly(s.handleTestResetRateLimit))
+	mux.HandleFunc("POST /test/set-donor-load", testModeOnly(s.handleTestSetDonorLoad))
 
 	// Provider install script.
 	mux.HandleFunc("GET /install-provider.sh", s.handleInstallScript)

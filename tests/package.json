@@ -1,0 +1,16 @@
+{
+  "name": "gpumesh-tests",
+  "private": true,
+  "scripts": {
+    "test": "cucumber-js",
+    "test:api": "cucumber-js -p api",
+    "test:ui": "cucumber-js -p ui"
+  },
+  "devDependencies": {
+    "@cucumber/cucumber": "latest",
+    "playwright": "latest"
+  },
+  "dependencies": {
+    "ws": "^8.21.1"
+  }
+}

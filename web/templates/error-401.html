@@ -12,13 +12,13 @@
 </head>
 <body>
   <nav class="topbar">
-    <a href="/" class="logo">⚡ GPU Mesh</a>
+    <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
     <ul class="nav-links">
-      <li><a href="/">Home</a></li>
-      <li><a href="/use">Use Models</a></li>
-      <li><a href="/share">Share GPU</a></li>
-      <li><a href="/models">Models</a></li>
-      <li><a href="/about">About</a></li>
+      <li><a href="/" data-testid="nav-home">Home</a></li>
+      <li><a href="/use" data-testid="nav-use">Use Models</a></li>
+      <li><a href="/share" data-testid="nav-share">Share GPU</a></li>
+      <li><a href="/models" data-testid="nav-models">Models</a></li>
+      <li><a href="/about" data-testid="nav-about">About</a></li>
     </ul>
     <div class="nav-right">
       {{if .LoggedIn}}
@@ -30,16 +30,16 @@
     </div>
   </nav>
 
-  <main>
+  <main data-testid="error-page">
     <div class="empty-state">
-      <strong>401 — Unauthorized</strong>
+      <strong data-testid="error-code">401 — Unauthorized</strong>
       <p>You need to sign in to access this page.</p>
-      <a href="/" class="btn-consumer btn-primary">Go home</a>
+      <a href="/" class="btn-consumer btn-primary" data-testid="btn-go-home">Go home</a>
     </div>
   </main>
 
-  <footer>
-    <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+  <footer data-testid="footer">
+    <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
     &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
   </footer>
 

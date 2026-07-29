@@ -19,6 +19,7 @@ type PageData struct {
 	HasOAuth bool
 	HasKeys  bool
 	NewKey   string // full key, shown only once after auto-creation
+	Title    string // optional page title override
 	// Live data for dynamic pages.
 	DonorsOnline  int
 	ModelsOnline  int
@@ -37,6 +38,8 @@ type PageData struct {
 	RateLimit    int      // daily request limit
 	BaseURL      string   // server base URL for tool config snippets
 	DefaultModel string   // most popular model name (for "Try it now" block)
+	// Error page support.
+	ErrorCode *int // HTTP status code for error pages
 }
 
 // ModelSummary is a lightweight model entry for template rendering.

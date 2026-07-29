@@ -85,6 +85,13 @@ func (rl *RateLimiter) Remaining(key string) int {
 	return int(math.Floor(tokens))
 }
 
+// Reset removes the token bucket for a key, effectively resetting its rate limit.
+func (rl *RateLimiter) Reset(key string) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	delete(rl.buckets, key)
+}
+
 func (rl *RateLimiter) cleanup() {
 	ticker := time.NewTicker(rl.cleanupInterval)
 	defer ticker.Stop()

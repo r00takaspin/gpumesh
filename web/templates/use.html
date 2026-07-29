@@ -15,22 +15,22 @@
 {{if not .LoggedIn}}
 <!-- ====== LOGGED OUT ====== -->
 <nav class="topbar">
-  <a href="/" class="logo">⚡ GPU Mesh</a>
+  <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
   <ul class="nav-links">
-    <li><a href="/">Home</a></li>
-    <li><a href="/use" class="active">Use Models</a></li>
-    <li><a href="/share">Share GPU</a></li>
-    <li><a href="/models">Models</a></li>
-    <li><a href="/about">About</a></li>
+    <li><a href="/" data-testid="nav-home">Home</a></li>
+    <li><a href="/use" class="active" data-testid="nav-use">Use Models</a></li>
+    <li><a href="/share" data-testid="nav-share">Share GPU</a></li>
+    <li><a href="/models" data-testid="nav-models">Models</a></li>
+    <li><a href="/about" data-testid="nav-about">About</a></li>
   </ul>
   <div class="nav-right">
-    <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
+    <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary btn-sm" data-testid="btn-signin">Sign in with GitHub</a>
   </div>
 </nav>
 
 <main>
   <!-- Hero -->
-  <div class="hero">
+  <div class="hero" data-testid="hero-logged-out">
     <div class="hero-logo">
   _____ _____  _    _    __  __ ______  _____ _    _
  / ____|  __ \| |  | |  |  \/  |  ____|/ ____| |  | |
@@ -90,36 +90,36 @@
   </div>
 </main>
 
-<footer>
-  <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+<footer data-testid="footer">
+  <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
   &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
 </footer>
 
 {{else}}
 <!-- ====== LOGGED IN ====== -->
 <nav class="topbar">
-  <a href="/" class="logo">⚡ GPU Mesh</a>
+  <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
   <ul class="nav-links">
-    <li><a href="/">Home</a></li>
-    <li><a href="/use" class="active">Use Models</a></li>
-    <li><a href="/share">Share GPU</a></li>
-    <li><a href="/models">Models</a></li>
-    <li><a href="/about">About</a></li>
+    <li><a href="/" data-testid="nav-home">Home</a></li>
+    <li><a href="/use" class="active" data-testid="nav-use">Use Models</a></li>
+    <li><a href="/share" data-testid="nav-share">Share GPU</a></li>
+    <li><a href="/models" data-testid="nav-models">Models</a></li>
+    <li><a href="/about" data-testid="nav-about">About</a></li>
   </ul>
   <div class="nav-right">
-    <span class="nav-user mono text-accent">{{.Login}}</span>
-    <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
+    <span class="nav-user mono text-accent" data-testid="nav-username">{{.Login}}</span>
+    <a href="/logout" class="btn btn--sm nav-logout" data-testid="btn-logout">[Logout]</a>
   </div>
 </nav>
 <main>
 {{if .NewKey}}
   <!-- One-time API key display -->
-  <div class="key-strip" id="onetime-key">
+  <div class="key-strip" id="onetime-key" data-testid="one-time-key-banner">
     <span style="font-size:11px;color:var(--orange);white-space:nowrap;margin-right:8px">⚠</span>
     <span class="key-label">API key</span>
     <span class="key-value">{{.NewKey}}</span>
-    <button class="key-copy" onclick="copyKey(this, '{{.NewKey}}')">Copy</button>
-    <button class="key-copy" onclick="dismissKey()" style="margin-left:4px" title="Dismiss">✕</button>
+    <button class="key-copy" onclick="copyKey(this, '{{.NewKey}}')" data-testid="btn-copy-key">Copy</button>
+    <button class="key-copy" onclick="dismissKey()" style="margin-left:4px" title="Dismiss" data-testid="btn-dismiss-key">✕</button>
   </div>
   <div id="onetime-warning" class="key-warning">
     ⚠ Copy this key now — it won't be shown again.
@@ -128,7 +128,7 @@
 
 {{if and .LoggedIn .DefaultModel}}
   <!-- Try it now -->
-  <div class="consumer-card" id="try-now" style="border-color:var(--accent);border-left:3px solid var(--accent);display:none">
+  <div class="consumer-card" id="try-now" style="border-color:var(--accent);border-left:3px solid var(--accent);display:none" data-testid="try-it-now">
     <div class="card-header"><div class="card-title">Try it now</div><button class="key-copy" onclick="dismissTryNow()" title="Dismiss" style="margin-left:auto">✕</button></div>
     <p style="font-size:13px;color:var(--text-dim);margin:0 0 10px 0">Run this in your terminal — your first request in seconds.</p>
     <pre class="code-block"><code>curl -s {{.BaseURL}}/v1/chat/completions \
@@ -146,14 +146,14 @@
 
   <!-- Tabs -->
   <div class="consumer-tabs">
-    <button class="consumer-tab{{if eq .Tab "overview"}} active{{end}}" onclick="switchTab('overview', this)">Overview</button>
-    <button class="consumer-tab{{if eq .Tab "keys"}} active{{end}}" onclick="switchTab('keys', this)">API Keys</button>
-    <button class="consumer-tab{{if eq .Tab "models"}} active{{end}}" onclick="switchTab('models', this)">Models</button>
+    <button class="consumer-tab{{if eq .Tab "overview"}} active{{end}}" onclick="switchTab('overview', this)" data-testid="tab-overview">Overview</button>
+    <button class="consumer-tab{{if eq .Tab "keys"}} active{{end}}" onclick="switchTab('keys', this)" data-testid="tab-api-keys">API Keys</button>
+    <button class="consumer-tab{{if eq .Tab "models"}} active{{end}}" onclick="switchTab('models', this)" data-testid="tab-models">Models</button>
   </div>
 
   <!-- TAB: Overview -->
   <div class="tab-panel{{if eq .Tab "overview"}} active{{end}}" id="tab-overview">
-    <div class="stat-grid">
+    <div class="stat-grid" data-testid="usage-stats">
       <div class="stat-box">
         <div class="stat-num">{{.RequestsToday}}<span style="font-size:14px;color:var(--text-dim)">/{{.RateLimit}}</span></div>
         <div class="stat-label">Requests today</div>
@@ -172,7 +172,7 @@
 
   <!-- TAB: API Keys -->
   <div class="tab-panel{{if eq .Tab "keys"}} active{{end}}" id="tab-keys">
-    <div id="consumer-keys-list" hx-get="/use/keys" hx-trigger="load">
+    <div id="consumer-keys-list" hx-get="/use/keys" hx-trigger="load" data-testid="api-keys-list">
       {{range .Keys}}
       <div class="key-card">
         <div class="key-card-row">
@@ -191,14 +191,15 @@
       <button class="btn-consumer btn-primary btn-sm"
         hx-post="/use/keys"
         hx-target="#consumer-keys-list"
-        hx-swap="innerHTML">
+        hx-swap="innerHTML"
+        data-testid="btn-create-first-key">
         + Create new key
       </button>
     </div>
   </div>
 
   <!-- TAB: Models -->
-  <div class="tab-panel{{if eq .Tab "models"}} active{{end}}" id="tab-models">
+  <div class="tab-panel{{if eq .Tab "models"}} active{{end}}" id="tab-models" data-testid="models-list">
     {{if .Models}}
     {{range $idx, $m := .Models}}
     <div class="model-card">
@@ -333,8 +334,8 @@ export OPENAI_API_KEY="{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}
   </div>
 </main>
 
-<footer>
-  <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+<footer data-testid="footer">
+  <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
   &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
 </footer>
 {{end}}

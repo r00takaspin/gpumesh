@@ -392,6 +392,6 @@ func BadgeForTokens(tokens int64) string {
 	case tokens >= 1_000:
 		return "bronze"
 	default:
-		return ""
+		return "beginner"
 	}
 }

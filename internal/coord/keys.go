@@ -1,6 +1,7 @@
 package coord
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,8 +18,17 @@ func (s *Server) handleCreateKey(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-
+	// Try query param first, then JSON body.
 	scope := r.URL.Query().Get("scope")
+	if scope == "" {
+		// Parse JSON body for scope.
+		var body struct {
+			Scope string `json:"scope"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err == nil && body.Scope != "" {
+			scope = body.Scope
+		}
+	}
 	if scope == "" {
 		scope = proto.ScopeConsumer
 	}
@@ -107,10 +117,10 @@ func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked"})
+	writeJSON(w, http.StatusOK, map[string]bool{"revoked": true})
 }
 
-// handleRegenerateKey regenerates a donor token.
+// handleRegenerateKey regenerates an API key (donor or consumer).
 func (s *Server) handleRegenerateKey(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
@@ -125,6 +135,18 @@ func (s *Server) handleRegenerateKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Look up the original key to preserve its scope.
+	oldKey, err := s.store.FindKeyByID(keyID)
+	if err != nil {
+		log.Printf("regenerate: find key error: %v", err)
+		writeError(w, http.StatusInternalServerError, "failed to find key")
+		return
+	}
+	if oldKey == nil {
+		writeError(w, http.StatusNotFound, "key not found")
+		return
+	}
+
 	// Revoke old key.
 	if err := s.store.RevokeKey(userID, keyID); err != nil {
 		log.Printf("regenerate: revoke error: %v", err)
@@ -132,9 +154,8 @@ func (s *Server) handleRegenerateKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create new key.
-	scope := proto.ScopeDonor
-	rawKey, newKeyID, err := s.store.CreateKey(userID, scope)
+	// Create new key with same scope.
+	rawKey, newKeyID, err := s.store.CreateKey(userID, oldKey.Scope)
 	if err != nil {
 		log.Printf("regenerate: create error: %v", err)
 		writeError(w, http.StatusInternalServerError, "failed to create key")
@@ -147,11 +168,11 @@ func (s *Server) handleRegenerateKey(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"id":         newKeyID,
 		"key":        rawKey,
 		"key_prefix": rawKey[:12],
-		"scope":      scope,
+		"scope":      oldKey.Scope,
 		"warning":    "Copy this key now. It will not be shown again.",
 	})
 }

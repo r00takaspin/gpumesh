@@ -34,21 +34,21 @@ func (s *Server) handleConsumerStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Consumer stats from rate limiter (per-user, aggregated across their keys).
+	// Consumer stats aggregated across all user keys.
 	keys, _ := s.store.ListKeys(userID)
-	var remaining int
 	rateLimit := s.limiter.Burst()
-	if len(keys) > 0 {
-		remaining = s.limiter.Remaining(keys[0].KeyHash)
-	} else {
-		remaining = rateLimit
+	minRemaining := rateLimit
+	for _, k := range keys {
+		if r := s.limiter.Remaining(k.KeyHash); r < minRemaining {
+			minRemaining = r
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"requests_today": rateLimit - remaining,
+		"requests_today": rateLimit - minRemaining,
 		"tokens_today":   int64(0), // per-consumer token tracking not in MVP
 		"rate_limit":     rateLimit,
-		"rate_remaining": remaining,
+		"rate_remaining": minRemaining,
 	})
 }
 

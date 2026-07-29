@@ -25,6 +25,11 @@ func initOAuthConfig(baseURL string) {
 
 // handleLoginStart redirects to GitHub OAuth.
 func (s *Server) handleLoginStart(w http.ResponseWriter, r *http.Request) {
+	// Test mode: short-circuit GitHub OAuth.
+	if testModeEnabled() && r.URL.Query().Get("test_user") != "" {
+		s.handleTestAuthGitHub(w, r)
+		return
+	}
 	if oauthConfig == nil {
 		initOAuthConfig(s.baseURL)
 	}

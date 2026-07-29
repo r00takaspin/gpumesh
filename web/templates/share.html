@@ -15,22 +15,22 @@
 {{if not .LoggedIn}}
 <!-- ====== LOGGED OUT ====== -->
 <nav class="topbar">
-  <a href="/" class="logo">⚡ GPU Mesh</a>
+  <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
   <ul class="nav-links">
-    <li><a href="/">Home</a></li>
-    <li><a href="/use">Use Models</a></li>
-    <li><a href="/share" class="active">Share GPU</a></li>
-    <li><a href="/models">Models</a></li>
-    <li><a href="/about">About</a></li>
+    <li><a href="/" data-testid="nav-home">Home</a></li>
+    <li><a href="/use" data-testid="nav-use">Use Models</a></li>
+    <li><a href="/share" class="active" data-testid="nav-share">Share GPU</a></li>
+    <li><a href="/models" data-testid="nav-models">Models</a></li>
+    <li><a href="/about" data-testid="nav-about">About</a></li>
   </ul>
   <div class="nav-right">
-    <a href="/auth/github?redirect=/share" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
+    <a href="/auth/github?redirect=/share" class="btn-consumer btn-primary btn-sm" data-testid="btn-signin">Sign in with GitHub</a>
   </div>
 </nav>
 
 <main>
   <!-- Hero -->
-  <div class="hero">
+  <div class="hero" data-testid="hero-share">
     <div class="hero-logo">
   _____ _____  _    _    __  __ ______  _____ _    _
  / ____|  __ \| |  | |  |  \/  |  ____|/ ____| |  | |
@@ -67,43 +67,43 @@
   </div>
 </main>
 
-<footer>
-  <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+<footer data-testid="footer">
+  <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
   &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
 </footer>
 
 {{else}}
 <!-- ====== LOGGED IN ====== -->
 <nav class="topbar">
-  <a href="/" class="logo">⚡ GPU Mesh</a>
+  <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
   <ul class="nav-links">
-    <li><a href="/">Home</a></li>
-    <li><a href="/use">Use Models</a></li>
-    <li><a href="/share" class="active">Share GPU</a></li>
-    <li><a href="/models">Models</a></li>
-    <li><a href="/about">About</a></li>
+    <li><a href="/" data-testid="nav-home">Home</a></li>
+    <li><a href="/use" data-testid="nav-use">Use Models</a></li>
+    <li><a href="/share" class="active" data-testid="nav-share">Share GPU</a></li>
+    <li><a href="/models" data-testid="nav-models">Models</a></li>
+    <li><a href="/about" data-testid="nav-about">About</a></li>
   </ul>
   <div class="nav-right">
-    <span class="nav-user mono text-accent">{{.Login}}</span>
-    <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
+    <span class="nav-user mono text-accent" data-testid="nav-username">{{.Login}}</span>
+    <a href="/logout" class="btn btn--sm nav-logout" data-testid="btn-logout">[Logout]</a>
   </div>
 </nav>
 
 <main>
   <!-- PHASE 1: Setup (always visible, content changes by state) -->
-  <div id="share-setup" hx-get="/share/setup" hx-trigger="load, every 5s" hx-swap="outerHTML">
+  <div id="share-setup" data-testid="share-setup" hx-get="/share/setup" hx-trigger="load, every 5s" hx-swap="outerHTML">
     <div class="empty-state">Loading setup...</div>
   </div>
 
   <!-- PHASE 2: Live models panel (only when provider connected, HTMX-polled) -->
-  <div id="share-models" hx-get="/share/models" hx-trigger="load, every 10s" hx-swap="outerHTML"></div>
+  <div id="share-models" data-testid="share-models" hx-get="/share/models" hx-trigger="load, every 10s" hx-swap="outerHTML"></div>
 
   <!-- PHASE 3: Stats + Badge + Tokens (only when has activity) -->
-  <div id="share-stats" hx-get="/share/donor-stats" hx-trigger="load, refreshStats from:body, every 60s" hx-swap="outerHTML"></div>
+  <div id="share-stats" data-testid="donor-stats" hx-get="/share/donor-stats" hx-trigger="load, refreshStats from:body, every 60s" hx-swap="outerHTML"></div>
 </main>
 
-<footer>
-  <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+<footer data-testid="footer">
+  <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
   &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
 </footer>
 {{end}}

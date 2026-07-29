@@ -233,6 +233,30 @@ func (s *Store) FindKeyByHash(hash string) (*APIKey, error) {
 	return &k, nil
 }
 
+// FindKeyByID looks up a key by its ID. Returns the key even if revoked
+// (callers can check RevokedAt). Returns nil if not found.
+func (s *Store) FindKeyByID(keyID int64) (*APIKey, error) {
+	var k APIKey
+	var createdStr string
+	var revokedStr *string
+	err := s.db.QueryRow(
+		`SELECT id, user_id, key_hash, key_prefix, scope, created_at, revoked_at
+		 FROM api_keys WHERE id = ?`, keyID,
+	).Scan(&k.ID, &k.UserID, &k.KeyHash, &k.KeyPrefix, &k.Scope, &createdStr, &revokedStr)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find key by id: %w", err)
+	}
+	k.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdStr)
+	if revokedStr != nil {
+		t, _ := time.Parse("2006-01-02 15:04:05", *revokedStr)
+		k.RevokedAt = &t
+	}
+	return &k, nil
+}
+
 // GetDonorStats returns persistent donor statistics for a user.
 func (s *Store) GetDonorStats(userID int64) (*DonorStats, error) {
 	var ds DonorStats

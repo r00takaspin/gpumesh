@@ -47,33 +47,33 @@
 </head>
 <body>
   <nav class="topbar">
-    <a href="/" class="logo">⚡ GPU Mesh</a>
+    <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
     <ul class="nav-links">
-      <li><a href="/">Home</a></li>
-      <li><a href="/use">Use Models</a></li>
-      <li><a href="/share">Share GPU</a></li>
-      <li><a href="/models">Models</a></li>
-      <li><a href="/about" class="active">About</a></li>
+      <li><a href="/" data-testid="nav-home">Home</a></li>
+      <li><a href="/use" data-testid="nav-use">Use Models</a></li>
+      <li><a href="/share" data-testid="nav-share">Share GPU</a></li>
+      <li><a href="/models" data-testid="nav-models">Models</a></li>
+      <li><a href="/about" class="active" data-testid="nav-about">About</a></li>
     </ul>
     <div class="nav-right">
       {{if .LoggedIn}}
-      <span class="nav-user mono text-accent">{{.Login}}</span>
-      <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
+      <span class="nav-user mono text-accent" data-testid="nav-username">{{.Login}}</span>
+      <a href="/logout" class="btn btn--sm nav-logout" data-testid="btn-logout">[Logout]</a>
       {{else}}
-      <a href="/auth/github?redirect=/about" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
+      <a href="/auth/github?redirect=/about" class="btn-consumer btn-primary btn-sm" data-testid="btn-signin">Sign in with GitHub</a>
       {{end}}
     </div>
   </nav>
 
   <main>
     <!-- Hero -->
-    <div class="hero">
-      <h1>What is GPU Mesh?</h1>
+    <div class="hero" data-testid="about-hero">
+      <h1 data-testid="about-title">What is GPU Mesh?</h1>
       <p>A free, community-powered network for using AI language models. GPU owners share their spare computing power — you use it through tools you already know. No credit card, no new apps.</p>
     </div>
 
     <!-- In plain language -->
-    <div class="consumer-card">
+    <div class="consumer-card" data-testid="about-plain-language">
       <div class="card-title">In plain language</div>
       <div class="community-banner">
         Imagine a <strong>community garden for GPUs</strong>. People with powerful graphics cards let others use them when they're idle. You get free access to AI models — the same kind that powers ChatGPT — running on real hardware shared by volunteers. Your existing tools (VS Code, terminal, any OpenAI-compatible app) connect to GPU Mesh instead of paid APIs.
@@ -81,9 +81,9 @@
     </div>
 
     <!-- How it works -->
-    <div class="consumer-card">
+    <div class="consumer-card" data-testid="about-how-it-works">
       <div class="card-title">How it works</div>
-      <div class="about-diagram">
+      <div class="about-diagram" data-testid="about-diagram">
         You &nbsp;── HTTP ──▶&nbsp; Coordinator &nbsp;── WebSocket ──▶&nbsp; Donor's GPU &nbsp;──▶&nbsp; AI Model
       </div>
       <div class="steps">
@@ -106,7 +106,7 @@
     </div>
 
     <!-- Who is this for -->
-    <div class="about-two-col">
+    <div class="about-two-col" data-testid="about-whos-for">
       <div class="consumer-card">
         <div class="card-title">For consumers</div>
         <div style="font-size:13px;color:var(--text-dim);line-height:1.7">
@@ -126,7 +126,7 @@
     </div>
 
     <!-- Key facts -->
-    <div class="consumer-card">
+    <div class="consumer-card" data-testid="about-key-facts">
       <div class="card-title">Key facts</div>
       <ul class="about-facts">
         <li><strong>Free</strong> — no payments, no credits, no catch</li>
@@ -138,37 +138,37 @@
     </div>
 
     <!-- FAQ -->
-    <div class="consumer-card about-faq">
+    <div class="consumer-card about-faq" data-testid="about-faq">
       <div class="card-title">FAQ</div>
-      <details>
+      <details data-testid="faq-item-0">
         <summary>Is it really free?</summary>
         <div class="faq-answer">Yes. Donors volunteer their GPU time. There is no payment system, no credits, no "pro tier." It's free by design.</div>
       </details>
-      <details>
+      <details data-testid="faq-item-1">
         <summary>What models are available?</summary>
         <div class="faq-answer">Whatever the community is running — typically Llama, Mistral, CodeLlama, Gemma, and other open-weight models via Ollama. Check <a href="/models" style="color:var(--blue)">/models</a> for the current list.</div>
       </details>
-      <details>
+      <details data-testid="faq-item-2">
         <summary>Is it fast?</summary>
         <div class="faq-answer">It depends on the donor's hardware and network. Consumer-grade GPUs over home internet won't match a datacenter. It's best-effort community infrastructure, not a paid SLA. For chat and coding, it's usually fast enough.</div>
       </details>
-      <details>
+      <details data-testid="faq-item-3">
         <summary>Can donors see my prompts?</summary>
         <div class="faq-answer">Yes. Donors run the AI model on their own hardware and could inspect traffic. This is disclosed transparently. Don't send passwords, API keys, or other sensitive information.</div>
       </details>
-      <details>
+      <details data-testid="faq-item-4">
         <summary>How do I contribute my GPU?</summary>
         <div class="faq-answer">Install <a href="https://ollama.com" style="color:var(--blue)">Ollama</a>, pull some models, then run <code>gpumesh-provider</code>. One command. See <a href="/share" style="color:var(--blue)">Share GPU</a> for the full guide.</div>
       </details>
-      <details>
+      <details data-testid="faq-item-5">
         <summary>Can I run my own coordinator?</summary>
         <div class="faq-answer">Yes. The whole project is open source (MIT). Clone <a href="https://github.com/r00takaspin/gpumesh" style="color:var(--blue)">the repo</a>, build the coordinator binary, and run your own mesh — private or public.</div>
       </details>
     </div>
   </main>
 
-  <footer>
-    <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+  <footer data-testid="footer">
+    <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
     &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
   </footer>
 

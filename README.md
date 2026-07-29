@@ -160,3 +160,39 @@ MIT — see [LICENSE](LICENSE) for details.
 
 MVP — under active development.
 
+
+## Testing
+
+BDD tests (Cucumber + Playwright) cover the full API surface and web UI.
+
+### Run API tests
+
+```bash
+# 1. Start coordinator in test mode (separate terminal)
+TEST_MODE=true MESH_DB=/tmp/gpumesh-test.db MESH_BASE_URL=http://localhost:8080 go run ./cmd/coordinator
+
+# 2. Install test dependencies (once)
+cd tests && npm ci
+
+# 3. Run API tests (126 scenarios, ~60s)
+COORDINATOR_URL=http://localhost:8080 npx cucumber-js -p api
+```
+
+### Run UI tests
+
+```bash
+# Requires Playwright Chromium (install once)
+cd tests && npx playwright install chromium
+
+# Run UI tests (130 scenarios, >6 min)
+COORDINATOR_URL=http://localhost:8080 npx cucumber-js -p ui
+```
+
+### Test profiles
+
+| Profile | Command | Scenarios | Requires |
+|---------|---------|-----------|----------|
+| `api` | `npx cucumber-js -p api` | 126 | Coordinator with TEST_MODE=true |
+| `ui` | `npx cucumber-js -p ui` | 130 | Coordinator + Chromium |
+
+Feature files live in `tests/features/` (Russian Gherkin). Step definitions: `tests/steps/`. Test-mode endpoints are guarded by `TEST_MODE=true` — unavailable in production.

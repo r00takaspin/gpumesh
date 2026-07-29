@@ -12,13 +12,13 @@
 </head>
 <body>
   <nav class="topbar">
-    <a href="/" class="logo">⚡ GPU Mesh</a>
+    <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
     <ul class="nav-links">
-      <li><a href="/">Home</a></li>
-      <li><a href="/use">Use Models</a></li>
-      <li><a href="/share">Share GPU</a></li>
-      <li><a href="/models">Models</a></li>
-      <li><a href="/about">About</a></li>
+      <li><a href="/" data-testid="nav-home">Home</a></li>
+      <li><a href="/use" data-testid="nav-use">Use Models</a></li>
+      <li><a href="/share" data-testid="nav-share">Share GPU</a></li>
+      <li><a href="/models" data-testid="nav-models">Models</a></li>
+      <li><a href="/about" data-testid="nav-about">About</a></li>
     </ul>
     <div class="nav-right">
       {{if .LoggedIn}}
@@ -32,7 +32,7 @@
 
   <main>
     <div class="login-page">
-      <div class="consumer-card login-card">
+      <div class="consumer-card login-card" data-testid="login-card">
         <div class="login-ascii">
   ___ ___ _   _   __  __        _    
  / __| _ \ | | | |  \/  |___ __| |_  
@@ -45,7 +45,7 @@
         </p>
 
         {{if .HasOAuth}}
-        <a href="/auth/github" class="btn-consumer btn-primary">
+        <a href="/auth/github" class="btn-consumer btn-primary" data-testid="btn-github-login">
           Sign in with GitHub →
         </a>
         {{else}}
@@ -58,7 +58,7 @@
         </p>
       </div>
 
-      <div class="consumer-card login-info mt-2">
+      <div class="consumer-card login-info mt-2" data-testid="login-why-github">
         <div class="card-title">Why GitHub?</div>
         <div class="mono text-dim" style="font-size:0.75rem;line-height:1.8">
           GPU Mesh is built by developers, for developers. You already have<br>
@@ -74,8 +74,8 @@
     </div>
   </main>
 
-  <footer>
-    <a href="https://github.com/r00takaspin/gpumesh">GitHub</a>
+  <footer data-testid="footer">
+    <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
     &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
   </footer>
 

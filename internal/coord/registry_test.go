@@ -174,8 +174,8 @@ func TestBadgeForTokens(t *testing.T) {
 		tokens int64
 		badge  string
 	}{
-		{0, ""},
-		{500, ""},
+		{0, "beginner"},
+		{500, "beginner"},
 		{1000, "bronze"},
 		{5000, "bronze"},
 		{10000, "silver"},

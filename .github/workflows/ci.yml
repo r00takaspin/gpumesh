@@ -35,3 +35,4 @@ jobs:
         run: |
           curl -sSfL https://github.com/golangci/golangci-lint/releases/download/v2.12.2/golangci-lint-2.12.2-linux-amd64.tar.gz | tar -xz -C /tmp
           /tmp/golangci-lint-2.12.2-linux-amd64/golangci-lint run ./...
+
