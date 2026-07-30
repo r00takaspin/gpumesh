@@ -71,7 +71,7 @@ Feature: Navigation (v2)
   Scenario: Footer on main pages
     When пользователь переходит на "/"
     Then элемент с data-testid="footer" видим
-    And элемент с data-testid="footer-tagline" содержит текст "Share local models with friends"
+    And элемент с data-testid="footer-license" содержит текст "MIT"
     When пользователь переходит на "/join"
     Then элемент с data-testid="footer" видим
     When пользователь переходит на "/use"

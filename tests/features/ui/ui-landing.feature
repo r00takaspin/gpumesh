@@ -52,11 +52,10 @@ Feature: Landing page (v2)
     And пользователь кликает на логотип с data-testid="logo"
     Then URL страницы равен "/"
 
-  Scenario: Footer tagline
+  Scenario: Footer links
     When пользователь переходит на "/"
     Then элемент с data-testid="footer" видим
     And футер содержит ссылку на GitHub-репозиторий
-    And элемент с data-testid="footer-tagline" содержит текст "Share local models with friends"
     And элемент с data-testid="footer-license" содержит текст "MIT"
 
   Scenario: Sign in for guests

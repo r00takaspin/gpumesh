@@ -576,7 +576,7 @@ Rate limit: token bucket на API key; default `MESH_RATE_LIMIT=100` req/hour; �
 - Logged out: Sign in with GitHub
 - Logged in: `@login` + Logout
 
-Footer: GitHub repo, «MIT», tagline: **Share local models with friends** (не «Powered by community»).
+Footer: GitHub repo · «MIT» (без tagline — на лендинге смысл уже в H1).
 
 ### 9.3 Landing `/`
 

@@ -23,4 +23,4 @@ Feature: Error pages (v2)
     When пользователь переходит на "/test/error?code=404"
     Then элемент с data-testid="nav-home" видим
     And элемент с data-testid="footer" видим
-    And элемент с data-testid="footer-tagline" содержит текст "Share local models with friends"
+    And элемент с data-testid="footer-license" содержит текст "MIT"
