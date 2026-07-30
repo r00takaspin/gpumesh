@@ -4,13 +4,13 @@
 
 GPU Mesh is a peer-to-peer network for **distributed LLM inference**. GPU owners ("donors") share their idle compute resources, and anyone can use them — for free — through a standard **OpenAI-compatible API**.
 
-No new client. No new API. No credit card. Just two environment variables and every OpenAI-compatible tool you already use (Continue.dev, Aider, Codex CLI, Cline, Open WebUI, LangChain, any SDK) just works.
+No new client. No new API. No credit card. Just two environment variables and every OpenAI-compatible tool you already use (Cursor, Aider, Codex CLI, Cline, Open WebUI, LangChain, any SDK) just works.
 
 ## How It Works
 
 ```
                          ┌──────────────┐
-Continue.dev ──HTTP──┐   │              │   ┌──────────────┐
+Cursor       ──HTTP──┐   │              │   ┌──────────────┐
 Codex CLI    ──HTTP──┤   │  Coordinator │   │              │
 Aider        ──HTTP──┼──▶│              │──▶│ Donor Agent  │── Ollama
 LangChain    ──HTTP──┤   │              │   │ Donor Agent  │── Ollama
@@ -24,25 +24,32 @@ curl         ──HTTP──┘   │              │   └──────�
 
 ## Quick Start
 
-### Consumer (use models)
+### Connect a tool (v2)
 
-```bash
-export OPENAI_BASE_URL="https://gpumesh.net/v1"
-export OPENAI_API_KEY="inf_xxxxxxxx"
+GPU Mesh v2 is **invite-first**: after a PIN join (or owning a machine), open **[Use](https://gpumesh.net/use)** → **Set up a tool**.
+
+Per-machine base URL (not a public pool):
+
+```text
+https://gpumesh.net/v1/machines/{machine_id}
 ```
 
-Then use any OpenAI-compatible tool:
+Plus a consumer API key (`inf_…`) and an Ollama model name from the machine card.
+
+Supported setup tabs in the product: **curl · Cursor · Cline · Pi · Python**.  
+Full how-to and troubleshooting: [`SPEC-v2.md` §19](./SPEC-v2.md#19-harness-подключение-инструментов).
+
+Example (Cline CLI):
 
 ```bash
-# Aider
-aider --openai-api-base $OPENAI_BASE_URL --openai-api-key $OPENAI_API_KEY --model openai/llama3.2:3b
-
-# Python
-from openai import OpenAI
-client = OpenAI(base_url=os.environ["OPENAI_BASE_URL"], api_key=os.environ["OPENAI_API_KEY"])
+cline auth \
+  -p openai-compatible \
+  -k 'inf_…' \
+  -m 'qwen3.5:9b' \
+  -b 'https://gpumesh.net/v1/machines/mch_…'
 ```
 
-### Donor (share your GPU)
+### Owner (share your GPU)
 
 **Prerequisites:** [Ollama](https://ollama.com) installed with at least one model pulled.
 

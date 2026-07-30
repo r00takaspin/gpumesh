@@ -21,7 +21,7 @@
 
 ### 1.3 Ключевое отличие: нулевая интеграция для потребителя
 
-Потребители используют **любой существующий OpenAI-совместимый инструмент** — Continue.dev, Codex CLI, Aider, Open WebUI, LangChain, любой SDK. Не нужно ставить новый клиент. Не нужно учить новый API. Две переменные окружения — и всё работает.
+Потребители используют **любой существующий OpenAI-совместимый инструмент** — Cursor, Codex CLI, Aider, Open WebUI, LangChain, любой SDK. Не нужно ставить новый клиент. Не нужно учить новый API. Две переменные окружения — и всё работает.
 
 ---
 
@@ -52,7 +52,7 @@
 
 ```
                          ┌─────────────────────┐
-   Continue.dev ──HTTP──▶│                     │◀──WS─── Агент донора ──▶ Ollama
+   Cursor       ──HTTP──▶│                     │◀──WS─── Агент донора ──▶ Ollama
    Codex CLI    ──HTTP──▶│   Координатор        │◀──WS─── Агент донора ──▶ Ollama
    Aider        ──HTTP──▶│  (Публичный VPS)     │◀──WS─── Агент донора ──▶ Ollama
    Open WebUI   ──HTTP──▶│                     │
@@ -477,7 +477,7 @@ registry = {
 
 Каждый инструмент — раскрывающаяся строка с названием, шевроном и кнопкой Copy:
 
-1. **Continue.dev** — JSON-конфигурация для `config.json`
+1. **Cursor** — Override OpenAI Base URL + API key + model id
 2. **Aider** — команда запуска с флагами `--openai-api-base` и `--openai-api-key`
 3. **Cline** — JSON-конфигурация для VS Code settings
 4. **Open WebUI** — переменные окружения

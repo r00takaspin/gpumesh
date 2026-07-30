@@ -44,7 +44,7 @@
 
 1. Owner поднимает Ollama + агент и выдаёт **PIN** доверенным людям.
 2. Member один раз вводит PIN (после GitHub), получает binding и API-ключ.
-3. Member настраивает **харнес** (Continue, Cline, Aider, curl/SDK и т.п.) на `OPENAI_BASE_URL` + key для **конкретной машины** и работает без повторного ввода PIN.
+3. Member настраивает **харнес** (Cursor, Cline, Aider, curl/SDK и т.п.) на `OPENAI_BASE_URL` + key для **конкретной машины** и работает без повторного ввода PIN.
 4. Координатор — реестр машин, ACL (invites/bindings), релей HTTP↔WS. Не «CDN незнакомцев».
 
 ### 0a.3 Критерий успеха
@@ -371,7 +371,8 @@ Content-Type: application/json
 
 Тело — OpenAI-совместимое (`model`, `messages`, `stream`, `temperature`, `tools`, `tool_choice`, …).  
 Поле `model` уходит в Ollama как есть (после возможного strip префикса `openai/` как в v1 §3.5 шаг 0 — сохранить для LiteLLM/Aider).  
-`tools` / `tool_choice` прокидываются в Ollama; ответные `tool_calls` возвращаются в OpenAI-форме (`finish_reason: tool_calls` когда применимо). Нужно для Cursor Ask/Agent и других tool-calling харнесов.
+`tools` / `tool_choice` прокидываются в Ollama; ответные `tool_calls` возвращаются в OpenAI-форме (`finish_reason: tool_calls` когда применимо). Нужно для Cursor Ask/Agent и других tool-calling харнесов.  
+Перед Ollama `/api/chat` provider: (1) flatten `messages[].content` arrays → string; (2) парсит replayed `tool_calls[].function.arguments` из JSON-строки в object. Иначе Pi/Cursor/Cline дают Ollama 400 (`content` array / `can't find closing '}'`).
 
 Streaming: SSE (`X-Accel-Buffering: no`; пустые content-keepalives не шлём). Non-stream: JSON.
 
@@ -581,7 +582,7 @@ Footer: GitHub repo, «MIT», tagline: **Share local models with friends** (не
 
 | # | Компонент | Содержание |
 |---|---|---|
-| 1 | Hero | Serif H1: «Share your local models with friends». Sub: send a PIN to a coworker/friend; they point Continue/Cline/curl at your machine URL. CTA: Create invite → `/share`, Enter a code → `/join` |
+| 1 | Hero | Serif H1: «Share your local models with friends». Sub: send a PIN to a coworker/friend; they point Cursor/Cline/Pi/curl at your machine URL. CTA: Create invite → `/share`, Enter a code → `/join` |
 | 2 | Example invite card | Демо-PIN (не из БД). CTA ведёт в owner-флоу (`/share` → auth при необходимости), не копирует «живой» код |
 | 3 | How it works | ① Run the agent ② Share a PIN ③ They use your URL (`/v1/machines/{id}`) |
 | 4 | What you get | Коротко и по делу: только друзья с PIN; revoke anytime; без открытого порта и public catalog |
@@ -640,13 +641,14 @@ Logged out: pitch + Sign in / Enter a code — job language: set up curl or an e
 Logged in:
 
 1. **Machines** — cards: name, owner (`owned by you` / `@login`), online/offline, models.
-   - Primary: **Set up a tool** → setup panel with tabs **curl (default) / Continue / Cline / Python**. Snippet includes machine `BASE_URL` (`/v1/machines/{id}`), API key (live one-time key while banner visible, else `YOUR_API_KEY`), and model. Short one-liner: paste into the tool (curl: run as-is).
+   - Primary: **Set up a tool** → setup panel with tabs **curl (default) / Cursor / Cline / Pi / Python**. Snippet includes machine `BASE_URL` (`/v1/machines/{id}`), API key (live one-time key while banner visible, else `YOUR_API_KEY`), and model. Short one-liner: paste into the tool (curl: run as-is).
+   - Tabs **curl / Cursor / Cline / Pi / Python**: сниппеты по §19; Cline — `cline auth …`; Cursor — Override Base URL; Pi — `~/.pi/agent/models.json` + `pi --provider gpumesh`.
    - Secondary: **Copy base URL**; Member: **Remove access**.
    - After successful join: land on `/use?setup={machine_id}` — that card highlighted, setup panel open on curl.
 2. **API Keys** — list / create / one-time key banner / empty (без jargon `scope:` в основном UI — «for tools» / «for provider»). Not required for happy path when one-time key banner is shown.
 3. Empty: «No machines yet — ask a friend for a PIN, or share your own models.»
 
-Убрать таб «browse all community models». Privacy notice обязателен. UI не завязан на один харнес (Continue) — curl равноправен.
+Убрать таб «browse all community models». Privacy notice обязателен. UI не завязан на один харнес (Cursor) — curl равноправен.
 
 ### 9.7 `/about`
 
@@ -850,7 +852,7 @@ OAuth secrets — как в v1 (env).
 1. **WebRTC family link** — signaling-only coordinator, промпты мимо релея при direct.
 2. **Guest hour** — поверх family binding эфемерный guest PIN на час.
 3. **Household policies** — quiet hours, per-member token caps, fair queue.
-4. **Плагины Continue/Open WebUI** — «Connect machine» one-click.
+4. **Плагины Cursor/Open WebUI** — «Connect machine» one-click.
 5. **Opt-in public discovery** — только если появится спрос; не default.
 
 ---
@@ -874,13 +876,13 @@ OAuth secrets — как в v1 (env).
 
 1. **Owner:** provider online, видит `machine_id`, создаёт PIN, копирует join-link.
 2. **Friend (второй GitHub):** redeem PIN на `/join`, переходит на `/use?setup={machine_id}`, открывает setup (curl по умолчанию или другой инструмент), копирует snippet с `OPENAI_BASE_URL=/v1/machines/{id}` и API key.
-3. **Харнес:** любой OpenAI-compatible клиент (Continue, Cline, Aider, curl, Python SDK, …) с base URL + key + именем модели как в Ollama; completion реально идёт с машины owner’а.
+3. **Харнес:** любой OpenAI-compatible клиент (Cursor, Cline, Aider, curl, Python SDK, …) с base URL + key + именем модели как в Ollama; completion реально идёт с машины owner’а. Для статьи удобный concrete path — **Cline CLI** (§19).
 4. Provider restart → тот же `machine_id`, харнес без смены base URL продолжает работать.
 5. Revoke binding → харнес получает отказ (403), без «тихого» hop на другую машину.
 6. Offline machine → предсказуемый 503.
 7. В UI есть короткий privacy warning (промпты видит owner / релей).
 
-В статье достаточно **одного** конкретного харнеса как примера (на выбор автора); продукт и UI не завязаны на Continue.
+В статье достаточно **одного** конкретного харнеса как примера (на выбор автора); продукт и UI не завязаны на один инструмент.
 
 Структура статьи (ориентир):
 
@@ -906,3 +908,217 @@ UI         → Light calm; PIN boarding-pass; без слова donor
 pool       → нет
 roles      → Owner / Member / Provider (agent) / Operator
 ```
+
+---
+
+## 19. Harness: подключение инструментов
+
+Где живёт документация по харнесам:
+
+| Слой | Где | Глубина |
+|---|---|---|
+| Source of truth | этот §19 | полный how-to + ошибки |
+| Пользовательский UX | `/use` → **Set up a tool** (tabs curl / Cursor / Cline / Pi / Python) | copy-paste snippet |
+| Осведомление | лендинг `/`, `/about`, join success | имена инструментов + CTA на `/use` |
+| GitHub | `README.md` (блок Connect a tool) | кратко + ссылка сюда |
+| Статья | §17 | один concrete path (Cline) |
+
+**Не** дублировать эти гайды в `docs/`. UI и README не пересказывают §19 целиком.
+
+### 19.0 Общие правила (все OpenAI-compatible клиенты)
+
+Одинаковые три значения для curl, Cursor, Cline, Pi, Python SDK и аналогов:
+
+| Поле | Значение | Не делать |
+|---|---|---|
+| Base URL | `{MESH_BASE}/v1/machines/{machine_id}` (prod: `https://gpumesh.net/v1/machines/mch_…`) | Без хвоста `/chat/completions`; без лишнего `/v1` (`…/machines/{id}/v1` → 404) |
+| API Key | consumer `inf_…` | Не provider token (`scope=provider`) |
+| Model | имя Ollama как в `ollama list` / карточке `/use` | Не выдумывать префиксы без нужды |
+
+Клиент обычно сам дописывает `/chat/completions` →  
+`POST /v1/machines/{machine_id}/chat/completions`.
+
+**Предусловия (любой харнес):**
+
+1. Owner: Ollama + `gpumesh-provider` online (`machine_id` в `/share`).
+2. Member (или owner): redeem PIN на `/join` **или** machine уже в `/use`.
+3. Consumer API key (`inf_…`) — banner после join / Create key на `/use`.
+4. Для tool-calling агентов: provider на GPU парсит replayed `tool_calls[].function.arguments` string→object перед `/api/chat` (§6.1); иначе второй ход после tool — Ollama 400 `can't find closing '}'`.
+
+---
+
+### 19.1 Cline (CLI) — канонический пример
+
+Пошаговый процесс подключения **Cline CLI**.  
+VS Code / Cursor extension Cline — те же Base URL / API Key / Model; ниже — проверенный CLI-путь.
+
+#### Установка CLI
+
+Официальный Cline CLI (пример; версия может отличаться):
+
+```bash
+# macOS / Linux — см. актуальный install у Cline
+npm i -g cline
+# или бинарь с релизов Cline
+cline --version
+```
+
+Конфиг по умолчанию: `~/.cline/data/settings/` (провайдеры в `providers.json`).  
+Логи: `~/.cline/data/logs/cline.log`.
+
+#### Auth (один раз на машину/ключ)
+
+Скопировать из setup-панели `/use` (tab Cline) или собрать вручную:
+
+```bash
+cline auth \
+  -p openai-compatible \
+  -k 'inf_YOUR_CONSUMER_KEY' \
+  -m 'qwen3.5:9b' \
+  -b 'https://gpumesh.net/v1/machines/mch_YOUR_MACHINE_ID'
+```
+
+Эквивалент флагов: `--provider` / `--apikey` / `--modelid` / `--baseurl`.
+
+**Важно:** provider id = **`openai-compatible`**. Не выбирать `ollama` против mesh — Cline пойдёт native-путями Ollama и получит `not found`.
+
+Проверка:
+
+```bash
+cline config
+# или:
+cat ~/.cline/data/settings/providers.json
+```
+
+Ожидается блок примерно:
+
+```json
+"openai-compatible": {
+  "settings": {
+    "provider": "openai-compatible",
+    "apiKey": "inf_…",
+    "model": "qwen3.5:9b",
+    "baseUrl": "https://gpumesh.net/v1/machines/mch_…"
+  }
+}
+```
+
+`lastUsedProvider` должен быть `openai-compatible` (или явно `-P openai-compatible` при запуске).
+
+#### Первый запуск и smoke
+
+1. API-smoke без Cline — см. §19.3 curl.
+2. Запуск:
+
+```bash
+cline -P openai-compatible -m 'qwen3.5:9b' "скажи hi"
+# интерактивно (нужен TTY):
+cline -i
+```
+
+3. Tool loop (act mode): простой `ls` / shell — после `tool_calls` второй ход с `role:tool` не должен давать Ollama 400.
+
+#### VS Code / IDE extension (кратко)
+
+1. Provider / API: **OpenAI Compatible** (не Ollama).
+2. Base URL / API Key / Model — §19.0.
+3. Не включать «Ollama» provider с URL координатора.
+
+#### Типичные ошибки (Cline)
+
+| Симптом | Причина | Что сделать |
+|---|---|---|
+| `Error: not found` / `{"error":"not found"}` | Base URL с лишним `/v1`, или provider id `ollama` | Base = `…/v1/machines/{id}`; `-p openai-compatible` |
+| `machine_offline` / 503 | Provider offline | Поднять `gpumesh-provider` на машине owner’а |
+| `model_not_found` | Имя модели ≠ Ollama | Id из карточки `/use` / `ollama list` |
+| `invalid API key` / 401 | Неверный/revoked consumer key | Новый key на `/use` |
+| Zod / `expected array` + `ollama status 400` + `closing '}'` | Старый provider без string→object args (§6.1) | Обновить provider на GPU-хосте |
+| Работает curl, Cline нет | Лог `~/.cline/data/logs/cline.log`, `baseUrl` в `providers.json` | Перезапустить `cline auth` |
+
+#### UI tab Cline
+
+Snippet обязан содержать:
+
+```text
+cline auth -p openai-compatible -k '<API_KEY>' -m '<MODEL>' -b '<BASE_URL>'
+```
+
+Допустима подпись полей Base URL / API Key / Model **плюс** эта команда.
+
+---
+
+### 19.2 Cursor
+
+В Cursor: **Settings → Models** — включить OpenAI API и задать Override:
+
+```text
+# Cursor → Settings → Models
+# OpenAI API → enable + Override Base URL
+Override OpenAI Base URL: https://gpumesh.net/v1/machines/mch_…
+OpenAI API Key: inf_…
+Add model: qwen3.5:9b
+```
+
+UI tab **Cursor** на `/use` отдаёт тот же блок (значения на одной строке с label; сверху — куда зайти в меню).  
+Cursor cloud блокирует LAN/private IP — для Override нужен публичный HTTPS (`gpumesh.net` или туннель).  
+Не указывать community `/v1` без `machines/{id}`.
+
+---
+
+### 19.3 Pi (coding agent CLI)
+
+[Pi](https://pi.dev/) — минимальный terminal coding agent. Кастомный OpenAI Completions provider через `~/.pi/agent/models.json`:
+
+```json
+{
+  "providers": {
+    "gpumesh": {
+      "baseUrl": "https://gpumesh.net/v1/machines/mch_…",
+      "api": "openai-completions",
+      "apiKey": "inf_…",
+      "models": [{ "id": "qwen3.5:9b" }]
+    }
+  }
+}
+```
+
+Запуск:
+
+```bash
+pi --provider gpumesh --model qwen3.5:9b
+```
+
+UI tab **Pi** на `/use` отдаёт JSON-фрагмент + команду запуска. Merge в существующий `providers` (не затирать другие ключи). `baseUrl` = §19.0 (без `/chat/completions`).
+
+---
+
+### 19.4 curl и Python
+
+**curl** (также smoke перед любым харнесом):
+
+```bash
+export OPENAI_BASE_URL="https://gpumesh.net/v1/machines/mch_…"
+export OPENAI_API_KEY="inf_…"
+curl -sS "$OPENAI_BASE_URL/chat/completions" \
+  -H "Authorization: Bearer $OPENAI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen3.5:9b","messages":[{"role":"user","content":"hi"}],"stream":false}'
+```
+
+Ожидание: JSON с `choices[0].message`, не `not found` / `machine_offline` / `model_not_found`.
+
+**Python** (`openai` SDK):
+
+```python
+from openai import OpenAI
+client = OpenAI(
+  base_url="https://gpumesh.net/v1/machines/mch_…",
+  api_key="inf_…",
+)
+client.chat.completions.create(
+  model="qwen3.5:9b",
+  messages=[{"role":"user","content":"hi"}],
+)
+```
+
+UI tabs **curl** / **Python** на `/use` генерируют эти сниппеты (§9.6).

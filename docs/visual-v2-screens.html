@@ -483,7 +483,7 @@
           { id: "out", label: "Logged out" },
           { id: "empty", label: "Empty machines" },
           { id: "machines", label: "Machines · online + offline" },
-          { id: "snippets", label: "Snippets open (Continue)" },
+          { id: "snippets", label: "Snippets open (Cursor)" },
           { id: "keys", label: "API Keys list" },
           { id: "keys-new", label: "One-time key banner" },
           { id: "keys-empty", label: "API Keys empty" },
@@ -601,7 +601,7 @@
           <section class="hero-grid">
             <div>
               <h1 class="serif-h1">Share your local models with friends</h1>
-              <p class="lead">Send a PIN to a coworker or friend. They sign in with GitHub and point Continue, Cline, or curl at your machine URL.</p>
+              <p class="lead">Send a PIN to a coworker or friend. They sign in with GitHub and point Cursor, Cline, or curl at your machine URL.</p>
               <div class="hero-actions">
                 <button type="button" class="btn btn-primary" data-go="share" data-status="${loggedIn ? 'ready' : 'out'}">Create invite</button>
                 <button type="button" class="btn" data-go="join" data-status="${loggedIn ? 'in-form' : 'out-empty'}">Enter a code</button>
@@ -909,16 +909,29 @@ export OPENAI_API_KEY="inf_…"
 curl "$OPENAI_BASE_URL/chat/completions" \\
   -H "Authorization: Bearer $OPENAI_API_KEY" \\
   -d '{"model":"llama3.2:3b","messages":[{"role":"user","content":"hi"}]}'`,
-        continue: `models:
-  - title: home-lab
-    provider: openai
-    model: llama3.2:3b
-    apiBase: https://gpumesh.net/v1/machines/mch_01HZX…
-    apiKey: inf_…`,
-        cline: `OpenAI Compatible
-Base URL: https://gpumesh.net/v1/machines/mch_01HZX…
-API Key: inf_…
-Model: llama3.2:3b`,
+        cursor: `# Cursor → Settings → Models
+# OpenAI API → enable + Override Base URL
+Override OpenAI Base URL: https://gpumesh.net/v1/machines/mch_01HZX…
+OpenAI API Key: inf_…
+Add model: llama3.2:3b`,
+        cline: `cline auth \\
+  -p openai-compatible \\
+  -k 'inf_…' \\
+  -m 'llama3.2:3b' \\
+  -b 'https://gpumesh.net/v1/machines/mch_01HZX…'`,
+        pi: `# ~/.pi/agent/models.json — merge into providers
+{
+  "providers": {
+    "gpumesh": {
+      "baseUrl": "https://gpumesh.net/v1/machines/mch_01HZX…",
+      "api": "openai-completions",
+      "apiKey": "inf_…",
+      "models": [{ "id": "llama3.2:3b" }]
+    }
+  }
+}
+
+pi --provider gpumesh --model llama3.2:3b`,
         python: `from openai import OpenAI
 client = OpenAI(
   base_url="https://gpumesh.net/v1/machines/mch_01HZX…",
@@ -935,8 +948,9 @@ client.chat.completions.create(
           <h2>Tool snippet</h2>
           <div class="snippet-tabs">
             <button type="button" class="${active==='curl'?'on':''}" data-snippet="curl">curl</button>
-            <button type="button" class="${active==='continue'?'on':''}" data-snippet="continue">Continue</button>
+            <button type="button" class="${active==='cursor'?'on':''}" data-snippet="cursor">Cursor</button>
             <button type="button" class="${active==='cline'?'on':''}" data-snippet="cline">Cline</button>
+            <button type="button" class="${active==='pi'?'on':''}" data-snippet="pi">Pi</button>
             <button type="button" class="${active==='python'?'on':''}" data-snippet="python">Python</button>
           </div>
           <div class="code">${snip[active]}</div>
@@ -1075,7 +1089,7 @@ client.chat.completions.create(
         ${navHtml("about")}
         <main class="page" style="max-width:720px">
           <h1 class="serif-h1">About GPU Mesh</h1>
-          <p class="lead">Share local Ollama models with friends or coworkers using a PIN. They get a stable URL for Continue, Cline, curl, and similar tools.</p>
+          <p class="lead">Share local Ollama models with friends or coworkers using a PIN. They get a stable URL for Cursor, Cline, curl, and similar tools.</p>
           <div class="grid-2 mt-28">
             <div class="card">
               <h2>Owner</h2>

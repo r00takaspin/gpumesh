@@ -10,7 +10,6 @@ import (
 	"log"
 	"math/rand/v2"
 	"net/http"
-	"net"
 	"os"
 	"strings"
 	"sync"
@@ -148,22 +147,14 @@ func (a *Agent) connect(ctx context.Context) error {
 	url := a.cfg.CoordinatorURL + "?token=" + a.cfg.Token
 	log.Printf("\033[36m⌬\033[0m connecting to %s", a.cfg.CoordinatorURL)
 
-	dialer := websocket.Dialer{
-		HandshakeTimeout: 10 * time.Second,
-		NetDialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			d := net.Dialer{KeepAlive: 30 * time.Second}
-			conn, err := d.DialContext(ctx, network, addr)
-			if err != nil {
-				return nil, err
-			}
-			if tcp, ok := conn.(*net.TCPConn); ok {
-			_ = tcp.SetKeepAlivePeriod(30 * time.Second)
-			}
-			return conn, nil
-		},
-	}
-	conn, _, err := dialer.DialContext(ctx, url, nil)
+	dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
+	conn, resp, err := dialer.DialContext(ctx, url, nil)
 	if err != nil {
+		if resp != nil {
+			body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
+			_ = resp.Body.Close()
+			return fmt.Errorf("dial: %w (status=%d body=%q)", err, resp.StatusCode, truncateForLog(string(body), 200))
+		}
 		return fmt.Errorf("dial: %w", err)
 	}
 
@@ -389,6 +380,22 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 	}
 	defer func() { _ = ollamaResp.Body.Close() }()
 	log.Printf("handleRequest: ollama responded status=%d", ollamaResp.StatusCode)
+	if ollamaResp.StatusCode < 200 || ollamaResp.StatusCode >= 300 {
+		errBody, _ := io.ReadAll(io.LimitReader(ollamaResp.Body, 4096))
+		log.Printf("handleRequest: ollama error body: %s", truncateForLog(string(errBody), 500))
+		a.mu.Lock()
+		conn := a.conn
+		a.mu.Unlock()
+		if conn != nil {
+			_ = a.writeWS(conn, proto.ErrorMsg{
+				Type:      proto.TypeError,
+				RequestID: msg.RequestID,
+				Code:      proto.ErrInternal,
+				Message:   fmt.Sprintf("ollama status %d: %s", ollamaResp.StatusCode, truncateForLog(string(errBody), 300)),
+			})
+		}
+		return
+	}
 
 	if msg.Stream {
 		a.handleStreamingResponse(msg.RequestID, ollamaResp.Body)
@@ -554,9 +561,14 @@ func normalizeToolCalls(raw json.RawMessage) json.RawMessage {
 
 // sendToOllama sends a chat completion request to the local Ollama instance.
 func (a *Agent) sendToOllama(ctx context.Context, msg proto.RequestMsg) (*http.Response, error) {
+	messages, err := normalizeMessagesForOllama(msg.Messages)
+	if err != nil {
+		return nil, fmt.Errorf("normalize messages: %w", err)
+	}
+
 	ollamaReq := map[string]interface{}{
 		"model":    msg.Model,
-		"messages": msg.Messages,
+		"messages": messages,
 		"stream":   msg.Stream,
 	}
 	if len(msg.Tools) > 0 {
@@ -590,6 +602,126 @@ func (a *Agent) sendToOllama(ctx context.Context, msg proto.RequestMsg) (*http.R
 
 	log.Printf("sendToOllama: calling %s/api/chat model=%s", a.cfg.OllamaURL, msg.Model)
 	return a.httpClient.Do(httpReq)
+}
+
+// normalizeMessagesForOllama prepares OpenAI-shaped messages for Ollama /api/chat:
+// - flattens content arrays (Cursor/Pi/Cline) to strings — else Ollama 400
+//   "cannot unmarshal array into … content of type string"
+// - parses tool_calls[].function.arguments JSON strings into objects — else Ollama 400
+//   "Value looks like object, but can't find closing '}' symbol"
+func normalizeMessagesForOllama(raw json.RawMessage) ([]map[string]interface{}, error) {
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("empty messages")
+	}
+	var msgs []map[string]interface{}
+	if err := json.Unmarshal(raw, &msgs); err != nil {
+		return nil, err
+	}
+	out := make([]map[string]interface{}, 0, len(msgs))
+	for _, m := range msgs {
+		nm := make(map[string]interface{}, len(m))
+		for k, v := range m {
+			nm[k] = v
+		}
+		if c, ok := nm["content"]; ok {
+			nm["content"] = flattenMessageContent(c)
+		}
+		if nm["content"] == nil {
+			nm["content"] = ""
+		}
+		normalizeToolCallArgumentsInMessage(nm)
+		out = append(out, nm)
+	}
+	return out, nil
+}
+
+func flattenMessageContent(content interface{}) interface{} {
+	switch v := content.(type) {
+	case string:
+		return v
+	case nil:
+		return ""
+	case []interface{}:
+		var b strings.Builder
+		for _, part := range v {
+			pm, ok := part.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			typ, _ := pm["type"].(string)
+			switch typ {
+			case "text", "":
+				if t, ok := pm["text"].(string); ok {
+					b.WriteString(t)
+				}
+			case "image_url":
+				b.WriteString("[image]")
+			default:
+				// tool_result / other parts — keep any text field
+				if t, ok := pm["text"].(string); ok {
+					b.WriteString(t)
+				}
+			}
+		}
+		return b.String()
+	default:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return ""
+		}
+		return string(b)
+	}
+}
+
+func truncateForLog(s string, n int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
+}
+
+func normalizeToolCallArgumentsInMessage(m map[string]interface{}) {
+	if tcs, ok := m["tool_calls"].([]interface{}); ok {
+		for _, tc := range tcs {
+			tcm, ok := tc.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			fn, _ := tcm["function"].(map[string]interface{})
+			if fn == nil {
+				continue
+			}
+			fn["arguments"] = ensureArgsObject(fn["arguments"])
+		}
+	}
+	if fc, ok := m["function_call"].(map[string]interface{}); ok {
+		fc["arguments"] = ensureArgsObject(fc["arguments"])
+	}
+}
+
+func ensureArgsObject(args interface{}) interface{} {
+	switch v := args.(type) {
+	case map[string]interface{}:
+		return v
+	case nil:
+		return map[string]interface{}{}
+	case string:
+		s := strings.TrimSpace(v)
+		if s == "" {
+			return map[string]interface{}{}
+		}
+		var obj interface{}
+		if err := json.Unmarshal([]byte(s), &obj); err != nil {
+			return v
+		}
+		if obj == nil {
+			return map[string]interface{}{}
+		}
+		return obj
+	default:
+		return v
+	}
 }
 
 // discoverModels fetches available models from Ollama.

@@ -172,12 +172,34 @@ function buildSnippet(kind, baseURL, model) {
   baseURL = baseURL || 'https://gpumesh.net/v1/machines/mch_…';
   model = model || 'llama3.2:3b';
   var apiKey = resolveApiKey();
-  if (kind === 'continue') {
-    return 'models:\n  - title: machine\n    provider: openai\n    model: ' + model +
-      '\n    apiBase: ' + baseURL + '\n    apiKey: ' + apiKey;
+  if (kind === 'cursor') {
+    return '# Cursor → Settings → Models\n' +
+      '# OpenAI API → enable + Override Base URL\n' +
+      'Override OpenAI Base URL: ' + baseURL + '\n' +
+      'OpenAI API Key: ' + apiKey + '\n' +
+      'Add model: ' + model;
   }
   if (kind === 'cline') {
-    return 'OpenAI Compatible\nBase URL: ' + baseURL + '\nAPI Key: ' + apiKey + '\nModel: ' + model;
+    return 'cline auth \\\n' +
+      '  -p openai-compatible \\\n' +
+      '  -k \'' + apiKey + '\' \\\n' +
+      '  -m \'' + model + '\' \\\n' +
+      '  -b \'' + baseURL + '\'';
+  }
+  if (kind === 'pi') {
+    return '# ~/.pi/agent/models.json — merge into providers\n' +
+      '{\n' +
+      '  "providers": {\n' +
+      '    "gpumesh": {\n' +
+      '      "baseUrl": "' + baseURL + '",\n' +
+      '      "api": "openai-completions",\n' +
+      '      "apiKey": "' + apiKey + '",\n' +
+      '      "models": [{ "id": "' + model + '" }]\n' +
+      '    }\n' +
+      '  }\n' +
+      '}\n' +
+      '\n' +
+      'pi --provider gpumesh --model ' + model;
   }
   if (kind === 'python') {
     return 'from openai import OpenAI\nclient = OpenAI(\n  base_url="' + baseURL + '",\n  api_key="' + apiKey + '",\n)\n' +
