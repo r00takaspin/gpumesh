@@ -403,9 +403,12 @@ Rate limit: token bucket на API key; default `MESH_RATE_LIMIT=100` req/hour; �
 
 ### 6.3 Таймауты
 
-Общий таймаут запроса на координаторе: **120s** (как v1).  
-Heartbeat timeout: 90s без heartbeat → session offline (machine запись остаётся, online=false).  
-`backend_ok=false` > 5 минут → disconnect WS.
+- TTFT (до первого токена): **120s** (cold load + большие промпты/tools от Cursor).
+- Inter-token: **120s** (thinking-модели вроде qwen могут молчать между чанками).
+- Общий таймаут запроса: **300s**.
+- Heartbeat timeout: 90s без heartbeat → session offline (machine запись остаётся, online=false).
+- `backend_ok=false` > 5 минут → disconnect WS.
+- Provider прокидывает Ollama `thinking` в `content`, если `content` пуст (иначе SSE выглядит «мёртвым» для Cursor).
 
 ---
 

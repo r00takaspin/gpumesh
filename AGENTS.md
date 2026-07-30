@@ -41,15 +41,15 @@ SPEC-v2 wins. If SPEC-v2 is ambiguous, default to the interpretation that preser
 
 ### Production SSH (VPS)
 
-- **Host:** `gpumesh.net` → `194.113.153.87` (root SSH; user did `ssh-copy-id`)
-- **Key:** `~/.ssh/id_ed25519_r00takaspin` with `IdentitiesOnly=yes`
+- **Alias (preferred):** `ssh gpumesh` — configured in `~/.ssh/config` → `root@194.113.153.87` with `~/.ssh/id_ed25519_r00takaspin`
+- **Also:** `ssh gpumesh.net` / `ssh gpumesh-vps` (same host)
 - **App:** Dokku `gpumesh`
 - **Canonical commands:**
 
 ```bash
-SSH="ssh -i ~/.ssh/id_ed25519_r00takaspin -o IdentitiesOnly=yes -o BatchMode=yes root@194.113.153.87"
-$SSH 'dokku logs gpumesh -n 200'
-$SSH 'dokku ps:report gpumesh'
+ssh gpumesh 'dokku logs gpumesh -n 200'
+ssh gpumesh 'dokku ps:report gpumesh'
+ssh -o BatchMode=yes gpumesh 'hostname'   # non-interactive / agent use
 ```
 
 - When debugging prod (Cursor hang, 5xx, offline machine): **use this SSH**, don’t claim there is no access.

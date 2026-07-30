@@ -410,6 +410,7 @@ func (a *Agent) handleStreamingResponse(requestID string, body io.Reader) {
 		var chunk struct {
 			Message struct {
 				Content   string          `json:"content"`
+				Thinking  string          `json:"thinking"`
 				ToolCalls json.RawMessage `json:"tool_calls"`
 			} `json:"message"`
 			Done bool `json:"done"`
@@ -426,11 +427,16 @@ func (a *Agent) handleStreamingResponse(requestID string, body io.Reader) {
 			return
 		}
 
+		// Thinking-only tokens (qwen etc.) must keep the stream alive for Cursor.
+		content := chunk.Message.Content
+		if content == "" && chunk.Message.Thinking != "" {
+			content = chunk.Message.Thinking
+		}
 		toolCalls := normalizeToolCalls(chunk.Message.ToolCalls)
 		if err := a.writeWS(conn, proto.ChunkMsg{
 			Type:      proto.TypeChunk,
 			RequestID: requestID,
-			Content:   chunk.Message.Content,
+			Content:   content,
 			ToolCalls: toolCalls,
 			Done:      chunk.Done,
 		}); err != nil {
@@ -454,6 +460,7 @@ func (a *Agent) handleNonStreamingResponse(requestID, model string, body io.Read
 	var ollamaResp struct {
 		Message struct {
 			Content   string          `json:"content"`
+			Thinking  string          `json:"thinking"`
 			ToolCalls json.RawMessage `json:"tool_calls"`
 		} `json:"message"`
 		TotalDuration   int64 `json:"total_duration"`
@@ -478,11 +485,15 @@ func (a *Agent) handleNonStreamingResponse(requestID, model string, body io.Read
 		return
 	}
 
+	content := ollamaResp.Message.Content
+	if content == "" && ollamaResp.Message.Thinking != "" {
+		content = ollamaResp.Message.Thinking
+	}
 	toolCalls := normalizeToolCalls(ollamaResp.Message.ToolCalls)
 	if err := a.writeWS(conn, proto.ResponseMsg{
 		Type:      proto.TypeResponse,
 		RequestID: requestID,
-		Content:   ollamaResp.Message.Content,
+		Content:   content,
 		ToolCalls: toolCalls,
 		Model:     model,
 		Usage:     usage,
