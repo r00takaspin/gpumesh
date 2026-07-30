@@ -3,7 +3,7 @@
 > **Статус:** Черновик v2 — заменяет продуктовое направление [`SPEC.md`](SPEC.md) (v1)  
 > **Лицензия:** MIT  
 > **Стек:** Go (координатор + агент)  
-> **Визуал:** Light calm (см. [`docs/visual-v2-sketch.html`](docs/visual-v2-sketch.html))  
+> **Визуал:** Light calm — экраны и статусы: [`docs/visual-v2-screens.html`](docs/visual-v2-screens.html); moodboard: [`docs/visual-v2-sketch.html`](docs/visual-v2-sketch.html)  
 > **Совместимость с v1:** breaking change; активных пользователей нет — чистый cut допустим
 
 ---
@@ -67,6 +67,7 @@
 - Федерация координаторов
 - Платёжная система
 - Drop-in гарантия для всех OpenAI-инструментов без настройки base URL (форма API близка к OpenAI, но пути **per-machine**)
+- Менеджмент токенов / статус машин / кабинет owner’а внутри `gpumesh-provider` (control plane только `/share`, см. §11.0)
 
 ---
 
@@ -515,9 +516,21 @@ Heartbeat timeout: 90s без heartbeat → session offline (machine запис�
 
 ## 9. Веб-интерфейс (Light calm)
 
+### 9.0 Visual source of truth
+
+| Артефакт | Роль |
+|---|---|
+| [`docs/visual-v2-screens.html`](docs/visual-v2-screens.html) | **Утверждаемые экраны, статусы и переходы** (кликабельный прототип: сайдбар → screen/status, CTAs в превью) |
+| [`docs/visual-v2-sketch.html`](docs/visual-v2-sketch.html) | Ранний moodboard Light calm (не карта статусов) |
+
+Реализация UI в `web/templates/` должна совпадать со screens-прототипом по IA, копирайту и визуальным статусам ниже. При расхождении — сначала обновить screens + этот §9, потом код.
+
+**Карта экранов в прототипе:** Home · Join · Share · Use · About · Login · Errors (404/500/503).  
+**Auth chrome:** Logged out / Logged in переключается в прототипе и влияет на дефолтный статус экрана.
+
 ### 9.1 Design system
 
-Опирается на скетч Light calm:
+Опирается на Light calm (токены как в screens-прототипе):
 
 | Токен | Значение |
 |---|---|
@@ -538,12 +551,14 @@ Heartbeat timeout: 90s без heartbeat → session offline (machine запис�
 
 - Без ASCII-баннеров и «terminal CRT»
 - PIN — главный визуальный артефакт (крупный mono, «boarding pass»)
+- На лендинге PIN в hero — **пример / illustration**, не живой invite (не генерировать запись в БД при `GET /`)
 - Mono только для кода/PIN/ключей
 - Язык UI: **English** (как v1)
 - HTMX + полные HTML-страницы (без SPA)
 - Один job на секцию; без dashboard-каши из community stats
+- Копирайт простой: friends / coworkers / local models — без «neurobullshit» (tunnel/mesh манифесты, «someone’s», jargon вроде TTL/bindings в user-facing тексте)
 
-Предупреждение privacy (обязательно в v2): на `/join` и `/use` — короткий notice: *Prompts are relayed through the coordinator and visible to the machine owner.*
+Предупреждение privacy (обязательно в v2): на `/join` и `/use` — короткий notice в духе: *Your prompts go through the GPU Mesh server and are visible to whoever runs the machine.*
 
 ### 9.2 Навигация
 
@@ -552,56 +567,77 @@ Heartbeat timeout: 90s без heartbeat → session offline (machine запис�
 - Logged out: Sign in with GitHub
 - Logged in: `@login` + Logout
 
-Footer: GitHub repo, «MIT», без «Powered by community» как главной идеи — заменить на нейтральное «Share your GPU with people you trust».
+Footer: GitHub repo, «MIT», tagline: **Share local models with friends** (не «Powered by community»).
 
 ### 9.3 Landing `/`
 
 | # | Компонент | Содержание |
 |---|---|---|
-| 1 | Hero | Serif H1: «Invite someone to your GPU». Sub: trusted access via PIN; OpenAI-compatible base URL per machine. CTA: Create invite → `/share`, Enter a code → `/join` |
-| 2 | How it works | ① Run agent on your machine ② Share a PIN ③ They point tools at your machine URL |
-| 3 | Honesty | Короткий блок vs tunnel/VPN: LLM-scoped invites, revoke, harness base URL |
+| 1 | Hero | Serif H1: «Share your local models with friends». Sub: send a PIN to a coworker/friend; they point Continue/Cline/curl at your machine URL. CTA: Create invite → `/share`, Enter a code → `/join` |
+| 2 | Example invite card | Демо-PIN (не из БД). CTA ведёт в owner-флоу (`/share` → auth при необходимости), не копирует «живой» код |
+| 3 | How it works | ① Run the agent ② Share a PIN ③ They use your URL (`/v1/machines/{id}`) |
+| 4 | What you get | Коротко и по делу: только друзья с PIN; revoke anytime; без открытого порта и public catalog |
 
 **Нет:** Models online / Nodes online / Requests today как community proof.  
 Опционально позже: «Your machines online» только для logged-in.
 
 ### 9.4 `/join`
 
-Logged out: PIN field + Sign in to connect (OAuth сохраняет pin в redirect).  
-Logged in: PIN field + Connect.  
-Success: machine name, online status, link to `/use`, one-time API key banner если создан.  
-Errors: человекочитаемые сообщения из §4.4.
+Статусы (см. прототип):
 
-### 9.5 `/share` (Owner)
+| Status | UI |
+|---|---|
+| Logged out · empty | PIN field + Sign in to connect (OAuth `redirect=/join` или `/join?pin=…`) |
+| Logged out · `?pin=` | PIN prefilled + Sign in to connect |
+| Logged in · form | PIN field (пустое, если не из query) + Connect |
+| Success | Machine name + online, link to `/use`, one-time API key banner если ключ только что создан |
+| Errors | Человекочитаемые сообщения из §4.4 (`invalid_pin`, `expired`, `exhausted`, `revoked`, `machine_gone`, `rate_limited`) — **без** сырого `code:` в UI |
 
-Logged out: hero «Share your GPU» + Sign in.  
-Logged in:
+Privacy notice обязателен.
 
-1. **Setup** — install/run provider, provider token (reused UX из v1 setup, без слова Donate).
-2. **Machines** — список logical machines: name/description, hardware, online, models, `machine_id`, copy base URL (для self).
-3. **Invites** — Create invite → modal с PIN + copy link; list invites.
-4. **Members** — who has access, last seen, Revoke.
+### 9.5 `/share` (Owner) — progressive single-surface
+
+Единственный control plane owner’а в MVP: provider token, setup/run command, machine online/models, Create invite, members/revoke, stats. Агент эти функции не дублирует (§11.0).
+
+Не четыре равноправные вкладки. Одна страница: **состояние диктует, что видно**. Цель — минимум действий до PIN (повторный шаринг ≈ Create invite → Copy).
+
+| State | Что на экране | Primary action |
+|---|---|---|
+| Logged out | Hero «Share your local models» + Sign in | Sign in |
+| No provider token | Generate provider token + короткий why | Generate token |
+| Token · waiting | Run command + «Waiting for provider…»; Create invite disabled | Copy run command |
+| Online · ready | Machine strip + Create invite (uses/TTL перед созданием) + Members | Create invite |
+| Online · 2+ machines | Компактный select машины над CTA (без отдельной секции Machines) | Create invite |
+| Machine offline | Warning; invite всё ещё можно создать (§4.2) | Create invite |
+| PIN modal | Boarding-pass PIN + Copy code + Copy link + meta; shown once | Copy |
+| Revoke confirm | Confirm dialog для member | Revoke / Cancel |
+| Empty members | Одна строка empty, без большой пустой карточки | — |
+
+Свёрнуто после ready: **Past invites**, **Setup & provider token**, **Advanced** (regenerate key → новый machine URL; UI предупреждает).
+
+Автовыбор: 1 machine → без пикера; 2+ → select.
 
 Polling: machines ~10s, members ~30s.
 
 ### 9.6 `/use` (Member / self)
 
-Logged out: краткий pitch + Sign in / Join with PIN.  
+Logged out: pitch + Sign in / Enter a code.  
 Logged in:
 
-1. **Machines** — cards: name, owner login, online, models count, **Copy base URL**, Copy snippet для харнесов (curl / Continue / Cline / Python и т.д.) с подставленным `/v1/machines/{id}`.
-2. **API Keys** — как v1.
-3. Empty state: «No machines yet — ask for a PIN or share your own GPU».
+1. **Machines** — cards: name, owner (`owned by you` / `@login`), online/offline, models, **Copy base URL**, snippets (curl / Continue / Cline / Python) с `/v1/machines/{id}`. Member может Remove access.
+2. **API Keys** — list / create / one-time key banner / empty (без jargon `scope:` в основном UI — «for tools» / «for provider»).
+3. Empty: «No machines yet — ask a friend for a PIN, or share your own models.»
 
-Убрать таб «browse all community models».
+Убрать таб «browse all community models». Privacy notice обязателен.
 
 ### 9.7 `/about`
 
-Переписать под invite-first: что это, кто owner/member, privacy notice, FAQ (PIN one-time? GitHub required? vs Tailscale?).
+Invite-first: local models + PIN для friends/coworkers; Owner / Member; privacy; FAQ (PIN one-time? GitHub? vs Tailscale? offline?).
 
-### 9.8 Ошибки HTML
+### 9.8 `/login` и ошибки HTML
 
-404 / 500 / 503 — сохранить простые страницы; стилизовать Light calm.
+`/login`: Sign in with GitHub; edge — OAuth unset warning (простым языком).  
+404 / 500 / 503 — простые Light calm страницы + Go home.
 
 ---
 
@@ -681,14 +717,27 @@ machines_runtime[machine_id] = {
 
 ## 11. Агент провайдера (`gpumesh-provider`)
 
+### 11.0 Граница scope: daemon ≠ control plane
+
+Агент — лёгкий демон рядом с Ollama: thin wizard → WebSocket → proxy. **Control plane owner’а** (provider token CRUD, online/models/load, invites, members, stats) живёт **только** на веб `/share` (§9.5). Дублировать кабинет в CLI — два источника правды (токены/реестр на координаторе + OAuth) и ломает headless-кейсы.
+
+| В агенте (MVP) | НЕ в агенте |
+|---|---|
+| Wizard один раз: paste provider token, Ollama URL, опциональный `--models` | Create / regenerate / revoke токенов |
+| Авто-детект моделей + heartbeat + reconnect + proxy | Live model picker, pull models UI, TUI / local web UI |
+| Понятные логи: connected, `machine_id`, models[], errors | Дашборд статуса машин, members, invites, badge |
+| Конфиг `~/.gpumesh.json` | Device-login / OAuth в CLI; синхронизация конфига с кабинетом |
+
+Источник правды «онлайн ли машина / какие модели» — реестр координатора, UI на `/share`. Локальный one-shot `gpumesh-provider status` (ollama ok / last error) — допустим пост-MVP, не замена `/share`.
+
 ### 11.1 Почти без изменений
 
-Порядок запуска, конфиг `~/.gpumesh.json`, автодетект Ollama, heartbeat, reconnect backoff, proxy к `/api/chat` — как в v1 §4.
+Порядок запуска, конфиг `~/.gpumesh.json`, автодетект Ollama, heartbeat, reconnect backoff, proxy к `/api/chat` — как в v1 §4 (в рамках границы §11.0).
 
 ### 11.2 Изменения
 
 - После `registered` агент может залогировать `machine_id` (для человека в `/share`).
-- Copy в wizard/README: акцент на «share PIN from dashboard», не «join the public mesh».
+- Copy в wizard/README: «get provider token at `/share`», не «join the public mesh».
 - Default coordinator URL без изменения концепта (`MESH_COORDINATOR`).
 
 ### 11.3 Дистрибуция
@@ -772,6 +821,9 @@ OAuth secrets — как в v1 (env).
 - [ ] PIN без GitHub
 - [ ] Browser-only chat без API key
 - [ ] Биллинг
+- [ ] Менеджмент токенов / статус моделей / кабинет owner’а в `gpumesh-provider` (только `/share`, §11.0)
+- [ ] TUI или локальный web UI агента
+- [ ] Device-login / OAuth flow внутри CLI провайдера
 
 ---
 

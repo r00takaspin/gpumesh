@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPU Mesh v2 — Visual screens &amp; statuses</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --studio-bg: #111110;
+      --studio-panel: #1c1b1a;
+      --studio-line: #2a2826;
+      --studio-text: #e7e5e4;
+      --studio-muted: #a8a29e;
+      --studio-accent: #2dd4bf;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: "IBM Plex Sans", system-ui, sans-serif;
+      background: var(--studio-bg);
+      color: var(--studio-text);
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      min-height: 100vh;
+    }
+
+    /* ── Studio sidebar ── */
+    .studio {
+      border-right: 1px solid var(--studio-line);
+      background: var(--studio-panel);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      overflow: hidden;
+    }
+    .studio-head {
+      padding: 18px 18px 14px;
+      border-bottom: 1px solid var(--studio-line);
+    }
+    .studio-head h1 {
+      font-size: 13px; font-weight: 600; letter-spacing: .02em;
+      text-transform: uppercase; color: var(--studio-muted);
+    }
+    .studio-head p { margin-top: 6px; font-size: 12px; color: #78716c; line-height: 1.45; }
+    .studio-scroll { flex: 1; overflow-y: auto; padding: 12px; }
+    .studio-group { margin-bottom: 18px; }
+    .studio-group h2 {
+      font-size: 11px; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; color: #78716c; margin: 0 6px 8px;
+    }
+    .screen-btn, .status-btn {
+      display: block; width: 100%; text-align: left;
+      border: 1px solid transparent; background: transparent;
+      color: var(--studio-text); padding: 9px 10px; border-radius: 8px;
+      font: 500 13px/1.2 "IBM Plex Sans", sans-serif; cursor: pointer;
+      margin-bottom: 2px;
+    }
+    .screen-btn:hover, .status-btn:hover { background: #292524; }
+    .screen-btn.active {
+      background: #292524; border-color: #44403c; color: #fff;
+    }
+    .screen-btn small {
+      display: block; margin-top: 3px; font-weight: 400;
+      font-size: 11px; color: #78716c;
+    }
+    .status-btn.active {
+      background: rgba(45, 212, 191, .12);
+      border-color: rgba(45, 212, 191, .35);
+      color: var(--studio-accent);
+    }
+    .auth-toggle {
+      display: flex; gap: 6px; padding: 0 6px; margin-bottom: 10px;
+    }
+    .auth-toggle button {
+      flex: 1; border: 1px solid #44403c; background: #1c1b1a; color: #a8a29e;
+      padding: 8px; border-radius: 8px; font: 500 12px/1 "IBM Plex Sans", sans-serif;
+      cursor: pointer;
+    }
+    .auth-toggle button.active { background: #fff; color: #111; border-color: #fff; }
+    .legend {
+      margin-top: 8px; padding: 12px; border-radius: 10px;
+      background: #141413; border: 1px solid var(--studio-line);
+      font-size: 11px; color: #a8a29e; line-height: 1.55;
+    }
+    .legend strong { color: #e7e5e4; font-weight: 500; }
+    .legend code {
+      font-family: "IBM Plex Mono", monospace; font-size: 10px;
+      color: var(--studio-accent);
+    }
+    .studio-foot {
+      padding: 12px 16px; border-top: 1px solid var(--studio-line);
+      font-size: 11px; color: #78716c;
+    }
+
+    /* ── Preview frame ── */
+    .preview-wrap {
+      display: flex; flex-direction: column; min-height: 100vh;
+      background: #0c0c0b;
+    }
+    .preview-bar {
+      height: 44px; display: flex; align-items: center; gap: 12px;
+      padding: 0 16px; border-bottom: 1px solid var(--studio-line);
+      background: #161615; color: var(--studio-muted); font-size: 12px;
+      flex-shrink: 0;
+    }
+    .preview-bar .path {
+      font-family: "IBM Plex Mono", monospace; color: #e7e5e4; font-size: 12px;
+    }
+    .preview-bar .chip {
+      margin-left: auto; padding: 4px 10px; border-radius: 999px;
+      background: #292524; font-size: 11px; color: #a8a29e;
+    }
+    .preview-scroll {
+      flex: 1; overflow: auto; padding: 24px;
+      display: flex; justify-content: center; align-items: flex-start;
+    }
+    .phone {
+      width: min(960px, 100%);
+      min-height: calc(100vh - 92px);
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #2a2826;
+      box-shadow: 0 24px 80px rgba(0,0,0,.45);
+      background: #f7f7f5;
+    }
+
+    /* ── Product Light calm ── */
+    .app {
+      --bg: #f7f7f5;
+      --panel: #ffffff;
+      --ink: #1c1917;
+      --muted: #78716c;
+      --line: #e7e5e4;
+      --accent: #0f766e;
+      --ok: #15803d;
+      --warn: #b45309;
+      --danger: #b91c1c;
+      --soft: #fafaf9;
+      --font: "IBM Plex Sans", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+      --serif: "Source Serif 4", Georgia, serif;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--font);
+      min-height: calc(100vh - 92px);
+      display: flex;
+      flex-direction: column;
+    }
+    .app a { color: var(--accent); text-decoration: none; cursor: pointer; }
+    .app button { font-family: var(--font); cursor: pointer; }
+    .top {
+      height: 64px; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 28px; border-bottom: 1px solid var(--line);
+      background: rgba(247,247,245,.92); backdrop-filter: blur(8px);
+      position: sticky; top: 0; z-index: 5; gap: 16px;
+    }
+    .brand { font-weight: 650; font-size: 16px; letter-spacing: -0.03em; color: var(--ink); border: 0; background: none; padding: 0; }
+    .nav { display: flex; gap: 22px; list-style: none; flex-wrap: wrap; }
+    .nav a, .nav button {
+      color: var(--muted); font-size: 14px; border: 0; background: none; padding: 0;
+      font-family: var(--font); cursor: pointer;
+    }
+    .nav a.on, .nav button.on { color: var(--ink); font-weight: 500; }
+    .nav-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      border-radius: 999px; border: 1px solid var(--line);
+      background: var(--panel); color: var(--ink);
+      padding: 11px 18px; font: 500 14px/1 var(--font); cursor: pointer;
+    }
+    .btn:hover { background: var(--soft); }
+    .btn-primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .btn-primary:hover { background: #292524; }
+    .btn-primary:disabled, .btn:disabled {
+      opacity: .45; cursor: not-allowed;
+    }
+    .btn-danger {
+      background: #fff; color: var(--danger); border-color: #fecaca;
+      padding: 7px 12px; font-size: 12px; border-radius: 999px;
+    }
+    .btn-sm { padding: 8px 14px; font-size: 13px; }
+    .btn-ghost { background: transparent; }
+    .btn-block { width: 100%; border-radius: 12px; }
+    main.page { max-width: 920px; margin: 0 auto; padding: 48px 24px 80px; width: 100%; flex: 1; }
+    .foot {
+      border-top: 1px solid var(--line); padding: 22px 28px;
+      display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+      color: var(--muted); font-size: 13px;
+    }
+    .foot span { color: #a8a29e; }
+
+    .hero-grid {
+      display: grid; grid-template-columns: 1.15fr .85fr; gap: 28px; align-items: start;
+    }
+    @media (max-width: 800px) {
+      body { grid-template-columns: 1fr; }
+      .studio { height: auto; position: relative; max-height: none; }
+      .hero-grid { grid-template-columns: 1fr; }
+      .top { padding: 0 16px; height: auto; min-height: 64px; flex-wrap: wrap; padding-top: 12px; padding-bottom: 12px; }
+    }
+    .serif-h1 {
+      font-family: var(--serif); font-weight: 600;
+      font-size: clamp(34px, 5vw, 48px);
+      letter-spacing: -0.03em; line-height: 1.12;
+    }
+    .lead { margin-top: 16px; color: var(--muted); font-size: 17px; line-height: 1.6; max-width: 38ch; }
+    .hero-actions { display: flex; gap: 10px; margin-top: 28px; flex-wrap: wrap; }
+
+    .pass {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 20px;
+      padding: 22px; box-shadow: 0 10px 30px rgba(28,25,23,.04);
+    }
+    .pass-label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 10px; }
+    .pin {
+      font-family: var(--mono); font-size: 34px; font-weight: 600; letter-spacing: .14em;
+      text-align: center; padding: 22px 10px; border-radius: 14px; background: var(--soft);
+      border: 1px dashed #d6d3d1;
+    }
+    .meta { margin-top: 12px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .meta.center { text-align: center; }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px;
+    }
+    .card h2, .section-title {
+      font-size: 15px; font-weight: 600; margin-bottom: 14px;
+    }
+    .section-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 28px; }
+    @media (max-width: 800px) { .grid-2 { grid-template-columns: 1fr; } }
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 36px; }
+    @media (max-width: 800px) { .steps { grid-template-columns: 1fr; } }
+    .step {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px;
+    }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 999px; background: var(--ink); color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600; margin-bottom: 12px;
+    }
+    .step strong { display: block; font-size: 14px; margin-bottom: 6px; }
+    .step p { font-size: 13px; color: var(--muted); line-height: 1.45; }
+
+    .machine-row, .member-row, .invite-row, .key-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 14px; border-radius: 12px; background: var(--soft); border: 1px solid var(--line);
+    }
+    .machine-row + .machine-row,
+    .member-row + .member-row,
+    .invite-row + .invite-row,
+    .key-row + .key-row { margin-top: 8px; }
+    .machine-info { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+    .dot {
+      width: 9px; height: 9px; border-radius: 50%; background: var(--ok);
+      margin-top: 5px; flex-shrink: 0;
+    }
+    .dot.off { background: #a8a29e; }
+    .dot.warn { background: var(--warn); }
+    .machine-info strong { display: block; font-size: 14px; }
+    .machine-info span, .mono-muted {
+      display: block; color: var(--muted); font-size: 12px; margin-top: 3px;
+      font-family: var(--mono); word-break: break-all;
+    }
+    .stack { display: flex; flex-direction: column; gap: 12px; }
+    .stack-lg { display: flex; flex-direction: column; gap: 20px; }
+
+    .join-box { display: flex; gap: 8px; flex-wrap: wrap; }
+    .join-box input, .field input, .field select, .field textarea {
+      flex: 1; min-width: 160px; border: 1px solid var(--line); border-radius: 12px;
+      padding: 12px 14px; font: 500 15px/1 var(--mono); letter-spacing: .08em;
+      background: var(--soft); color: var(--ink); outline: none;
+    }
+    .field input, .field select, .field textarea { width: 100%; letter-spacing: normal; font-family: var(--font); font-size: 14px; }
+    .join-box input:focus, .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field { margin-bottom: 14px; }
+    .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 600px) { .field-row { grid-template-columns: 1fr; } }
+
+    .banner {
+      border-radius: 14px; padding: 14px 16px; font-size: 13px; line-height: 1.5;
+      border: 1px solid var(--line); background: var(--soft); color: var(--ink);
+    }
+    .banner.warn { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+    .banner.ok { border-color: #bbf7d0; background: #f0fdf4; color: #166534; }
+    .banner.err { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+    .banner.info { border-color: #99f6e4; background: #f0fdfa; color: #115e59; }
+    .banner .key {
+      display: block; margin-top: 8px; font-family: var(--mono); font-size: 13px;
+      word-break: break-all; color: var(--ink);
+    }
+    .privacy {
+      margin-top: 24px; font-size: 12px; color: var(--muted); line-height: 1.5;
+      padding: 12px 14px; border-left: 3px solid var(--line); background: transparent;
+    }
+
+    .code {
+      font-family: var(--mono); font-size: 12px; background: var(--soft);
+      border: 1px solid var(--line); border-radius: 12px; padding: 14px;
+      overflow-x: auto; white-space: pre; color: var(--ink); line-height: 1.55;
+    }
+    .snippet-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+    .snippet-tabs button {
+      border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
+      padding: 6px 12px; font-size: 12px; color: var(--muted); cursor: pointer;
+    }
+    .snippet-tabs button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+    details.collapse {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px;
+    }
+    details.collapse summary {
+      cursor: pointer; font-size: 14px; font-weight: 500; list-style: none;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    details.collapse summary::-webkit-details-marker { display: none; }
+    details.collapse summary::after { content: "▸"; color: var(--muted); font-size: 12px; }
+    details.collapse[open] summary::after { content: "▾"; }
+    details.collapse .collapse-body { margin-top: 14px; }
+
+    .waiting {
+      display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px;
+      padding: 16px; border-radius: 12px; background: var(--soft); border: 1px dashed #d6d3d1;
+    }
+    .spinner {
+      width: 16px; height: 16px; border: 2px solid #d6d3d1; border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty-line { font-size: 13px; color: var(--muted); padding: 4px 0; }
+
+    .modal-backdrop {
+      position: absolute; inset: 0; background: rgba(28,25,23,.35);
+      display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 20;
+    }
+    .phone { position: relative; }
+    .modal {
+      background: var(--panel); border-radius: 20px; border: 1px solid var(--line);
+      padding: 24px; width: min(420px, 100%);
+      box-shadow: 0 24px 60px rgba(28,25,23,.18);
+    }
+    .modal h3 { font-family: var(--serif); font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+    .modal .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+    .modal .actions .btn { flex: 1; min-width: 120px; border-radius: 12px; }
+
+    .faq details {
+      border-bottom: 1px solid var(--line); padding: 14px 0;
+    }
+    .faq summary { cursor: pointer; font-weight: 500; font-size: 14px; }
+    .faq p { margin-top: 8px; color: var(--muted); font-size: 14px; line-height: 1.55; }
+
+    .error-page { text-align: center; padding: 80px 20px; }
+    .error-page .code-big {
+      font-family: var(--mono); font-size: 64px; font-weight: 600; letter-spacing: -.04em;
+      color: var(--ink);
+    }
+    .error-page p { margin: 12px auto 24px; color: var(--muted); max-width: 36ch; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--muted); padding: 4px 10px;
+      border-radius: 999px; background: var(--soft); border: 1px solid var(--line);
+    }
+    .badge.ok { color: var(--ok); border-color: #bbf7d0; background: #f0fdf4; }
+    .badge.off { color: #78716c; }
+
+    .hidden { display: none !important; }
+    .mt-8 { margin-top: 8px; }
+    .mt-12 { margin-top: 12px; }
+    .mt-16 { margin-top: 16px; }
+    .mt-20 { margin-top: 20px; }
+    .mt-28 { margin-top: 28px; }
+    .mb-0 { margin-bottom: 0; }
+    .text-muted { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .row-actions { display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+  <aside class="studio">
+    <div class="studio-head">
+      <h1>Visual v2 · Light calm</h1>
+      <p>Click screens &amp; statuses. CTAs in the preview also navigate the flow.</p>
+    </div>
+    <div class="studio-scroll">
+      <div class="studio-group">
+        <h2>Auth chrome</h2>
+        <div class="auth-toggle">
+          <button type="button" id="auth-out" class="active" data-auth="out">Logged out</button>
+          <button type="button" id="auth-in" data-auth="in">Logged in</button>
+        </div>
+      </div>
+
+      <div class="studio-group">
+        <h2>Screens</h2>
+        <button type="button" class="screen-btn active" data-screen="home"><strong>Home</strong><small>/</small></button>
+        <button type="button" class="screen-btn" data-screen="join"><strong>Join</strong><small>/join · enter PIN</small></button>
+        <button type="button" class="screen-btn" data-screen="share"><strong>Share</strong><small>/share · progressive owner</small></button>
+        <button type="button" class="screen-btn" data-screen="use"><strong>Use</strong><small>/use · machines &amp; keys</small></button>
+        <button type="button" class="screen-btn" data-screen="about"><strong>About</strong><small>/about</small></button>
+        <button type="button" class="screen-btn" data-screen="login"><strong>Login</strong><small>/login</small></button>
+        <button type="button" class="screen-btn" data-screen="error"><strong>Errors</strong><small>404 / 500 / 503</small></button>
+      </div>
+
+      <div class="studio-group">
+        <h2>Status</h2>
+        <div id="status-list"></div>
+      </div>
+
+      <div class="studio-group">
+        <h2>Happy path</h2>
+        <div class="legend">
+          <strong>Owner:</strong> Share → token → wait → online → Create invite → PIN modal<br>
+          <strong>Member:</strong> Join → GitHub → Connect → Use → copy <code>BASE_URL</code><br>
+          <strong>CTAs</strong> in preview switch screen/status live.
+        </div>
+      </div>
+    </div>
+    <div class="studio-foot">SPEC-v2 · approval prototype · not production</div>
+  </aside>
+
+  <div class="preview-wrap">
+    <div class="preview-bar">
+      <span>Preview</span>
+      <span class="path" id="path-label">/</span>
+      <span class="chip" id="status-label">default</span>
+    </div>
+    <div class="preview-scroll">
+      <div class="phone">
+        <div class="app" id="app">
+          <!-- chrome + pages injected -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SCREENS = {
+      home: {
+        path: "/",
+        statuses: [
+          { id: "out", label: "Logged out" },
+          { id: "in", label: "Logged in" },
+        ],
+      },
+      join: {
+        path: "/join",
+        statuses: [
+          { id: "out-empty", label: "Logged out · empty PIN" },
+          { id: "out-prefill", label: "Logged out · ?pin= prefilled" },
+          { id: "in-form", label: "Logged in · form" },
+          { id: "success", label: "Success + API key banner" },
+          { id: "err-invalid", label: "Error · invalid_pin" },
+          { id: "err-expired", label: "Error · expired" },
+          { id: "err-exhausted", label: "Error · exhausted" },
+          { id: "err-revoked", label: "Error · revoked" },
+          { id: "err-gone", label: "Error · machine_gone" },
+          { id: "err-rate", label: "Error · rate_limited" },
+        ],
+      },
+      share: {
+        path: "/share",
+        statuses: [
+          { id: "out", label: "Logged out" },
+          { id: "no-token", label: "No provider token" },
+          { id: "waiting", label: "Token · waiting for provider" },
+          { id: "ready", label: "Online · ready to invite" },
+          { id: "ready-multi", label: "Online · 2+ machines" },
+          { id: "offline", label: "Machine offline (warn)" },
+          { id: "pin-modal", label: "PIN boarding-pass modal" },
+          { id: "revoke-confirm", label: "Revoke member confirm" },
+          { id: "empty-members", label: "Online · empty members" },
+        ],
+      },
+      use: {
+        path: "/use",
+        statuses: [
+          { id: "out", label: "Logged out" },
+          { id: "empty", label: "Empty machines" },
+          { id: "machines", label: "Machines · online + offline" },
+          { id: "snippets", label: "Snippets open (Continue)" },
+          { id: "keys", label: "API Keys list" },
+          { id: "keys-new", label: "One-time key banner" },
+          { id: "keys-empty", label: "API Keys empty" },
+        ],
+      },
+      about: {
+        path: "/about",
+        statuses: [{ id: "default", label: "About + FAQ" }],
+      },
+      login: {
+        path: "/login",
+        statuses: [
+          { id: "default", label: "Sign in with GitHub" },
+          { id: "oauth-unset", label: "OAuth unset warning" },
+        ],
+      },
+      error: {
+        path: "/error",
+        statuses: [
+          { id: "404", label: "404 Not found" },
+          { id: "500", label: "500 Internal error" },
+          { id: "503", label: "503 Unavailable" },
+        ],
+      },
+    };
+
+    const state = { screen: "home", status: "out", auth: "out", snippet: "curl", returnTo: "share/no-token" };
+
+    function defaultStatus(screen) {
+      if (state.auth !== "in") {
+        return ({ home: "out", join: "out-empty", share: "out", use: "out", about: "default", login: "default", error: "404" })[screen]
+          || SCREENS[screen].statuses[0].id;
+      }
+      return ({ home: "in", join: "in-form", share: "ready", use: "machines", about: "default", login: "default", error: "404" })[screen]
+        || SCREENS[screen].statuses[0].id;
+    }
+
+    function go(screen, status, auth, skipHash) {
+      state.screen = screen;
+      if (auth) state.auth = auth;
+      state.status = status || defaultStatus(screen);
+      // Sync auth chrome with screen when meaningful
+      if (screen === "home") {
+        if (state.status === "out") state.auth = "out";
+        if (state.status === "in") state.auth = "in";
+      }
+      if (["no-token","waiting","ready","ready-multi","offline","pin-modal","revoke-confirm","empty-members"].includes(state.status)) {
+        state.auth = "in";
+      }
+      if (screen === "share" && state.status === "out") state.auth = "out";
+      if (screen === "join") {
+        if (state.status === "out-empty" || state.status === "out-prefill") state.auth = "out";
+        if (["in-form","success","err-invalid","err-expired","err-exhausted","err-revoked","err-gone","err-rate"].includes(state.status)) state.auth = "in";
+      }
+      if (screen === "use") {
+        if (state.status === "out") state.auth = "out";
+        else state.auth = "in";
+      }
+      if (!skipHash) {
+        const next = `#${state.screen}/${state.status}`;
+        if (location.hash !== next) history.replaceState(null, "", next);
+      }
+      render();
+    }
+
+    function applyHash() {
+      const raw = (location.hash || "").replace(/^#/, "");
+      if (!raw) return false;
+      const [screen, status] = raw.split("/");
+      if (!SCREENS[screen]) return false;
+      const ok = !status || SCREENS[screen].statuses.some(s => s.id === status);
+      if (!ok) return false;
+      go(screen, status, undefined, true);
+      return true;
+    }
+
+    function navHtml(active) {
+      const authed = state.auth === "in";
+      return `
+        <header class="top">
+          <button type="button" class="brand" data-go="home">GPU Mesh</button>
+          <ul class="nav">
+            <li><button type="button" class="${active==='home'?'on':''}" data-go="home">Home</button></li>
+            <li><button type="button" class="${active==='join'?'on':''}" data-go="join">Join</button></li>
+            <li><button type="button" class="${active==='use'?'on':''}" data-go="use">Use</button></li>
+            <li><button type="button" class="${active==='share'?'on':''}" data-go="share">Share</button></li>
+            <li><button type="button" class="${active==='about'?'on':''}" data-go="about">About</button></li>
+          </ul>
+          <div class="nav-right">
+            ${authed
+              ? `<span class="badge">@vasya</span><button type="button" class="btn btn-sm" data-go="home" data-status="out" data-auth="out">Logout</button>`
+              : `<button type="button" class="btn btn-sm btn-primary" data-go="login" data-return="${state.screen === 'join' ? 'join/in-form' : state.screen === 'use' ? 'use/machines' : 'share/no-token'}">Sign in with GitHub</button>`}
+          </div>
+        </header>`;
+    }
+
+    function footHtml() {
+      return `<footer class="foot">
+        <a href="https://github.com/r00takaspin/gpumesh" target="_blank" rel="noopener">GitHub</a>
+        <span>·</span><span>MIT</span><span>·</span>
+        <span>Share local models with friends</span>
+      </footer>`;
+    }
+
+    function privacyHtml() {
+      return `<p class="privacy">Your prompts go through the GPU Mesh server and are visible to whoever runs the machine.</p>`;
+    }
+
+    /* ── Pages ── */
+    function pageHome() {
+      const loggedIn = state.status === "in" || state.auth === "in";
+      return `
+        ${navHtml("home")}
+        <main class="page">
+          <section class="hero-grid">
+            <div>
+              <h1 class="serif-h1">Share your local models with friends</h1>
+              <p class="lead">Send a PIN to a coworker or friend. They sign in with GitHub and point Continue, Cline, or curl at your machine URL.</p>
+              <div class="hero-actions">
+                <button type="button" class="btn btn-primary" data-go="share" data-status="${loggedIn ? 'ready' : 'out'}">Create invite</button>
+                <button type="button" class="btn" data-go="join" data-status="${loggedIn ? 'in-form' : 'out-empty'}">Enter a code</button>
+              </div>
+            </div>
+            <div class="pass">
+              <div class="pass-label">Example invite</div>
+              <div class="pin">7K4Q-9M2P</div>
+              <button type="button" class="btn btn-primary btn-block mt-12" data-go="share" data-status="${loggedIn ? 'ready' : 'out'}">Create invite</button>
+              <p class="meta center">Example only — not a real code</p>
+            </div>
+          </section>
+          <div class="steps">
+            <div class="step"><div class="step-num">1</div><strong>Run the agent</strong><p>Ollama + gpumesh-provider on your machine.</p></div>
+            <div class="step"><div class="step-num">2</div><strong>Share a PIN</strong><p>Send the code or join link in chat.</p></div>
+            <div class="step"><div class="step-num">3</div><strong>They use your URL</strong><p>Tools call <code style="font-family:var(--mono);font-size:12px">/v1/machines/{id}</code>.</p></div>
+          </div>
+          <div class="card mt-28">
+            <h2>What you get</h2>
+            <p class="text-muted mb-0">Friends only reach the models on that machine. You can revoke access anytime. No open port, no public model catalog.</p>
+          </div>
+        </main>
+        ${footHtml()}`;
+    }
+
+    function joinError(_code, title, msg) {
+      return `
+        ${navHtml("join")}
+        <main class="page" style="max-width:560px">
+          <h1 class="serif-h1" style="font-size:36px">Join with a code</h1>
+          <p class="lead">Enter the PIN you got from a friend or coworker.</p>
+          <div class="banner err mt-20"><strong>${title}</strong><br>${msg}</div>
+          <div class="join-box mt-16">
+            <input value="7K4Q-9M2P" aria-label="PIN">
+            <button type="button" class="btn btn-primary" data-go="join" data-status="in-form">Try again</button>
+          </div>
+          ${privacyHtml()}
+        </main>
+        ${footHtml()}`;
+    }
+
+    function pageJoin() {
+      const s = state.status;
+      if (s === "success") {
+        return `
+          ${navHtml("join")}
+          <main class="page" style="max-width:640px">
+            <div class="banner ok">You’re in. <strong>home-lab</strong> is available on your Use page.</div>
+            <div class="banner warn mt-12">
+              Copy your API key now — it won’t be shown again.
+              <span class="key">inf_01HZX8K3EXAMPLEKEY_ONLY_ONCE</span>
+            </div>
+            <div class="card mt-20">
+              <div class="machine-info">
+                <div class="dot"></div>
+                <div>
+                  <strong>home-lab is online</strong>
+                  <span>mch_01HZX… · RTX 4090 · llama3.2:3b, qwen2.5:14b</span>
+                </div>
+              </div>
+              <div class="hero-actions">
+                <button type="button" class="btn btn-primary" data-go="use" data-status="machines">Go to Use</button>
+                <button type="button" class="btn" data-go="use" data-status="snippets">Copy base URL</button>
+              </div>
+            </div>
+            ${privacyHtml()}
+          </main>
+          ${footHtml()}`;
+      }
+      if (s === "err-invalid") return joinError("invalid_pin", "Invalid code", "That PIN isn’t recognized. Check for typos.");
+      if (s === "err-expired") return joinError("expired", "Code expired", "This invite expired. Ask for a new PIN.");
+      if (s === "err-exhausted") return joinError("exhausted", "Code already used", "This invite already hit its use limit.");
+      if (s === "err-revoked") return joinError("revoked", "Invite revoked", "The owner revoked this invite. Ask them for a new code.");
+      if (s === "err-gone") return joinError("machine_gone", "Machine gone", "The machine for this invite no longer exists.");
+      if (s === "err-rate") return joinError("rate_limited", "Too many attempts", "Wait a few minutes before trying again.");
+
+      const loggedOut = s === "out-empty" || s === "out-prefill";
+      const prefill = s === "out-prefill";
+      return `
+        ${navHtml("join")}
+        <main class="page" style="max-width:560px">
+          <h1 class="serif-h1" style="font-size:36px">Join with a code</h1>
+          <p class="lead">${loggedOut
+            ? "Enter the PIN you got. You’ll sign in with GitHub, then get access to that machine."
+            : "Enter the PIN you got from a friend or coworker."}</p>
+          <div class="card mt-20">
+            <div class="pass-label">Invite PIN</div>
+            <div class="join-box mt-8">
+              <input placeholder="XXXX-XXXX" value="${prefill ? '7K4Q-9M2P' : ''}" aria-label="PIN">
+              ${loggedOut
+                ? `<button type="button" class="btn btn-primary" data-go="login" data-status="default" data-return="join/in-form">Sign in to connect</button>`
+                : `<button type="button" class="btn btn-primary" data-go="join" data-status="success">Connect</button>`}
+            </div>
+            <p class="meta">After this, your tools talk only to that machine.</p>
+          </div>
+          ${privacyHtml()}
+        </main>
+        ${footHtml()}`;
+    }
+
+    function pageShare() {
+      const s = state.status;
+
+      if (s === "out") {
+        return `
+          ${navHtml("share")}
+          <main class="page">
+            <h1 class="serif-h1">Share your local models</h1>
+            <p class="lead">Run the provider next to Ollama, then send a PIN to friends or coworkers.</p>
+            <div class="hero-actions">
+              <button type="button" class="btn btn-primary" data-go="login" data-return="share/no-token">Sign in with GitHub</button>
+            </div>
+            <div class="steps">
+              <div class="step"><div class="step-num">1</div><strong>Connect provider</strong><p>One token, stable machine URL.</p></div>
+              <div class="step"><div class="step-num">2</div><strong>Create invite</strong><p>PIN + join link in two clicks.</p></div>
+              <div class="step"><div class="step-num">3</div><strong>Revoke anytime</strong><p>Cut access per member.</p></div>
+            </div>
+          </main>
+          ${footHtml()}`;
+      }
+
+      if (s === "no-token") {
+        return `
+          ${navHtml("share")}
+          <main class="page" style="max-width:640px">
+            <h1 class="serif-h1" style="font-size:36px">Share your local models</h1>
+            <p class="lead">First, create a provider token for the agent on your machine.</p>
+            <div class="card mt-20">
+              <h2>Provider token</h2>
+              <p class="text-muted">The agent uses this token to connect. After the first connection you get a stable machine URL that won’t change on reconnect.</p>
+              <button type="button" class="btn btn-primary mt-16" data-go="share" data-status="waiting">Generate provider token</button>
+            </div>
+          </main>
+          ${footHtml()}`;
+      }
+
+      if (s === "waiting") {
+        return `
+          ${navHtml("share")}
+          <main class="page stack-lg" style="max-width:720px">
+            <div>
+              <h1 class="serif-h1" style="font-size:36px">Almost there</h1>
+              <p class="lead">Run the provider on the machine with your models. This page updates when it connects.</p>
+            </div>
+            <div class="waiting"><div class="spinner"></div> Waiting for provider…</div>
+            <div class="card">
+              <h2>Run command</h2>
+              <div class="code">export MESH_COORDINATOR="https://gpumesh.net"
+export MESH_TOKEN="prv_01HZX…REDACTED"
+gpumesh-provider</div>
+              <button type="button" class="btn btn-sm mt-12">Copy command</button>
+              <p class="meta">Install script: <code style="font-family:var(--mono)">curl -sSfL …/install-provider.sh | sh</code></p>
+            </div>
+            <button type="button" class="btn" disabled title="Machine offline">Create invite</button>
+            <p class="text-muted">Prototype shortcut: <button type="button" class="btn btn-sm" data-go="share" data-status="ready">Simulate online</button></p>
+            <details class="collapse">
+              <summary>Setup &amp; install</summary>
+              <div class="collapse-body text-muted">
+                1. Install Ollama and pull a model<br>
+                2. Install gpumesh-provider<br>
+                3. Export token and run the agent
+              </div>
+            </details>
+          </main>
+          ${footHtml()}`;
+      }
+
+      const multi = s === "ready-multi";
+      const offline = s === "offline";
+      const emptyMembers = s === "empty-members";
+      const showModal = s === "pin-modal";
+      const showRevoke = s === "revoke-confirm";
+      const readyLike = ["ready","ready-multi","offline","pin-modal","revoke-confirm","empty-members"].includes(s);
+
+      if (!readyLike) {
+        return `${navHtml("share")}<main class="page"><p class="text-muted">Unknown share status.</p></main>${footHtml()}`;
+      }
+
+      const members = emptyMembers ? `
+        <p class="empty-line">No members yet — create an invite to share access.</p>
+      ` : `
+        <div class="member-row">
+          <div><strong>@alice</strong><div class="mono-muted">joined · 2d ago</div></div>
+          <button type="button" class="btn-danger" data-go="share" data-status="revoke-confirm">Revoke</button>
+        </div>
+        <div class="member-row">
+          <div><strong>@bob</strong><div class="mono-muted">joined · 5d ago</div></div>
+          <button type="button" class="btn-danger" data-go="share" data-status="revoke-confirm">Revoke</button>
+        </div>
+      `;
+
+      return `
+        ${navHtml("share")}
+        <main class="page stack-lg" style="max-width:720px">
+          <div>
+            <h1 class="serif-h1" style="font-size:36px">Share your local models</h1>
+            <p class="lead">Create a PIN, send it in chat, revoke anytime.</p>
+          </div>
+
+          ${offline ? `<div class="banner warn">Machine is offline. You can still create an invite — friends won’t get answers until the provider reconnects.</div>` : ""}
+
+          <div class="card">
+            ${multi ? `
+              <div class="field">
+                <label>Machine</label>
+                <select>
+                  <option>home-lab · online · RTX 4090</option>
+                  <option>office-mac · offline · M2 Ultra</option>
+                </select>
+              </div>
+            ` : `
+              <div class="machine-row" style="background:transparent;border:0;padding:0">
+                <div class="machine-info">
+                  <div class="dot ${offline ? 'off' : ''}"></div>
+                  <div>
+                    <strong>home-lab ${offline ? 'is offline' : 'is online'}</strong>
+                    <span>mch_01HZX8K3ABC · RTX 4090 · 2 models</span>
+                  </div>
+                </div>
+                <span class="badge ${offline ? 'off' : 'ok'}">${offline ? 'Offline' : 'Online'}</span>
+              </div>
+            `}
+            <div class="field-row mt-16">
+              <div class="field mb-0"><label>Max uses</label><select><option>1</option><option>3</option><option>10</option></select></div>
+              <div class="field mb-0"><label>Expires</label><select><option>7 days</option><option>1 day</option><option>30 days</option></select></div>
+            </div>
+            <button type="button" class="btn btn-primary btn-block mt-16" data-go="share" data-status="pin-modal">Create invite</button>
+            <p class="meta">Defaults: one use, expires in 7 days.</p>
+          </div>
+
+          <div>
+            <div class="section-title"><span>Members</span></div>
+            ${members}
+          </div>
+
+          <details class="collapse">
+            <summary>Past invites</summary>
+            <div class="collapse-body">
+              <div class="invite-row">
+                <div><strong class="mono-muted" style="font-size:13px">7K4Q-****</strong><div class="text-muted">active · 0/1 uses · expires in 6d</div></div>
+                <button type="button" class="btn btn-sm">Revoke invite</button>
+              </div>
+              <div class="invite-row">
+                <div><strong class="mono-muted" style="font-size:13px">9M2P-****</strong><div class="text-muted">exhausted · 1/1</div></div>
+                <span class="badge">Done</span>
+              </div>
+            </div>
+          </details>
+
+          <details class="collapse">
+            <summary>Setup &amp; provider token</summary>
+            <div class="collapse-body">
+              <div class="code">export MESH_TOKEN="prv_…"
+gpumesh-provider</div>
+              <p class="meta">Token prefix <code style="font-family:var(--mono)">prv_01HZ…</code></p>
+            </div>
+          </details>
+
+          <details class="collapse">
+            <summary>Advanced</summary>
+            <div class="collapse-body">
+              <p class="text-muted">Regenerating the provider key gives you a <strong>new machine URL</strong>. Old invites, member access, and tool configs stop working.</p>
+              <button type="button" class="btn btn-sm mt-12">Regenerate provider key…</button>
+            </div>
+          </details>
+        </main>
+        ${footHtml()}
+        ${showModal ? `
+          <div class="modal-backdrop">
+            <div class="modal">
+              <div class="pass-label">New invite</div>
+              <h3>Send this code</h3>
+              <div class="pin mt-12">7K4Q-9M2P</div>
+              <p class="meta center">1 use · expires in 7 days · home-lab</p>
+              <div class="field mt-16">
+                <label>Join link</label>
+                <input value="https://gpumesh.net/join?pin=7K4Q-9M2P" readonly style="font-family:var(--mono);font-size:12px;letter-spacing:0">
+              </div>
+              <div class="banner warn mt-12">Shown once. Copy the PIN or link before closing.</div>
+              <div class="actions">
+                <button type="button" class="btn btn-primary">Copy code</button>
+                <button type="button" class="btn">Copy link</button>
+              </div>
+              <button type="button" class="btn btn-ghost btn-block mt-12" data-go="share" data-status="ready">Done</button>
+            </div>
+          </div>` : ""}
+        ${showRevoke ? `
+          <div class="modal-backdrop">
+            <div class="modal">
+              <h3>Revoke @alice?</h3>
+              <p class="text-muted mt-8">They’ll lose access to home-lab immediately. Active streams are cancelled.</p>
+              <div class="actions">
+                <button type="button" class="btn btn-primary" style="background:var(--danger);border-color:var(--danger)" data-go="share" data-status="ready">Revoke access</button>
+                <button type="button" class="btn" data-go="share" data-status="ready">Cancel</button>
+              </div>
+            </div>
+          </div>` : ""}
+      `;
+    }
+
+    function snippetsBlock(open) {
+      const snip = {
+        curl: `export OPENAI_BASE_URL="https://gpumesh.net/v1/machines/mch_01HZX…"
+export OPENAI_API_KEY="inf_…"
+curl "$OPENAI_BASE_URL/chat/completions" \\
+  -H "Authorization: Bearer $OPENAI_API_KEY" \\
+  -d '{"model":"llama3.2:3b","messages":[{"role":"user","content":"hi"}]}'`,
+        continue: `models:
+  - title: home-lab
+    provider: openai
+    model: llama3.2:3b
+    apiBase: https://gpumesh.net/v1/machines/mch_01HZX…
+    apiKey: inf_…`,
+        cline: `OpenAI Compatible
+Base URL: https://gpumesh.net/v1/machines/mch_01HZX…
+API Key: inf_…
+Model: llama3.2:3b`,
+        python: `from openai import OpenAI
+client = OpenAI(
+  base_url="https://gpumesh.net/v1/machines/mch_01HZX…",
+  api_key="inf_…",
+)
+client.chat.completions.create(
+  model="llama3.2:3b",
+  messages=[{"role":"user","content":"hi"}],
+)`,
+      };
+      const active = state.snippet || "curl";
+      return `
+        <div class="card ${open ? '' : 'hidden'}" id="snippets-card">
+          <h2>Tool snippet</h2>
+          <div class="snippet-tabs">
+            <button type="button" class="${active==='curl'?'on':''}" data-snippet="curl">curl</button>
+            <button type="button" class="${active==='continue'?'on':''}" data-snippet="continue">Continue</button>
+            <button type="button" class="${active==='cline'?'on':''}" data-snippet="cline">Cline</button>
+            <button type="button" class="${active==='python'?'on':''}" data-snippet="python">Python</button>
+          </div>
+          <div class="code">${snip[active]}</div>
+          <button type="button" class="btn btn-sm mt-12">Copy snippet</button>
+        </div>`;
+    }
+
+    function pageUse() {
+      const s = state.status;
+      if (s === "out") {
+        return `
+          ${navHtml("use")}
+          <main class="page">
+            <h1 class="serif-h1">Your machines</h1>
+            <p class="lead">Sign in to see machines you own or joined with a PIN. Then copy a base URL into your tools.</p>
+            <div class="hero-actions">
+              <button type="button" class="btn btn-primary" data-go="login" data-return="use/machines">Sign in with GitHub</button>
+              <button type="button" class="btn" data-go="join" data-status="out-empty">Enter a code</button>
+            </div>
+            ${privacyHtml()}
+          </main>
+          ${footHtml()}`;
+      }
+
+      if (s === "empty") {
+        return `
+          ${navHtml("use")}
+          <main class="page" style="max-width:640px">
+            <h1 class="serif-h1" style="font-size:36px">Your machines</h1>
+            <div class="card mt-20" style="text-align:center;padding:36px 24px">
+              <p class="text-muted">No machines yet — ask a friend for a PIN, or share your own models.</p>
+              <div class="hero-actions" style="justify-content:center">
+                <button type="button" class="btn btn-primary" data-go="join" data-status="in-form">Enter a code</button>
+                <button type="button" class="btn" data-go="share" data-status="no-token">Share your models</button>
+              </div>
+            </div>
+            ${privacyHtml()}
+          </main>
+          ${footHtml()}`;
+      }
+
+      if (s === "keys" || s === "keys-new" || s === "keys-empty") {
+        return `
+          ${navHtml("use")}
+          <main class="page stack-lg" style="max-width:720px">
+            <div class="section-title">
+              <h1 class="serif-h1" style="font-size:32px;margin:0">API Keys</h1>
+              <div class="row-actions">
+                <button type="button" class="btn btn-sm" data-go="use" data-status="machines">← Machines</button>
+                <button type="button" class="btn btn-sm btn-primary" data-go="use" data-status="keys-new">Create key</button>
+              </div>
+            </div>
+            ${s === "keys-new" ? `
+              <div class="banner warn">
+                Copy your API key now — it won’t be shown again.
+                <span class="key">inf_01HZX8K3NEVER_SHOWN_AGAIN</span>
+              </div>` : ""}
+            ${s === "keys-empty" ? `
+              <p class="empty-line">No API keys yet. Create one to call /v1/machines/…</p>
+            ` : `
+              <div class="key-row">
+                <div>
+                  <strong>inf_01HZ…a3f2</strong>
+                  <div class="text-muted">for tools · created 3d ago</div>
+                </div>
+                <button type="button" class="btn-danger">Revoke</button>
+              </div>
+              <div class="key-row">
+                <div>
+                  <strong>prv_01HZ…9c1e</strong>
+                  <div class="text-muted">for provider · home-lab</div>
+                </div>
+                <button type="button" class="btn-danger">Revoke</button>
+              </div>
+            `}
+            ${privacyHtml()}
+          </main>
+          ${footHtml()}`;
+      }
+
+      // machines / snippets
+      const openSnip = s === "snippets";
+      return `
+        ${navHtml("use")}
+        <main class="page stack-lg" style="max-width:720px">
+          <div class="section-title">
+            <div>
+              <h1 class="serif-h1" style="font-size:32px;margin:0">Your machines</h1>
+              <p class="text-muted mt-8 mb-0">One base URL per machine. Change the URL in your tool to switch machines.</p>
+            </div>
+            <button type="button" class="btn btn-sm" data-go="use" data-status="keys">API Keys</button>
+          </div>
+
+          <div class="card">
+            <div class="machine-row" style="background:transparent;border:0;padding:0;align-items:flex-start">
+              <div class="machine-info">
+                <div class="dot"></div>
+                <div>
+                  <strong>home-lab</strong>
+                  <span>owned by you · mch_01HZX… · llama3.2:3b, qwen2.5:14b</span>
+                </div>
+              </div>
+              <span class="badge ok">Online</span>
+            </div>
+            <div class="row-actions mt-16">
+              <button type="button" class="btn btn-sm btn-primary">Copy base URL</button>
+              <button type="button" class="btn btn-sm" data-go="use" data-status="snippets">Snippets</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="machine-row" style="background:transparent;border:0;padding:0;align-items:flex-start">
+              <div class="machine-info">
+                <div class="dot off"></div>
+                <div>
+                  <strong>alice-rig</strong>
+                  <span>@alice · mch_01HYW… · offline</span>
+                </div>
+              </div>
+              <span class="badge off">Offline</span>
+            </div>
+            <div class="row-actions mt-16">
+              <button type="button" class="btn btn-sm">Copy base URL</button>
+              <button type="button" class="btn btn-sm btn-danger">Remove access</button>
+            </div>
+          </div>
+
+          ${snippetsBlock(openSnip)}
+          ${privacyHtml()}
+        </main>
+        ${footHtml()}`;
+    }
+
+    function pageAbout() {
+      return `
+        ${navHtml("about")}
+        <main class="page" style="max-width:720px">
+          <h1 class="serif-h1">About GPU Mesh</h1>
+          <p class="lead">Share local Ollama models with friends or coworkers using a PIN. They get a stable URL for Continue, Cline, curl, and similar tools.</p>
+          <div class="grid-2 mt-28">
+            <div class="card">
+              <h2>Owner</h2>
+              <p class="text-muted mb-0">Runs Ollama + provider, creates invites, revokes access.</p>
+            </div>
+            <div class="card">
+              <h2>Member</h2>
+              <p class="text-muted mb-0">Enters a PIN once, then uses a base URL + API key in their tools.</p>
+            </div>
+          </div>
+          <div class="banner info mt-28">
+            Privacy: your prompts go through the GPU Mesh server and are visible to whoever runs the machine. We don’t store prompt content.
+          </div>
+          <div class="faq mt-28">
+            <h2 class="section-title">FAQ</h2>
+            <details open><summary>Is the PIN one-time?</summary><p>By default yes (1 use, 7 days). The owner can allow more uses or a longer expiry.</p></details>
+            <details><summary>Is GitHub required?</summary><p>Yes to join and manage invites. After that, tools use an API key.</p></details>
+            <details><summary>How is this different from Tailscale?</summary><p>This is only for LLM API access with invites and revoke — not a full VPN.</p></details>
+            <details><summary>What if the machine is offline?</summary><p>Requests fail with a clear offline error. We don’t silently switch to another machine.</p></details>
+          </div>
+        </main>
+        ${footHtml()}`;
+    }
+
+    function pageLogin() {
+      const unset = state.status === "oauth-unset";
+      return `
+        ${navHtml("login")}
+        <main class="page" style="max-width:480px;text-align:center;padding-top:72px">
+          <h1 class="serif-h1" style="font-size:36px">Sign in</h1>
+          <p class="lead" style="margin-left:auto;margin-right:auto">GitHub is required to create invites and join with a PIN.</p>
+          ${unset ? `<div class="banner warn mt-20" style="text-align:left">GitHub sign-in isn’t configured on this server (missing GITHUB_CLIENT_ID).</div>` : ""}
+          <button type="button" class="btn btn-primary mt-28" id="login-submit" ${unset ? "disabled" : ""}>Sign in with GitHub</button>
+          <p class="meta center mt-16">After auth you’ll return to where you left off.</p>
+        </main>
+        ${footHtml()}`;
+    }
+
+    function pageError() {
+      const map = {
+        "404": { code: "404", title: "Page not found", body: "That page doesn’t exist." },
+        "500": { code: "500", title: "Something broke", body: "Try again in a moment." },
+        "503": { code: "503", title: "Unavailable", body: "The service is busy or temporarily down." },
+      };
+      const e = map[state.status] || map["404"];
+      return `
+        ${navHtml("home")}
+        <main class="page">
+          <div class="error-page">
+            <div class="code-big">${e.code}</div>
+            <h1 class="serif-h1" style="font-size:28px;margin-top:8px">${e.title}</h1>
+            <p>${e.body}</p>
+            <button type="button" class="btn btn-primary" data-go="home" data-status="out">Go home</button>
+          </div>
+        </main>
+        ${footHtml()}`;
+    }
+
+    function pageHtml() {
+      switch (state.screen) {
+        case "home": return pageHome();
+        case "join": return pageJoin();
+        case "share": return pageShare();
+        case "use": return pageUse();
+        case "about": return pageAbout();
+        case "login": return pageLogin();
+        case "error": return pageError();
+        default: return pageHome();
+      }
+    }
+
+    function renderSidebar() {
+      document.querySelectorAll(".screen-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.screen === state.screen);
+      });
+      document.getElementById("auth-out").classList.toggle("active", state.auth === "out");
+      document.getElementById("auth-in").classList.toggle("active", state.auth === "in");
+
+      const list = SCREENS[state.screen].statuses;
+      const el = document.getElementById("status-list");
+      el.innerHTML = list.map(st =>
+        `<button type="button" class="status-btn ${st.id === state.status ? "active" : ""}" data-status="${st.id}">${st.label}</button>`
+      ).join("");
+
+      el.querySelectorAll(".status-btn").forEach(btn => {
+        btn.addEventListener("click", () => go(state.screen, btn.dataset.status));
+      });
+
+      const path = SCREENS[state.screen].path;
+      const pathExtra = {
+        "out-prefill": "?pin=7K4Q-9M2P",
+        "404": " (404)",
+        "500": " (500)",
+        "503": " (503)",
+      }[state.status] || "";
+      document.getElementById("path-label").textContent = path + pathExtra;
+      document.getElementById("status-label").textContent = list.find(x => x.id === state.status)?.label || state.status;
+    }
+
+    function bindApp() {
+      const app = document.getElementById("app");
+      app.querySelectorAll("[data-go]").forEach(el => {
+        el.addEventListener("click", (e) => {
+          e.preventDefault();
+          if (el.dataset.return) state.returnTo = el.dataset.return;
+          go(el.dataset.go, el.dataset.status, el.dataset.auth);
+        });
+      });
+      app.querySelectorAll("[data-snippet]").forEach(el => {
+        el.addEventListener("click", () => {
+          state.snippet = el.dataset.snippet;
+          state.status = "snippets";
+          render();
+        });
+      });
+      const loginBtn = app.querySelector("#login-submit");
+      if (loginBtn && !loginBtn.disabled) {
+        loginBtn.addEventListener("click", () => {
+          const [screen, status] = (state.returnTo || "share/no-token").split("/");
+          go(screen, status || undefined, "in");
+        });
+      }
+    }
+
+    function render() {
+      document.getElementById("app").innerHTML = pageHtml();
+      renderSidebar();
+      bindApp();
+    }
+
+    document.querySelectorAll(".screen-btn").forEach(btn => {
+      btn.addEventListener("click", () => go(btn.dataset.screen));
+    });
+    document.getElementById("auth-out").addEventListener("click", () => {
+      state.auth = "out";
+      if (state.screen === "home") go("home", "out");
+      else if (state.screen === "share") go("share", "out");
+      else if (state.screen === "use") go("use", "out");
+      else if (state.screen === "join") go("join", "out-empty");
+      else render();
+    });
+    document.getElementById("auth-in").addEventListener("click", () => {
+      state.auth = "in";
+      if (state.screen === "home") go("home", "in");
+      else if (state.screen === "share") go("share", "ready");
+      else if (state.screen === "use") go("use", "machines");
+      else if (state.screen === "join") go("join", "in-form");
+      else render();
+    });
+
+    window.addEventListener("hashchange", () => { applyHash(); });
+    if (!applyHash()) render();
+  </script>
+</body>
+</html>
