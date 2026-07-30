@@ -1,45 +1,39 @@
-# GPU Mesh — Free LLM Inference, Powered by Community GPUs
+# GPU Mesh — Share your local models with friends
 
-> **New to GPU Mesh?** → [What is GPU Mesh?](https://gpumesh.net/about) — plain-language explanation, no jargon.
+> **New to GPU Mesh?** → [What is GPU Mesh?](https://gpumesh.net/about)
 
-GPU Mesh is a peer-to-peer network for **distributed LLM inference**. GPU owners ("donors") share their idle compute resources, and anyone can use them — for free — through a standard **OpenAI-compatible API**.
+Invite-first OpenAI-compatible relay: run Ollama at home, share a PIN, friends point Cursor / Cline / Pi / curl at your machine URL. No public community pool.
 
-No new client. No new API. No credit card. Just two environment variables and every OpenAI-compatible tool you already use (Cursor, Aider, Codex CLI, Cline, Open WebUI, LangChain, any SDK) just works.
+Product source of truth: [`SPEC-v2.md`](./SPEC-v2.md). (`SPEC.md` is historical v1.)
 
-## How It Works
+## How it works
 
 ```
-                         ┌──────────────┐
-Cursor       ──HTTP──┐   │              │   ┌──────────────┐
-Codex CLI    ──HTTP──┤   │  Coordinator │   │              │
-Aider        ──HTTP──┼──▶│              │──▶│ Donor Agent  │── Ollama
-LangChain    ──HTTP──┤   │              │   │ Donor Agent  │── Ollama
-curl         ──HTTP──┘   │              │   └──────────────┘
-                         └──────────────┘
+Cursor / Cline / Pi / curl ──HTTP──▶ Coordinator ──WS──▶ Provider agent ──▶ Ollama
 ```
 
-1. **Donors** run `gpumesh-provider` next to their Ollama instance — one command, zero ongoing maintenance.
-2. **The Coordinator** maintains a registry of available models and routes inference requests to the least-loaded donor.
-3. **Consumers** set `OPENAI_BASE_URL` and `OPENAI_API_KEY` and use their existing tools as if they were talking to OpenAI.
+1. **Owner** runs `gpumesh-provider` next to Ollama and creates a PIN on `/share`.
+2. **Friend** signs in with GitHub, enters the PIN on `/join`, gets a binding + API key.
+3. They set the harness to `https://gpumesh.net/v1/machines/{machine_id}` + key + model name.
 
-## Quick Start
+The coordinator is a registry + ACL + HTTP↔WS relay — not a CDN of strangers.
 
-### Connect a tool (v2)
+## Quick start
 
-GPU Mesh v2 is **invite-first**: after a PIN join (or owning a machine), open **[Use](https://gpumesh.net/use)** → **Set up a tool**.
+### Use a friend’s machine
 
-Per-machine base URL (not a public pool):
+After join (or if you own a machine), open **[Use](https://gpumesh.net/use)** → **Set up a tool**.
 
 ```text
 https://gpumesh.net/v1/machines/{machine_id}
 ```
 
-Plus a consumer API key (`inf_…`) and an Ollama model name from the machine card.
+Consumer API key (`inf_…`) + Ollama model id from the machine card.
 
-Supported setup tabs in the product: **curl · Cursor · Cline · Pi · Python**.  
-Full how-to and troubleshooting: [`SPEC-v2.md` §19](./SPEC-v2.md#19-harness-подключение-инструментов).
+Setup tabs: **curl · Cursor · Cline · Pi · Python**.  
+How-to + troubleshooting: [`SPEC-v2.md` §19](./SPEC-v2.md#19-harness-подключение-инструментов).
 
-Example (Cline CLI):
+Cline example:
 
 ```bash
 cline auth \
@@ -49,157 +43,101 @@ cline auth \
   -b 'https://gpumesh.net/v1/machines/mch_…'
 ```
 
-### Owner (share your GPU)
+### Share your GPU (owner)
 
-**Prerequisites:** [Ollama](https://ollama.com) installed with at least one model pulled.
+**Prerequisites:** [Ollama](https://ollama.com) with at least one model pulled.
 
-#### Linux & macOS
+Linux & macOS:
 
 ```bash
 curl -sSfL https://gpumesh.net/install-provider.sh | sh
 gpumesh-provider
 ```
 
-The setup wizard will guide you through configuration on first run.
-
-#### Windows (PowerShell)
-
-Download from [GitHub Releases](https://github.com/r00takaspin/gpumesh/releases/latest):
+Windows (PowerShell) — from [Releases](https://github.com/r00takaspin/gpumesh/releases/latest):
 
 ```powershell
 Invoke-WebRequest -Uri https://github.com/r00takaspin/gpumesh/releases/latest/download/gpumesh-provider_windows_amd64.exe -OutFile gpumesh-provider.exe
 .\gpumesh-provider.exe
 ```
 
-#### From source (any platform)
+From source:
 
 ```bash
 go install github.com/r00takaspin/gpumesh/cmd/provider@latest
 gpumesh-provider
 ```
 
-The agent auto-detects your Ollama instance, discovers available models, and starts serving requests. Configuration is persisted to `~/.gpumesh.json`. Earn reputation badges (Bronze → Silver → Gold → Platinum) and climb the public leaderboard.
+Config persists in `~/.gpumesh.json`. Then open `/share` to mint a provider key (if needed) and create invites.
 
-## Features
+## Features (v2)
 
-- **OpenAI-compatible API** — `/v1/models` and `/v1/chat/completions` with streaming (SSE)
-- **Zero consumer setup** — any existing OpenAI-compatible tool works
-- **GitHub OAuth** — no password management, natural for the developer audience
-- **Rate limiting** — token bucket per API key, configurable
-- **Leaderboard** — public donor reputation, weekly/monthly/all-time
-- **Web dashboard** — manage keys, view donor stats, copy ready-to-use tool configs
-- **Load-aware routing** — requests go to the least-loaded donor for a given model
-- **Resilience** — donor disconnect mid-stream triggers transparent retry on another donor
-- **Privacy by design** — prompts and responses are never stored
+- **Per-machine OpenAI API** — `/v1/machines/{id}/models`, `/chat/completions` (stream + tools)
+- **Invite-first ACL** — owner or active binding; revoke anytime
+- **Stable `machine_id`** — survives provider reconnect (until provider key regenerate)
+- **GitHub OAuth** — no passwords
+- **Harness snippets** — curl, Cursor, Cline, Pi, Python on `/use`
+- **Self-hostable** — single Go binary + SQLite
 
 ## Architecture
 
-| Component | Binary | Description |
+| Component | Binary | Role |
 |---|---|---|
-| **Coordinator** | `gpumesh-coordinator` | HTTP + WS server, model registry, request relay, rate limiter, web dashboard |
-| **Provider Agent** | `gpumesh-provider` | Lightweight agent next to Ollama, connects to coordinator, proxies inference requests |
+| **Coordinator** | `gpumesh-coordinator` | HTTP API, WS `/ws/provider`, invites/bindings, web UI |
+| **Provider agent** | `gpumesh-provider` | Outbound WS to coordinator; proxies to local Ollama |
 
-The coordinator is a single Go binary with an embedded SQLite store. No external database required. Agents maintain an outgoing WebSocket to the coordinator — NAT traversal is trivial.
+Agents dial out — no open inbound port on the owner machine.
 
-## Tech Stack
+## Tech stack
 
-| Decision | Rationale |
+| Choice | Why |
 |---|---|
-| **Go** | Single binary, no runtime deps, excellent concurrency for WS relay |
-| **SQLite** | Zero-dependency persistence for users and API keys |
-| **WS relay** (not WebRTC) | Works through any NAT, simpler implementation |
-| **HTMX + Pico.css** | Functional dashboard, no SPA complexity |
-| **Ollama-only (MVP)** | 80%+ of local LLM users use Ollama |
+| **Go** | Single binary, solid WS concurrency |
+| **SQLite** | Zero-ops persistence |
+| **WS relay** | Works through NAT |
+| **HTMX + CSS** | Dashboard without an SPA |
+| **Ollama** | Default local backend |
 
-## Project Structure
+## Project structure
 
 ```
 gpumesh/
-├── cmd/
-│   ├── coordinator/main.go
-│   └── provider/main.go
-├── internal/
-│   ├── proto/          # Shared protocol types and constants
-│   ├── coord/          # Coordinator: HTTP handlers, WS, registry, relay
-│   ├── provider/       # Provider agent: WS client, Ollama proxy
-│   └── dashboard/      # Web dashboard: templates, static assets, OAuth
-├── web/
-│   ├── templates/
-│   └── static/
-├── go.mod
-├── go.sum
-├── README.md
-├── SPEC.md
-└── LICENSE
+├── cmd/coordinator/
+├── cmd/provider/
+├── internal/coord/      # HTTP, WS, store, OAuth
+├── internal/provider/   # Agent + Ollama proxy
+├── internal/proto/      # Shared protocol
+├── web/templates/       # Embedded UI
+├── web/static/
+├── tests/               # Cucumber + Playwright
+├── SPEC-v2.md
+└── README.md
 ```
 
-## Scope
+## Privacy
 
-**In MVP:**
-- OpenAI-compatible `/v1/models` and `/v1/chat/completions`
-- Streaming (SSE) and non-streaming responses
-- Rate limiting (token bucket per API key)
-- GitHub OAuth + API key management
-- Web dashboard with landing page, leaderboard, model catalog
-- Donor heartbeat monitoring, reconnection with exponential backoff
-- Transparent retry on donor failure
-
-**Out of scope (future):**
-- WebRTC direct P2P
-- Non-Ollama backends (vLLM, llama.cpp)
-- Request queuing / batching
-- Credit system / dynamic priority
-- Content moderation
-- Federation across coordinators
-
-## Safety & Privacy
-
-- **Prompts and responses are never stored.** The coordinator is a relay, not a database of conversations.
-- **Donors see prompts** — clearly disclosed to consumers ("the donor can see your requests").
-- **Open source.** Anyone can audit, anyone can self-host a coordinator.
-- **Abuse reporting.** Consumers can report spam/abuse from donors; repeated reports trigger manual review.
+Prompts go through the coordinator and are visible to whoever runs the machine. Short notice on `/join` and `/use`. Conversations are not stored as a product feature — the coordinator is a relay.
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
-
-## Status
-
-MVP — under active development.
-
+MIT — see [LICENSE](LICENSE).
 
 ## Testing
 
-BDD tests (Cucumber + Playwright) cover the full API surface and web UI.
-
-### Run API tests
+BDD (Cucumber + Playwright) covers API and UI.
 
 ```bash
-# 1. Start coordinator in test mode (separate terminal)
-TEST_MODE=true MESH_DB=/tmp/gpumesh-test.db MESH_BASE_URL=http://localhost:8080 go run ./cmd/coordinator
+# Coordinator (separate terminal)
+TEST_MODE=true MESH_DB=/tmp/gpumesh-test.db MESH_BASE_URL=http://localhost:8080 \
+  go run ./cmd/coordinator
 
-# 2. Install test dependencies (once)
 cd tests && npm ci
 
-# 3. Run API tests (126 scenarios, ~60s)
+# API
 COORDINATOR_URL=http://localhost:8080 npx cucumber-js -p api
-```
 
-### Run UI tests
-
-```bash
-# Requires Playwright Chromium (install once)
-cd tests && npx playwright install chromium
-
-# Run UI tests (130 scenarios, >6 min)
+# UI (needs Chromium once: npx playwright install chromium)
 COORDINATOR_URL=http://localhost:8080 npx cucumber-js -p ui
 ```
 
-### Test profiles
-
-| Profile | Command | Scenarios | Requires |
-|---------|---------|-----------|----------|
-| `api` | `npx cucumber-js -p api` | 126 | Coordinator with TEST_MODE=true |
-| `ui` | `npx cucumber-js -p ui` | 130 | Coordinator + Chromium |
-
-Feature files live in `tests/features/` (Russian Gherkin). Step definitions: `tests/steps/`. Test-mode endpoints are guarded by `TEST_MODE=true` — unavailable in production.
+Feature files: `tests/features/`. Steps: `tests/steps/`. Test helpers require `TEST_MODE=true`.
