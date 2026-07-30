@@ -41,8 +41,33 @@ SPEC-v2 wins. If SPEC-v2 is ambiguous, default to the interpretation that preser
 
 ## Local Development
 
-- `.env` contains local OAuth credentials and `MESH_BASE_URL`.
-- Start server: `export $(grep -v '^#' .env | grep -v '^$' | xargs) && nohup go run ./cmd/coordinator > /tmp/coordinator.log 2>&1 &` (MUST use `nohup` — bare `&` dies with bash)
-- **AFTER starting: MUST verify** with `curl -s http://192.168.0.102:8080/health` returns `OK` before telling user it's ready.
-- Access at `http://192.168.0.102:8080` (not localhost — OAuth callback is registered for this IP).
+- `.env` contains local OAuth credentials and `MESH_BASE_URL` — **это источник правды для URL**, не хардкод IP из памяти/старых чатов.
 - Existing DB is `data/gpumesh.db` — use it, not `/tmp/` temp DB.
+- Templates/CSS are **embedded** (`web.EmbeddedFS`): after UI changes rebuild the binary (`go build -o /tmp/gpumesh-coordinator ./cmd/coordinator`), don’t assume `go run` / old binary picked them up.
+
+### Start coordinator (Cursor / agent shells)
+
+`nohup … &` + `disown` в Cursor **часто умирает** сразу после конца tool-call — процесс пропадает, а агент уже пишет «готово». Так нельзя.
+
+**Правильный старт:** запустить координатор как **persistent background shell** (`block_until_ms: 0` / foreground в фоне harness), например:
+
+```bash
+cd <repo> && export $(grep -v '^#' .env | grep -v '^$' | xargs) && \
+  go build -o /tmp/gpumesh-coordinator ./cmd/coordinator && \
+  /tmp/gpumesh-coordinator >> /tmp/coordinator.log 2>&1
+```
+
+(без `&` в конце — harness сам держит background job)
+
+### BEFORE telling the user the server is ready — ALL of these MUST pass
+
+1. `lsof -nP -iTCP:8080 -sTCP:LISTEN` показывает **наш** `gpumesh-coordinator` (не пусто).
+2. `BASE=$(grep '^MESH_BASE_URL=' .env | cut -d= -f2-)` — curl **именно** `$BASE/health` → `OK` (не «какой-то IP из AGENTS/чата»).
+3. `curl -sS "$BASE/"` → title/H1 содержат **`Share your local models with friends`** (v2). Если видишь **`Free LLM Inference`** — это **чужой/старый v1 хост**, не наш UI. Не отправляй юзера туда.
+4. Повтори health через ~1–2с: процесс всё ещё жив и LISTEN на месте.
+5. Только после пунктов 1–4 напиши юзеру URL = значение `MESH_BASE_URL` из `.env`.
+
+### Известный проеб (не повторять)
+
+- Хардкод `http://192.168.0.102:8080` в инструкциях/ответах: IP машины меняется; `.102` может быть **другим хостом в LAN** со старым v1, пока локальный координатор мёртв.
+- «Сервер готов» после одного `curl` / без проверки title / без проверки что pid ещё слушает — **ложь**. Сначала факты из чеклиста выше, потом слова.

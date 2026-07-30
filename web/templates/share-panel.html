@@ -3,7 +3,7 @@
   <h1 class="serif-h1" style="font-size:36px" data-testid="share-title">Share your local models</h1>
   <p class="lead">First, create a provider token for the agent on your machine.</p>
 </div>
-<div class="card mt-20" data-testid="provider-token-card">
+<div class="card" data-testid="provider-token-card">
   <h2>Provider token</h2>
   <p class="text-muted">The agent uses this token to connect. After the first connection you get a stable machine URL that won’t change on reconnect.</p>
   <button type="button" class="btn btn-primary mt-16"
@@ -84,7 +84,11 @@
       <div class="dot {{if not .Online}}off{{end}}"></div>
       <div>
         <strong>{{.Name}} {{if .Online}}is online{{else}}is offline{{end}}</strong>
-        <span>{{.ID}}{{if .Hardware}} · {{.Hardware}}{{end}}{{if .ModelCount}} · {{.ModelCount}} models{{end}}</span>
+        <span class="machine-meta">
+          <span class="meta-part mono-id">{{.ID}}</span>
+          {{if .Hardware}}<span class="meta-sep">·</span><span class="meta-part">{{.Hardware}}</span>{{end}}
+          {{if .ModelCount}}<span class="meta-sep">·</span><span class="meta-part">{{.ModelCount}} models</span>{{end}}
+        </span>
       </div>
     </div>
     <span class="badge {{if .Online}}ok{{else}}off{{end}}" data-testid="machine-status">{{if .Online}}Online{{else}}Offline{{end}}</span>

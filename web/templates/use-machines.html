@@ -6,7 +6,18 @@
       <div class="dot {{if not .Online}}off{{end}}"></div>
       <div>
         <strong data-testid="machine-name">{{.Name}}</strong>
-        <span data-testid="machine-meta">{{.OwnerLabel}} · {{.ID}}{{if .Models}} · {{.Models}}{{else}}{{if not .Online}} · offline{{end}}{{end}}</span>
+        <span class="machine-meta" data-testid="machine-meta">
+          <span class="meta-part">{{.OwnerLabel}}</span>
+          <span class="meta-sep">·</span>
+          <span class="meta-part mono-id">{{.ID}}</span>
+          {{if .Models}}
+          <span class="meta-sep">·</span>
+          <span class="meta-part">{{.Models}}</span>
+          {{else}}{{if not .Online}}
+          <span class="meta-sep">·</span>
+          <span class="meta-part">offline</span>
+          {{end}}{{end}}
+        </span>
       </div>
     </div>
     <span class="badge {{if .Online}}ok{{else}}off{{end}}" data-testid="machine-badge">{{if .Online}}Online{{else}}Offline{{end}}</span>

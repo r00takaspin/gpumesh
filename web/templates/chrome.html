@@ -22,6 +22,8 @@
     {{if .LoggedIn}}
     <span class="badge" data-testid="nav-username">@{{.Login}}</span>
     <a href="/logout" class="btn btn-sm nav-logout" data-testid="btn-logout">Logout</a>
+    {{else if eq .ActiveNav "login"}}
+    <a href="/auth/github?redirect={{if .Redirect}}{{.Redirect}}{{else}}/use{{end}}" class="btn btn-sm btn-ghost" data-testid="btn-signin">Sign in</a>
     {{else}}
     <a href="/auth/github?redirect={{if .Redirect}}{{.Redirect}}{{else}}/use{{end}}" class="btn btn-sm btn-primary" data-testid="btn-signin">Sign in with GitHub</a>
     {{end}}
