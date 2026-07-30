@@ -33,11 +33,11 @@ SPEC-v2 wins. If SPEC-v2 is ambiguous, default to the interpretation that preser
 
 - Make changes to files, but wait for the user's command before touching git.
 - Before deploying: ALWAYS build (`go build ./...`) and vet (`go vet ./...`).
-- On deploy: push to origin first, then push to dokku.
-- After deploy: verify `/health` returns OK before reporting done.
+- On deploy: push to origin `main` first; GitHub Actions (`.github/workflows/deploy.yml`) pushes to Dokku with **`branch: main`** (Dokku deploy branch). Push to `master` updates git but does **not** rebuild the container.
+- After deploy: verify `/health` returns OK and landing H1 matches SPEC-v2 §9.3 before reporting done.
 - **NEVER** restart nginx or manually edit `/etc/nginx/` on the VPS — use `dokku proxy:build-config gpumesh`.
 - **NEVER** manually kill/rename Docker containers — use `dokku ps:rebuild gpumesh`.
-- If Dokku gets stuck: `dokku ps:rebuild gpumesh` is the nuke-from-orbit fix.
+- If Dokku gets stuck or git sha is new but UI is old: `dokku ps:rebuild gpumesh` is the nuke-from-orbit fix.
 
 ## Local Development
 

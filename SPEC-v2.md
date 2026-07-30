@@ -130,6 +130,8 @@ export OPENAI_API_KEY="inf_..."
 - Задаёт rate limits, следит за `/health`
 - Не читает содержимое промптов из БД (они не персистятся); на релею оператор теоретически может видеть трафик — опенсорс + self-host как митигация (как в v1)
 
+Публичный инстанс (`gpumesh.net`): деплой через Dokku. **Deploy branch = `main`**. Push в другую ветку (например `master`) обновляет git на сервере, но **не** пересобирает контейнер — после деплоя обязательны `/health` → `OK` и smoke лендинга (H1 из §9.3). Застрявший процесс: `dokku ps:rebuild gpumesh` (не ручной docker/nginx).
+
 ### 2.4 Совмещение ролей
 
 Один GitHub-пользователь может быть owner и member одновременно (своя машина + чужие invites).
@@ -478,15 +480,14 @@ Heartbeat timeout: 90s без heartbeat → session offline (machine запис�
 |---|---|---|---|
 | `GET/POST` | `/use/keys` | R | Keys UI |
 | `GET` | `/use/machines` | N | Список bindings + copy base URL (polling ~10s) |
-| `GET` | `/share/setup` | R | Setup provider + token |
-| `GET` | `/share/models` | R | Карточки machines/models owner’а |
-| `GET` | `/share/stats` | N (was `/share/donor-stats`) | Stats |
-| `POST` | `/share/tokens` | R | Create provider token |
-| `GET/POST` | `/share/invites` | N | Create/list invites (PIN modal) |
-| `GET` | `/share/members` | N | Members + revoke |
-| `GET/POST` | `/join` fragments | N | PIN form + result |
+| `GET` | `/share/panel` | N | Progressive owner surface (§9.5): token / waiting / online / invite |
+| `POST` | `/share/tokens` | R | Create provider token (modal / fragment) |
+| `POST` | `/share/invites` | N | Create invite → PIN modal (plaintext once) |
+| `GET` | `/share/members` | N | Members + revoke (polling ~30s) |
+| `POST` | `/join` | N | HTMX redeem PIN → result fragment |
+| `GET` | `/share/setup` · `/share/models` · `/share/stats` | R→alias | Legacy paths → тот же handler, что `/share/panel` |
 
-Удалены community-фрагменты v1: `/use/donor` (таб «community donor»).
+Удалены community-фрагменты v1: `/use/donor`, `/share/donor-stats`.
 
 ---
 
@@ -525,6 +526,8 @@ Heartbeat timeout: 90s без heartbeat → session offline (machine запис�
 
 Реализация UI в `web/templates/` должна совпадать со screens-прототипом по IA, копирайту и визуальным статусам ниже. При расхождении — сначала обновить screens + этот §9, потом код.
 
+Общий chrome (nav / footer / head / privacy notice / scripts) — в **`web/templates/chrome.html`**; страницы подключают его через `{{template …}}`. Менять chrome в одном месте, не копипастить по страницам.
+
 **Карта экранов в прототипе:** Home · Join · Share · Use · About · Login · Errors (404/500/503).  
 **Auth chrome:** Logged out / Logged in переключается в прототипе и влияет на дефолтный статус экрана.
 
@@ -555,6 +558,7 @@ Heartbeat timeout: 90s без heartbeat → session offline (machine запис�
 - Mono только для кода/PIN/ключей
 - Язык UI: **English** (как v1)
 - HTMX + полные HTML-страницы (без SPA)
+- Polling-фрагменты (`/use/machines`, `/share/panel`, `/share/members`) **не должны сбрасывать** открытые `<details>`, значения форм и выбранный snippet при swap — иначе UI «сам закрывается» каждые ~10s
 - Один job на секцию; без dashboard-каши из community stats
 - Копирайт простой: friends / coworkers / local models — без «neurobullshit» (tunnel/mesh манифесты, «someone’s», jargon вроде TTL/bindings в user-facing тексте)
 
