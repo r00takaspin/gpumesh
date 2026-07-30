@@ -18,6 +18,7 @@ All changes to this repository **MUST** align with `SPEC-v2.md` — the authorit
 - Provider protocol (WebSocket `/ws/provider`) MUST match `SPEC-v2.md` §6.2
 - Data model MUST match `SPEC-v2.md` §10 (machines, invites, bindings)
 - Access is invite-first: owner OR active binding — no public community pool
+- Harness setup UI (`/use` snippets) and how-to copy MUST match `SPEC-v2.md` §9.6 and §19 (curl / Cursor / Cline / Pi / Python; Cline = `openai-compatible` + `cline auth`; Pi = `models.json` + `pi --provider gpumesh`)
 
 ### When in Doubt
 

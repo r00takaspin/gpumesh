@@ -36,10 +36,11 @@
   <div class="setup-panel{{if not .SetupOpen}} hidden{{end}} mt-16" data-testid="setup-panel">
     <h2>Point your tool at this machine</h2>
     <div class="snippet-tabs" data-testid="snippet-tabs">
-      <button type="button" class="on" data-snippet="curl" onclick="switchSnippet(this, 'curl')">curl</button>
-      <button type="button" data-snippet="continue" onclick="switchSnippet(this, 'continue')">Continue</button>
-      <button type="button" data-snippet="cline" onclick="switchSnippet(this, 'cline')">Cline</button>
-      <button type="button" data-snippet="python" onclick="switchSnippet(this, 'python')">Python</button>
+      <button type="button" class="on" data-testid="snippet-tab-curl" data-snippet="curl" onclick="switchSnippet(this, 'curl')">curl</button>
+      <button type="button" data-testid="snippet-tab-cursor" data-snippet="cursor" onclick="switchSnippet(this, 'cursor')">Cursor</button>
+      <button type="button" data-testid="snippet-tab-cline" data-snippet="cline" onclick="switchSnippet(this, 'cline')">Cline</button>
+      <button type="button" data-testid="snippet-tab-pi" data-snippet="pi" onclick="switchSnippet(this, 'pi')">Pi</button>
+      <button type="button" data-testid="snippet-tab-python" data-snippet="python" onclick="switchSnippet(this, 'python')">Python</button>
     </div>
     <p class="text-muted mt-8 mb-0" data-testid="setup-hint">Copy the snippet — it has the base URL and API key. For curl, run it as-is; for editors, paste into settings.</p>
     <div class="code mt-12" data-testid="snippet-code" data-base-url="{{.BaseURL}}" data-model="{{.DefaultModel}}"></div>

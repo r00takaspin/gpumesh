@@ -41,6 +41,16 @@ Feature: Use machines dashboard (v2)
     And элемент с data-testid="snippet-code" содержит текст "YOUR_API_KEY"
     And элемент с data-testid="snippet-code" содержит текст "curl"
 
+  Scenario: Cline setup tab shows cline auth openai-compatible
+    Given пользователь аутентифицирован как "owner-cline"
+    And у пользователя есть provider токен и онлайн машина
+    When пользователь переходит на "/use"
+    And пользователь кликает на data-testid="btn-setup-tool"
+    And пользователь кликает на data-testid="snippet-tab-cline"
+    Then элемент с data-testid="snippet-code" содержит текст "cline auth"
+    And элемент с data-testid="snippet-code" содержит текст "openai-compatible"
+    And элемент с data-testid="snippet-code" содержит текст "/v1/machines/"
+
   Scenario: setup query opens panel for machine
     Given пользователь аутентифицирован как "owner-setup"
     And у пользователя есть provider токен и онлайн машина
