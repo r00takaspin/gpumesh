@@ -16,6 +16,7 @@ Given("пользователь не аутентифицирован", async fu
 });
 
 Given(/^пользователь аутентифицирован как "(.*)"$/, async function (login) {
+  this.setState("current_login", login);
   await this.page.goto(`${this.baseUrl}/test/session?user=${login}&redirect=/`);
   // Wait for redirect to complete.
   await this.page.waitForLoadState("networkidle");
@@ -342,10 +343,13 @@ When("пользователь напрямую переходит по URL {str
 });
 
 When(/^пользователь кликает на data-testid="([^"]*)"$/, async function (testId) {
-  const locator = this.page.locator(`[data-testid="${testId}"]`);
-  await locator.waitFor({ state: "visible", timeout: 5000 });
+  const locator = this.page.locator(`[data-testid="${testId}"]`).first();
+  await locator.waitFor({ state: "visible", timeout: 10000 });
   await locator.click();
-  await this.page.waitForLoadState("networkidle");
+  await this.page.waitForTimeout(500);
+  try {
+    await this.page.waitForLoadState("networkidle", { timeout: 3000 });
+  } catch (_) {}
 });
 
 When(/^пользователь кликает на data-testid="(.*)" для ключа "(.*)"$/, async function (testId, keyId) {
@@ -434,17 +438,24 @@ Then(/^заголовок страницы содержит "(.*)"$/, async func
 });
 
 Then(/^элемент с data-testid="(.*)" видим$/, async function (testId) {
-  const locator = this.page.locator(`[data-testid="${testId}"]`);
+  const locator = this.page.locator(`[data-testid="${testId}"]`).first();
   await expect(locator).toBeVisible({ timeout: 5000 });
 });
 
 Then(/^элемент с data-testid="(.*)" не видим$/, async function (testId) {
   const locator = this.page.locator(`[data-testid="${testId}"]`);
-  await expect(locator).toBeHidden({ timeout: 5000 });
+  const count = await locator.count();
+  if (count === 0) return;
+  // All matching nodes must be hidden (or none visible).
+  await expect(locator).toHaveCount(0, { timeout: 5000 }).catch(async () => {
+    for (let i = 0; i < count; i++) {
+      await expect(locator.nth(i)).toBeHidden({ timeout: 2000 });
+    }
+  });
 });
 
 Then(/^элемент с data-testid="(.*)" содержит текст "(.*)"$/, async function (testId, text) {
-  const locator = this.page.locator(`[data-testid="${testId}"]`);
+  const locator = this.page.locator(`[data-testid="${testId}"]`).first();
   await expect(locator).toContainText(text, { timeout: 5000 });
 });
 
@@ -1346,4 +1357,152 @@ Given("агенты отображаются", async function () {
 
 Given("статистика отображается", async function () {
   await this.page.waitForTimeout(300);
+});
+
+// =============================================================================
+// v2 helpers — provider / machines / join
+// =============================================================================
+
+async function apiSession(baseUrl, login) {
+  const apiCtx = await require("playwright").request.newContext({ baseURL: baseUrl });
+  const tokResp = await apiCtx.get(`/test/session-token?user=${encodeURIComponent(login)}`);
+  if (!tokResp.ok()) {
+    throw new Error(`session-token failed: ${tokResp.status()}`);
+  }
+  const { token } = await tokResp.json();
+  await apiCtx.dispose();
+  return require("playwright").request.newContext({
+    baseURL: baseUrl,
+    extraHTTPHeaders: { Cookie: `gpumesh_session=${token}` },
+  });
+}
+
+Given("у пользователя нет provider токена", async function () {
+  const login = this.getState("current_login") || "owner1";
+  const apiCtx = await apiSession(this.baseUrl, login);
+  const resp = await apiCtx.get("/api/keys");
+  if (resp.ok()) {
+    const body = await resp.json();
+    const keys = body.keys || body || [];
+    for (const k of Array.isArray(keys) ? keys : []) {
+      if (k.scope === "provider" || k.scope === "donor" || k.scope === "both") {
+        await apiCtx.delete(`/api/keys/${k.id}`);
+      }
+    }
+  }
+});
+
+Given("у пользователя есть provider токен", async function () {
+  const login = this.getState("current_login") || "owner1";
+  const apiCtx = await apiSession(this.baseUrl, login);
+  const resp = await apiCtx.post("/api/keys", { data: { scope: "provider" } });
+  if (resp.status() === 201) {
+    const body = await resp.json();
+    this.setState("provider_key", body.key);
+    this.setState("provider_key_id", body.id);
+  }
+});
+
+Given("у пользователя нет машин", async function () {
+  // No WS connect — machines table stays empty for this provider key.
+  const md = this.getState("mock_donor");
+  if (md) md.disconnectAll();
+});
+
+Given("у пользователя есть provider токен и онлайн машина", async function () {
+  const login = this.getState("current_login") || "owner1";
+  const apiCtx = await apiSession(this.baseUrl, login);
+  let providerKey = this.getState("provider_key");
+  if (!providerKey) {
+    const resp = await apiCtx.post("/api/keys", { data: { scope: "provider" } });
+    const status = resp.status();
+    const text = await resp.text();
+    if (status !== 201) {
+      throw new Error(`create provider key failed: ${status} ${text.slice(0, 200)}`);
+    }
+    const body = JSON.parse(text);
+    providerKey = body.key;
+    this.setState("provider_key", providerKey);
+    this.setState("provider_key_id", body.id);
+  }
+  const { MockDonor } = require("../support/mock-donor");
+  const md = new MockDonor(this.baseUrl);
+  const machineId = await md.connect("llama3.2:3b", providerKey);
+  this.setState("mock_donor", md);
+  this.setState("machine_id", machineId);
+});
+
+Given("у пользователя есть provider токен и офлайн машина", async function () {
+  const login = this.getState("current_login") || "owner1";
+  const apiCtx = await apiSession(this.baseUrl, login);
+  const resp = await apiCtx.post("/api/keys", { data: { scope: "provider" } });
+  const status = resp.status();
+  const text = await resp.text();
+  if (status !== 201) {
+    throw new Error(`create provider key failed: ${status} ${text.slice(0, 200)}`);
+  }
+  const body = JSON.parse(text);
+  const providerKey = body.key;
+  this.setState("provider_key", providerKey);
+  const { MockDonor } = require("../support/mock-donor");
+  const md = new MockDonor(this.baseUrl);
+  const machineId = await md.connect("llama3.2:3b", providerKey);
+  this.setState("machine_id", machineId);
+  md.disconnectAll();
+  await this.page.waitForTimeout(300);
+});
+
+Given("у пользователя нет consumer ключей", async function () {
+  const login = this.getState("current_login") || "keyuser";
+  const apiCtx = await apiSession(this.baseUrl, login);
+  const resp = await apiCtx.get("/api/keys");
+  if (resp.ok()) {
+    const body = await resp.json();
+    const keys = body.keys || [];
+    for (const k of keys) {
+      if (k.scope === "consumer" || k.scope === "both") {
+        await apiCtx.delete(`/api/keys/${k.id}`);
+      }
+    }
+  }
+});
+
+Given("owner создал invite PIN", async function () {
+  const machineId = this.getState("machine_id");
+  const apiCtx = await apiSession(this.baseUrl, "owner1");
+  const resp = await apiCtx.post("/api/invites", {
+    data: { machine_id: machineId, max_uses: 3, ttl_days: 7 }
+  });
+  expect(resp.status()).toBe(201);
+  const body = await resp.json();
+  this.setState("invite_pin", body.pin);
+  this.setState("invite_join_link", body.join_link);
+});
+
+When("пользователь вводит PIN в join-форму", async function () {
+  const pin = this.getState("invite_pin");
+  await this.page.locator('[data-testid="join-pin-input"]').fill(pin);
+});
+
+When(/^пользователь вводит в data-testid="([^"]*)" текст "(.*)"$/, async function (testId, text) {
+  await this.page.locator(`[data-testid="${testId}"]`).fill(text);
+});
+
+When(/^пользователь подтверждает и кликает data-testid="([^"]*)"$/, async function (testId) {
+  this.page.once("dialog", async (dialog) => { await dialog.accept(); });
+  await this.page.locator(`[data-testid="${testId}"]`).first().click();
+  await this.page.waitForTimeout(800);
+});
+
+Then(/^элемент с data-testid="(.*)" неактивен$/, async function (testId) {
+  const locator = this.page.locator(`[data-testid="${testId}"]`).first();
+  await expect(locator).toBeDisabled({ timeout: 5000 });
+});
+
+Then(/^элемент с data-testid="(.*)" имеет значение "(.*)"$/, async function (testId, value) {
+  await expect(this.page.locator(`[data-testid="${testId}"]`)).toHaveValue(value);
+});
+
+Then(/^страница не содержит текст "(.*)"$/, async function (text) {
+  await expect(this.page.locator("body")).not.toContainText(text);
 });

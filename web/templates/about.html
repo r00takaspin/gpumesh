@@ -1,178 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="What is GPU Mesh? A free, community-powered network for using AI language models — explained in plain language.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  {{template "head" .}}
   <title>About — GPU Mesh</title>
-  <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <style>
-    .about-diagram {
-      font-family: var(--font-mono); font-size: 12px; color: var(--accent);
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: var(--radius-sm); padding: 14px 16px;
-      margin-bottom: 16px; text-align: center; overflow-x: auto; white-space: nowrap;
-    }
-    .about-two-col {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;
-    }
-    @media (max-width: 540px) { .about-two-col { grid-template-columns: 1fr; } }
-    .about-two-col .consumer-card { margin-bottom: 0; }
-    .about-facts {
-      font-size: 14px; color: var(--text-dim); line-height: 2;
-      padding-left: 18px; margin: 0;
-    }
-    .about-facts strong { color: var(--text); }
-    .about-faq details {
-      border: 1px solid var(--border); border-radius: var(--radius-sm);
-      margin-bottom: 6px; background: var(--bg-card);
-    }
-    .about-faq summary {
-      padding: 12px 14px; cursor: pointer; font-size: 14px; color: var(--text);
-      font-weight: 500; user-select: none;
-    }
-    .about-faq summary:hover { background: #21262d; }
-    .about-faq .faq-answer {
-      padding: 0 14px 14px; font-size: 13px; color: var(--text-dim); line-height: 1.6;
-    }
-    .about-faq .faq-answer code {
-      font-family: var(--font-mono); font-size: 12px;
-      background: var(--bg); padding: 1px 5px; border-radius: 3px; color: var(--blue);
-    }
-  </style>
 </head>
 <body>
-  <nav class="topbar">
-    <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
-    <ul class="nav-links">
-      <li><a href="/" data-testid="nav-home">Home</a></li>
-      <li><a href="/use" data-testid="nav-use">Use Models</a></li>
-      <li><a href="/share" data-testid="nav-share">Share GPU</a></li>
-      <li><a href="/models" data-testid="nav-models">Models</a></li>
-      <li><a href="/about" class="active" data-testid="nav-about">About</a></li>
-    </ul>
-    <div class="nav-right">
-      {{if .LoggedIn}}
-      <span class="nav-user mono text-accent" data-testid="nav-username">{{.Login}}</span>
-      <a href="/logout" class="btn btn--sm nav-logout" data-testid="btn-logout">[Logout]</a>
-      {{else}}
-      <a href="/auth/github?redirect=/about" class="btn-consumer btn-primary btn-sm" data-testid="btn-signin">Sign in with GitHub</a>
-      {{end}}
-    </div>
-  </nav>
+  {{template "nav" .}}
 
-  <main>
-    <!-- Hero -->
-    <div class="hero" data-testid="about-hero">
-      <h1 data-testid="about-title">What is GPU Mesh?</h1>
-      <p>A free, community-powered network for using AI language models. GPU owners share their spare computing power — you use it through tools you already know. No credit card, no new apps.</p>
-    </div>
+  <main class="page mid" data-testid="about-page">
+    <h1 class="serif-h1" data-testid="about-title">About GPU Mesh</h1>
+    <p class="lead" data-testid="about-lead">Share local Ollama models with friends or coworkers using a PIN. They get a stable URL for Continue, Cline, curl, and similar tools.</p>
 
-    <!-- In plain language -->
-    <div class="consumer-card" data-testid="about-plain-language">
-      <div class="card-title">In plain language</div>
-      <div class="community-banner">
-        Imagine a <strong>community garden for GPUs</strong>. People with powerful graphics cards let others use them when they're idle. You get free access to AI models — the same kind that powers ChatGPT — running on real hardware shared by volunteers. Your existing tools (VS Code, terminal, any OpenAI-compatible app) connect to GPU Mesh instead of paid APIs.
+    <div class="grid-2 mt-28">
+      <div class="card" data-testid="about-owner">
+        <h2>Owner</h2>
+        <p class="text-muted mb-0">Runs Ollama + provider, creates invites, revokes access.</p>
+      </div>
+      <div class="card" data-testid="about-member">
+        <h2>Member</h2>
+        <p class="text-muted mb-0">Enters a PIN once, then uses a base URL + API key in their tools.</p>
       </div>
     </div>
 
-    <!-- How it works -->
-    <div class="consumer-card" data-testid="about-how-it-works">
-      <div class="card-title">How it works</div>
-      <div class="about-diagram" data-testid="about-diagram">
-        You &nbsp;── HTTP ──▶&nbsp; Coordinator &nbsp;── WebSocket ──▶&nbsp; Donor's GPU &nbsp;──▶&nbsp; AI Model
-      </div>
-      <div class="steps">
-        <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-title">Share</div>
-          <div class="step-desc">GPU owners run a small agent program. It connects their hardware to the network.</div>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <div class="step-title">Match</div>
-          <div class="step-desc">When you send a request, the coordinator finds an available GPU with the model you need.</div>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <div class="step-title">Use</div>
-          <div class="step-desc">Your request runs on the donor's GPU. The response streams back to your tool. Nothing is stored.</div>
-        </div>
-      </div>
+    <div class="banner info mt-28" data-testid="about-privacy">
+      Privacy: your prompts go through the GPU Mesh server and are visible to whoever runs the machine. We don’t store prompt content.
     </div>
 
-    <!-- Who is this for -->
-    <div class="about-two-col" data-testid="about-whos-for">
-      <div class="consumer-card">
-        <div class="card-title">For consumers</div>
-        <div style="font-size:13px;color:var(--text-dim);line-height:1.7">
-          You want free access to AI models for coding, writing, or research.
-          You use tools like Continue.dev, Aider, Cline, or any OpenAI-compatible app.
-          You don't have a powerful GPU — or you do, but you want free inference.
-        </div>
-      </div>
-      <div class="consumer-card">
-        <div class="card-title">For donors</div>
-        <div style="font-size:13px;color:var(--text-dim);line-height:1.7">
-          You have a GPU that sits idle most of the time.
-          You run Ollama with some models.
-          You want to contribute to the community, earn reputation badges, and see your hardware put to good use.
-        </div>
-      </div>
-    </div>
-
-    <!-- Key facts -->
-    <div class="consumer-card" data-testid="about-key-facts">
-      <div class="card-title">Key facts</div>
-      <ul class="about-facts">
-        <li><strong>Free</strong> — no payments, no credits, no catch</li>
-        <li><strong>Open source</strong> — MIT licensed, anyone can audit or self-host</li>
-        <li><strong>Private</strong> — your prompts and responses are never stored</li>
-        <li><strong>Community-driven</strong> — powered by volunteers sharing spare GPU time</li>
-        <li><strong>Standard API</strong> — works with any OpenAI-compatible tool; no new client to install</li>
-      </ul>
-    </div>
-
-    <!-- FAQ -->
-    <div class="consumer-card about-faq" data-testid="about-faq">
-      <div class="card-title">FAQ</div>
-      <details data-testid="faq-item-0">
-        <summary>Is it really free?</summary>
-        <div class="faq-answer">Yes. Donors volunteer their GPU time. There is no payment system, no credits, no "pro tier." It's free by design.</div>
+    <div class="faq mt-28" data-testid="about-faq">
+      <h2 class="section-title">FAQ</h2>
+      <details open>
+        <summary>Is the PIN one-time?</summary>
+        <p>By default yes (1 use, 7 days). The owner can allow more uses or a longer expiry.</p>
       </details>
-      <details data-testid="faq-item-1">
-        <summary>What models are available?</summary>
-        <div class="faq-answer">Whatever the community is running — typically Llama, Mistral, CodeLlama, Gemma, and other open-weight models via Ollama. Check <a href="/models" style="color:var(--blue)">/models</a> for the current list.</div>
+      <details>
+        <summary>Is GitHub required?</summary>
+        <p>Yes to join and manage invites. After that, tools use an API key.</p>
       </details>
-      <details data-testid="faq-item-2">
-        <summary>Is it fast?</summary>
-        <div class="faq-answer">It depends on the donor's hardware and network. Consumer-grade GPUs over home internet won't match a datacenter. It's best-effort community infrastructure, not a paid SLA. For chat and coding, it's usually fast enough.</div>
+      <details>
+        <summary>How is this different from Tailscale?</summary>
+        <p>This is only for LLM API access with invites and revoke — not a full VPN.</p>
       </details>
-      <details data-testid="faq-item-3">
-        <summary>Can donors see my prompts?</summary>
-        <div class="faq-answer">Yes. Donors run the AI model on their own hardware and could inspect traffic. This is disclosed transparently. Don't send passwords, API keys, or other sensitive information.</div>
-      </details>
-      <details data-testid="faq-item-4">
-        <summary>How do I contribute my GPU?</summary>
-        <div class="faq-answer">Install <a href="https://ollama.com" style="color:var(--blue)">Ollama</a>, pull some models, then run <code>gpumesh-provider</code>. One command. See <a href="/share" style="color:var(--blue)">Share GPU</a> for the full guide.</div>
-      </details>
-      <details data-testid="faq-item-5">
-        <summary>Can I run my own coordinator?</summary>
-        <div class="faq-answer">Yes. The whole project is open source (MIT). Clone <a href="https://github.com/r00takaspin/gpumesh" style="color:var(--blue)">the repo</a>, build the coordinator binary, and run your own mesh — private or public.</div>
+      <details>
+        <summary>What if the machine is offline?</summary>
+        <p>Requests fail with a clear offline error. We don’t silently switch to another machine.</p>
       </details>
     </div>
   </main>
 
-  <footer data-testid="footer">
-    <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
-    &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
-  </footer>
-
-  <script src="/static/js/app.js"></script>
-  <script src="https://unpkg.com/htmx.org@2"></script>
+  {{template "footer" .}}
+  {{template "scripts" .}}
 </body>
 </html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  {{template "head" .}}
+  <title>Join — GPU Mesh</title>
+</head>
+<body>
+  {{template "nav" .}}
+
+  <main class="page narrow" data-testid="join-page">
+    <div id="join-result">
+      <h1 class="serif-h1" style="font-size:36px" data-testid="join-title">Join with a code</h1>
+      {{if .LoggedIn}}
+      <p class="lead">Enter the PIN you got from a friend or coworker.</p>
+      {{else}}
+      <p class="lead">Enter the PIN you got. You’ll sign in with GitHub, then get access to that machine.</p>
+      {{end}}
+
+      <div class="card mt-20" data-testid="join-form-card">
+        <div class="pass-label">Invite PIN</div>
+        {{if .LoggedIn}}
+        <form class="join-box mt-8"
+              hx-post="/join"
+              hx-target="#join-result"
+              hx-swap="innerHTML"
+              data-testid="join-form">
+          <input name="pin" placeholder="XXXX-XXXX" value="{{.Pin}}" aria-label="PIN" data-testid="join-pin-input" autocomplete="off" required>
+          <button type="submit" class="btn btn-primary" data-testid="btn-connect">Connect</button>
+        </form>
+        {{else}}
+        <div class="join-box mt-8">
+          <input name="pin" id="join-pin-out" placeholder="XXXX-XXXX" value="{{.Pin}}" aria-label="PIN" data-testid="join-pin-input" autocomplete="off">
+          <a href="/auth/github?redirect=/join{{if .Pin}}?pin={{.Pin}}{{end}}"
+             class="btn btn-primary"
+             data-testid="btn-signin-connect"
+             onclick="this.href='/auth/github?redirect='+encodeURIComponent('/join?pin='+document.getElementById('join-pin-out').value)">Sign in to connect</a>
+        </div>
+        {{end}}
+        <p class="meta">After this, your tools talk only to that machine.</p>
+      </div>
+
+      {{template "privacy" .}}
+    </div>
+  </main>
+
+  {{template "footer" .}}
+  {{template "scripts" .}}
+</body>
+</html>

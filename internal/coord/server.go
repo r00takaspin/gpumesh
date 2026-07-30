@@ -137,15 +137,19 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("DELETE /api/bindings/{machine_id}", s.requireAuth(s.handleRevokeBinding))
 	mux.HandleFunc("DELETE /api/machines/{machine_id}/members/{user_id}", s.requireAuth(s.handleRevokeMember))
 
-	// HTMX fragments (existing v1 templates; keep working).
+	// HTMX fragments (v2).
 	mux.HandleFunc("GET /use/keys", s.requireAuth(s.handleUseKeys))
 	mux.HandleFunc("POST /use/keys", s.requireAuth(s.handleUseCreateKey))
-	mux.HandleFunc("GET /use/donor", s.requireAuth(s.handleUseDonor))
-	mux.HandleFunc("GET /share/setup", s.requireAuth(s.handleShareSetup))
-	mux.HandleFunc("GET /share/models", s.requireAuth(s.handleShareModels))
-	mux.HandleFunc("GET /share/donor-stats", s.requireAuth(s.handleShareDonorStats))
-	mux.HandleFunc("GET /share/stats", s.requireAuth(s.handleShareDonorStats))
+	mux.HandleFunc("GET /use/machines", s.requireAuth(s.handleUseMachines))
+	mux.HandleFunc("GET /share/panel", s.requireAuth(s.handleSharePanel))
+	mux.HandleFunc("GET /share/members", s.requireAuth(s.handleShareMembers))
+	mux.HandleFunc("POST /share/invites", s.requireAuth(s.handleShareCreateInvite))
 	mux.HandleFunc("POST /share/tokens", s.requireAuth(s.handleShareCreateToken))
+	mux.HandleFunc("POST /join", s.requireAuth(s.handleJoinHTMX))
+	// Legacy aliases → progressive panel (bookmarks).
+	mux.HandleFunc("GET /share/stats", s.requireAuth(s.handleSharePanel))
+	mux.HandleFunc("GET /share/setup", s.requireAuth(s.handleSharePanel))
+	mux.HandleFunc("GET /share/models", s.requireAuth(s.handleSharePanel))
 
 	mux.HandleFunc("GET /health", s.handleHealth)
 
@@ -229,11 +233,15 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "index.html", s.pageDataWithStats(r))
+	pd := s.pageData(r)
+	pd.ActiveNav = "home"
+	renderTemplate(w, "index.html", pd)
 }
 
 func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "about.html", s.pageDataWithStats(r))
+	pd := s.pageData(r)
+	pd.ActiveNav = "about"
+	renderTemplate(w, "about.html", pd)
 }
 
 func (s *Server) redirectUse(w http.ResponseWriter, r *http.Request) {

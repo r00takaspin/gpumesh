@@ -1,114 +1,78 @@
 @ui
-Feature: Страница донора Share GPU
-  Страница `/share` с двумя состояниями: logged-out (публичный лендинг)
-  и logged-in (дашборд донора: Setup, Agent Status, Stats).
+Feature: Share owner dashboard (v2)
+  Progressive /share: no token → waiting → ready → create invite PIN modal.
 
   Background:
     Given пользователь открывает браузер
     And координатор запущен и доступен
 
-  # ===== Состояние logged-out =====
-
-  Scenario: Отображение logged-out версии
+  Scenario: Logged-out hero
     Given пользователь не аутентифицирован
     When пользователь переходит на "/share"
-    Then элемент с data-testid="hero-share" видим
-    And заголовок содержит "Share your GPU"
-    And подзаголовок содержит "Run the agent, serve LLM requests"
-    And элемент с data-testid="btn-signin" видим
-    And отображается блок «How it works» с шагами:
-      | шаг                          |
-      | Install Ollama               |
-      | Pull a model                 |
-      | Run the agent                |
+    Then элемент с data-testid="share-title" содержит текст "Share your local models"
+    And элемент с data-testid="btn-signin-share" содержит текст "Sign in with GitHub"
 
-  Scenario: Кнопка входа с редиректом на /share
+  Scenario: Sign-in link targets /share redirect
     Given пользователь не аутентифицирован
     When пользователь переходит на "/share"
-    And пользователь кликает на data-testid="btn-signin"
-    Then URL содержит "/auth/github"
-    And URL содержит параметр "redirect" со значением "/share"
+    Then элемент с data-testid="btn-signin-share" имеет href, содержащий "redirect=/share"
 
-  # ===== Состояние logged-in =====
-
-  Scenario: Отображение logged-in версии
-    Given пользователь аутентифицирован как "testuser"
+  Scenario: No provider token state
+    Given пользователь аутентифицирован как "owner-notoken"
+    And у пользователя нет provider токена
     When пользователь переходит на "/share"
-    Then навбар отображает "testuser"
-    And ссылка с data-testid="nav-share" имеет класс "active"
+    Then элемент с data-testid="share-panel" видим
+    And элемент с data-testid="btn-generate-token" видим
+    And элемент с data-testid="btn-generate-token" содержит текст "Generate provider token"
 
-  Scenario: Блок Setup отображается
-    Given пользователь аутентифицирован
+  Scenario: Generate provider token shows modal
+    Given пользователь аутентифицирован как "owner-gentoken"
+    And у пользователя нет provider токена
     When пользователь переходит на "/share"
-    Then элемент с data-testid="share-setup" видим
-    And блок содержит инструкцию по установке провайдера
-    And блок содержит команду для запуска
+    And пользователь кликает на data-testid="btn-generate-token"
+    Then элемент с data-testid="modal-provider-token" видим
+    And элемент с data-testid="provider-token-value" видим
 
-  Scenario: Отображение донорского токена в Setup
-    Given у пользователя есть донорский токен
+  Scenario: Waiting for provider after token
+    Given пользователь аутентифицирован как "owner-waiting"
+    And у пользователя есть provider токен
+    And у пользователя нет машин
     When пользователь переходит на "/share"
-    Then элемент с data-testid="donor-token" содержит токен, начинающийся с "inf_"
+    Then элемент с data-testid="waiting-provider" содержит текст "Waiting for provider"
+    And элемент с data-testid="btn-create-invite" неактивен
 
-  Scenario: Предупреждение при отсутствии донорского токена
-    Given у пользователя нет донорского токена
+  Scenario: Online ready can create invite
+    Given пользователь аутентифицирован как "owner-online"
+    And у пользователя есть provider токен и онлайн машина
     When пользователь переходит на "/share"
-    Then элемент с data-testid="no-token-warning" видим
-    And предупреждение предлагает создать токен
+    Then элемент с data-testid="btn-create-invite" видим
+    And элемент с data-testid="machine-strip" видим
+    And элемент с data-testid="machine-status" содержит текст "Online"
 
-  Scenario: Создание донорского токена
-    Given у пользователя нет донорского токена
-    When пользователь кликает на data-testid="btn-create-donor-token"
-    Then отображается модальное окно с data-testid="modal-donor-token"
-    And модальное окно содержит новый токен
-
-  Scenario: Закрытие модального окна с токеном
-    Given открыто модальное окно с новым донорским токеном
-    When пользователь кликает на data-testid="btn-close-modal"
-    Then модальное окно закрыто
-
-  Scenario: Отображение карточек агентов
-    Given у пользователя есть подключённый агент донора
+  Scenario: Create invite shows PIN modal once
+    Given пользователь аутентифицирован как "owner-invite"
+    And у пользователя есть provider токен и онлайн машина
     When пользователь переходит на "/share"
-    Then элемент с data-testid="share-models" видим
-    And отображается карточка агента с данными:
-      | поле         |
-      | provider_id  |
-      | models       |
-      | description  |
-      | hardware     |
-      | uptime       |
+    And пользователь кликает на data-testid="btn-create-invite"
+    Then элемент с data-testid="modal-invite-pin" видим
+    And элемент с data-testid="invite-pin" видим
+    And элемент с data-testid="invite-join-link" видим
+    And элемент с data-testid="btn-copy-pin" видим
+    And элемент с data-testid="btn-copy-join-link" видим
 
-  Scenario: Пустое состояние агентов
-    Given у пользователя нет подключённых агентов
+  Scenario: Offline warning still allows invite
+    Given пользователь аутентифицирован как "owner-offline"
+    And у пользователя есть provider токен и офлайн машина
     When пользователь переходит на "/share"
-    Then элемент с data-testid="share-models" видим
-    And отображается сообщение об отсутствии агентов
+    Then элемент с data-testid="offline-warning" видим
+    And элемент с data-testid="btn-create-invite" видим
 
-  Scenario: Отображение статистики донора
-    Given пользователь аутентифицирован
+  Scenario: Active nav on /share
     When пользователь переходит на "/share"
-    Then элемент с data-testid="donor-stats" видим
-    And отображается "total_requests"
-    And отображается "total_tokens"
-    And отображается "total_uptime_seconds"
-    And отображается бейдж донора
+    Then ссылка с data-testid="nav-share" имеет класс "on"
 
-  Scenario: HTMX polling для Setup
-    Given Setup блок загружен
-    When проходит 5 секунд
-    Then Setup блок обновляется
-
-  Scenario: HTMX polling для Agent Status
-    Given агенты отображаются
-    When проходит 10 секунд
-    Then карточки агентов обновляются
-
-  Scenario: HTMX polling для Stats
-    Given статистика отображается
-    When проходит 60 секунд
-    Then статистика обновляется
-
-  Scenario: Активная ссылка в навбаре для /share
-    Given пользователь аутентифицирован
+  Scenario: Advanced regenerate warning
+    Given пользователь аутентифицирован как "owner-advanced"
+    And у пользователя есть provider токен и онлайн машина
     When пользователь переходит на "/share"
-    Then ссылка с data-testid="nav-share" имеет класс "active"
+    Then элемент с data-testid="regen-warning" содержит текст "new machine URL"

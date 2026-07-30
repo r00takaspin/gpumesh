@@ -1,127 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="GPU Mesh — Free peer-to-peer LLM inference network. Use any OpenAI-compatible tool with community GPUs. No credit card.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
-  <title>GPU Mesh — Free LLM Inference</title>
-  <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  {{template "head" .}}
+  <title>GPU Mesh — Share local models with friends</title>
 </head>
 <body>
-  <nav class="topbar">
-    <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
-    <ul class="nav-links">
-      <li><a href="/" class="active" data-testid="nav-home">Home</a></li>
-      <li><a href="/use" data-testid="nav-use">Use Models</a></li>
-      <li><a href="/share" data-testid="nav-share">Share GPU</a></li>
-      <li><a href="/models" data-testid="nav-models">Models</a></li>
-      <li><a href="/about" data-testid="nav-about">About</a></li>
-    </ul>
-    <div class="nav-right">
-      {{if .LoggedIn}}
-      <span class="nav-user mono text-accent" data-testid="nav-username">{{.Login}}</span>
-      <a href="/logout" class="btn btn--sm nav-logout" data-testid="btn-logout">[Logout]</a>
-      {{else}}
-      <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary btn-sm" data-testid="btn-signin">Sign in with GitHub</a>
-      {{end}}
-    </div>
-  </nav>
+  {{template "nav" .}}
 
-  <main>
-    <!-- Hero -->
-    <div class="hero">
-      <div class="hero-logo" data-testid="hero-logo">
-  _____ _____  _    _    __  __ ______  _____ _    _
- / ____|  __ \| |  | |  |  \/  |  ____|/ ____| |  | |
-| |  __| |__) | |  | |  | \  / | |__  | (___ | |__| |
-| | |_ |  ___/| |  | |  | |\/| |  __|  \___ \|  __  |
-| |__| | |    | |__| |  | |  | | |____ ____) | |  | |
- \_____|_|     \____/   |_|  |_|______|_____/|_|  |_|
+  <main class="page" data-testid="landing">
+    <section class="hero-grid" data-testid="hero">
+      <div>
+        <h1 class="serif-h1" data-testid="hero-title">Share your local models with friends</h1>
+        <p class="lead" data-testid="hero-lead">Send a PIN to a coworker or friend. They sign in with GitHub and point Continue, Cline, or curl at your machine URL.</p>
+        <div class="hero-actions">
+          <a href="/share" class="btn btn-primary" data-testid="cta-create-invite">Create invite</a>
+          <a href="/join" class="btn" data-testid="cta-enter-code">Enter a code</a>
+        </div>
       </div>
-      <h1 data-testid="hero-title">Free LLM inference</h1>
-      <p data-testid="hero-subtitle">Use any OpenAI-compatible tool with community GPUs. No credit card, no limits.</p>
-      <div class="hero-cta">
-        <a href="/use" class="btn--hero" data-testid="hero-cta-use">Use Models <span class="arrow">&rarr;</span></a>
-        <a href="/share" class="btn--hero btn--secondary" data-testid="hero-cta-share">Share GPU <span class="arrow">&rarr;</span></a>
+      <div class="pass" data-testid="example-invite">
+        <div class="pass-label">Example invite</div>
+        <div class="pin" data-testid="demo-pin">7K4Q-9M2P</div>
+        <a href="/share" class="btn btn-primary btn-block mt-12" data-testid="cta-example-invite">Create invite</a>
+        <p class="meta center">Example only — not a real code</p>
       </div>
-    </div>
+    </section>
 
-    <!-- Live Stats -->
-    <div class="stat-grid" id="live-stats" data-testid="live-stats" hx-get="/" hx-trigger="every 30s" hx-select="#live-stats" hx-swap="outerHTML">
-      <div class="stat-box" data-testid="stat-models-online">
-        <div class="stat-num">{{.ModelsOnline}}</div>
-        <div class="stat-label">Models online</div>
+    <div class="steps" data-testid="how-it-works">
+      <div class="step" data-testid="step-1">
+        <div class="step-num">1</div>
+        <strong class="step-title">Run the agent</strong>
+        <p>Ollama + gpumesh-provider on your machine.</p>
       </div>
-      <div class="stat-box" data-testid="stat-donors-online">
-        <div class="stat-num">{{.DonorsOnline}}</div>
-        <div class="stat-label">Donors online</div>
+      <div class="step" data-testid="step-2">
+        <div class="step-num">2</div>
+        <strong class="step-title">Share a PIN</strong>
+        <p>Send the code or join link in chat.</p>
       </div>
-      <div class="stat-box" data-testid="stat-requests-today">
-        <div class="stat-num">{{.RequestsToday}}</div>
-        <div class="stat-label">Requests today</div>
+      <div class="step" data-testid="step-3">
+        <div class="step-num">3</div>
+        <strong class="step-title">They use your URL</strong>
+        <p>Tools call <code>/v1/machines/{id}</code>.</p>
       </div>
     </div>
 
-    <!-- How it works -->
-    <div class="consumer-card" data-testid="how-it-works">
-      <div class="card-title">How it works</div>
-      <div class="community-banner">
-        GPU Mesh is powered by <strong>community GPUs</strong>.
-        Enthusiasts share spare compute — you get free inference.
-      </div>
-      <div class="steps">
-        <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-title">Share</div>
-          <div class="step-desc">Donors run the agent, Ollama serves models. Anyone can contribute a GPU.</div>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <div class="step-title">Match</div>
-          <div class="step-desc">The coordinator routes your request to an available donor with the model you need.</div>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <div class="step-title">Use</div>
-          <div class="step-desc">Your tools just work — OpenAI-compatible API. No config changes needed.</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Top Models -->
-    <div class="consumer-card" data-testid="top-models">
-      <div class="card-title">Top models right now</div>
-      {{if .TopModels}}
-      {{range .TopModels}}
-      <div class="model-card">
-        <div class="model-card-head">
-          <div>
-            <div class="model-name">{{.Name}}</div>
-            <div class="model-meta">{{.DonorCount}} donor{{if ne .DonorCount 1}}s{{end}} · {{.Vendor}}</div>
-          </div>
-          <div class="model-badge">live</div>
-        </div>
-      </div>
-      {{end}}
-      {{else}}
-      <div class="empty-state">No models online right now. <strong>Be the first donor!</strong></div>
-      {{end}}
-      <div style="text-align:center;margin-top:12px">
-        <a href="/models" style="font-size:13px;color:var(--blue)">Browse all models &rarr;</a>
-      </div>
+    <div class="card mt-28" data-testid="what-you-get">
+      <h2>What you get</h2>
+      <p class="text-muted mb-0">Friends only reach the models on that machine. You can revoke access anytime. No open port, no public model catalog.</p>
     </div>
   </main>
 
-  <footer data-testid="footer">
-    <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
-    &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
-  </footer>
-
-  <script src="/static/js/app.js"></script>
-  <script src="https://unpkg.com/htmx.org@2"></script>
+  {{template "footer" .}}
+  {{template "scripts" .}}
 </body>
 </html>

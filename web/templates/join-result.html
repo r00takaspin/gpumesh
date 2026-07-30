@@ -1,0 +1,42 @@
+{{if .Success}}
+<div class="banner ok" data-testid="join-success">You’re in. <strong>{{.MachineName}}</strong> is available on your Use page.</div>
+{{if .NewKey}}
+<div class="banner warn mt-12" data-testid="onetime-key" id="onetime-key">
+  Copy your API key now — it won’t be shown again.
+  <span class="key" data-testid="onetime-key-value">{{.NewKey}}</span>
+  <button type="button" class="btn btn-sm mt-12" data-testid="btn-copy-onetime-key" onclick="copyText(this, '{{.NewKey}}')">Copy key</button>
+</div>
+{{end}}
+<div class="card mt-20" data-testid="join-machine-card">
+  <div class="machine-info">
+    <div class="dot {{if not .Online}}off{{end}}"></div>
+    <div>
+      <strong>{{.MachineName}} {{if .Online}}is online{{else}}is offline{{end}}</strong>
+      <span>{{.MachineID}}{{if .Models}} · {{.Models}}{{end}}</span>
+    </div>
+  </div>
+  <div class="hero-actions">
+    <a href="/use" class="btn btn-primary" data-testid="btn-go-use">Go to Use</a>
+    <button type="button" class="btn" data-testid="btn-copy-base-url" onclick="copyText(this, '{{.BaseURL}}')">Copy base URL</button>
+  </div>
+</div>
+{{template "privacy" .}}
+{{else}}
+<h1 class="serif-h1" style="font-size:36px" data-testid="join-title">Join with a code</h1>
+<p class="lead">Enter the PIN you got from a friend or coworker.</p>
+{{if .ErrorTitle}}
+<div class="banner err mt-20" data-testid="join-error">
+  <strong data-testid="join-error-title">{{.ErrorTitle}}</strong><br>
+  <span data-testid="join-error-msg">{{.ErrorMsg}}</span>
+</div>
+{{end}}
+<form class="join-box mt-16"
+      hx-post="/join"
+      hx-target="#join-result"
+      hx-swap="innerHTML"
+      data-testid="join-form">
+  <input name="pin" placeholder="XXXX-XXXX" value="{{.Pin}}" aria-label="PIN" data-testid="join-pin-input" autocomplete="off" required>
+  <button type="submit" class="btn btn-primary" data-testid="btn-connect">{{if .ErrorTitle}}Try again{{else}}Connect{{end}}</button>
+</form>
+{{template "privacy" .}}
+{{end}}

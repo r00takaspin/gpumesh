@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
@@ -169,11 +170,12 @@ func getUserID(r *http.Request) int64 {
 	return v.(int64)
 }
 
-// handleUse renders the use models page.
+// handleUse renders the member dashboard.
 func (s *Server) handleUse(w http.ResponseWriter, r *http.Request) {
-	pd := s.pageDataWithStats(r)
+	pd := s.pageData(r)
+	pd.ActiveNav = "use"
+	pd.Redirect = "/use"
 
-	// Extract user ID from session (public page, no requireAuth wrapper).
 	var userID int64
 	if cookie, err := r.Cookie("gpumesh_session"); err == nil {
 		uid, err := s.store.ValidateSession(cookie.Value)
@@ -182,19 +184,14 @@ func (s *Server) handleUse(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Set rate limit.
 	pd.RateLimit = s.limiter.Burst()
-	// Set base URL for tool config snippets.
-	pd.BaseURL = s.baseURL
-
-	// Set active tab from query param, default to "overview".
+	pd.BaseURL = strings.TrimRight(s.baseURL, "/")
 	pd.Tab = r.URL.Query().Get("tab")
 	if pd.Tab == "" {
-		pd.Tab = "overview"
+		pd.Tab = "machines"
 	}
 
 	if userID != 0 {
-		// Auto-create consumer key if none exists.
 		if r.URL.Query().Get("new") == "1" {
 			n, _ := s.store.CountKeysByScope(userID, "consumer")
 			if n == 0 {
@@ -204,8 +201,6 @@ func (s *Server) handleUse(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-
-		// Populate keys for the API Keys tab.
 		keys, _ := s.store.ListKeys(userID)
 		pd.Keys = keys
 	}
@@ -213,38 +208,22 @@ func (s *Server) handleUse(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "use.html", pd)
 }
 
-// handleShare renders the share GPU page (auth optional).
+// handleShare renders the owner dashboard (auth optional).
 func (s *Server) handleShare(w http.ResponseWriter, r *http.Request) {
-	pd := s.pageDataWithStats(r)
-
-	// Extract user ID from session (public page, no requireAuth wrapper).
-	var userID int64
-	if cookie, err := r.Cookie("gpumesh_session"); err == nil {
-		uid, err := s.store.ValidateSession(cookie.Value)
-		if err == nil && uid != 0 {
-			userID = uid
-		}
-	}
-
-	pd.BaseURL = s.baseURL
-
-	if userID != 0 {
-		// Auto-create provider key if none exists (first visit after OAuth).
-		if r.URL.Query().Get("new") == "1" {
-			n, _ := s.store.CountKeysByScope(userID, "provider")
-			if n == 0 {
-				rawKey, _, err := s.store.CreateKey(userID, "provider")
-				if err == nil {
-					pd.NewKey = rawKey
-				}
-			}
-		}
-	}
-
+	pd := s.pageData(r)
+	pd.ActiveNav = "share"
+	pd.Redirect = "/share"
+	pd.BaseURL = strings.TrimRight(s.baseURL, "/")
 	renderTemplate(w, "share.html", pd)
 }
 
 // handleLoginPage renders the login page with a GitHub OAuth button.
 func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "login.html", s.pageData(r))
+	pd := s.pageData(r)
+	pd.ActiveNav = "login"
+	pd.Redirect = r.URL.Query().Get("redirect")
+	if pd.Redirect == "" {
+		pd.Redirect = "/use"
+	}
+	renderTemplate(w, "login.html", pd)
 }

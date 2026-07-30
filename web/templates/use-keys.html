@@ -1,35 +1,39 @@
 {{if .NewKey}}
-<div class="key-strip" id="onetime-key" style="margin-bottom:16px">
-  <span style="font-size:11px;color:var(--orange);white-space:nowrap;margin-right:8px">⚠</span>
-  <span class="key-label">New API key</span>
-  <span class="key-value">{{.NewKey}}</span>
-  <button class="key-copy" onclick="copyKey(this, '{{.NewKey}}')">Copy</button>
-</div>
-<div style="font-size:11px;color:var(--orange);margin-bottom:16px;padding:0 2px">
-  ⚠ Copy this key now — it won't be shown again.
-</div>
-{{end}}
-
-{{range .Keys}}
-<div class="key-card">
-  <div class="key-card-row">
-    <div>
-      <div class="key-card-prefix">{{.Prefix}}…</div>
-      <div class="key-card-meta">Created {{.CreatedAt}} · Scope <span class="model-badge" style="font-size:10px">{{.Scope}}</span></div>
-    </div>
-    <button class="btn-danger-sm"
-      hx-delete="/api/keys/{{.ID}}"
-      hx-target="#consumer-keys-list"
-      hx-swap="innerHTML"
-      hx-confirm="Revoke this key?">Revoke</button>
+<div class="banner warn" data-testid="new-key-modal" id="new-key-modal">
+  Copy your API key now — it won’t be shown again.
+  <span class="key" data-testid="new-key-value">{{.NewKey}}</span>
+  <div class="row-actions mt-12">
+    <button type="button" class="btn btn-sm btn-primary" data-testid="btn-copy-new-key" onclick="copyText(this, '{{.NewKey}}')">Copy key</button>
+    <button type="button" class="btn btn-sm" data-testid="btn-close-new-key-modal" onclick="document.getElementById('new-key-modal').remove()">Close</button>
   </div>
 </div>
 {{end}}
 
-<button class="btn-consumer btn-primary btn-sm"
-  hx-post="/use/keys"
-  hx-target="#consumer-keys-list"
-  hx-swap="innerHTML"
-  data-testid="btn-create-key">
-  + Create new key
-</button>
+<div class="row-actions" style="justify-content:flex-end;margin-bottom:12px">
+  <button type="button" class="btn btn-sm btn-primary"
+          data-testid="btn-create-key"
+          hx-post="/use/keys"
+          hx-target="#use-keys"
+          hx-swap="innerHTML">Create key</button>
+</div>
+
+{{if .Keys}}
+<div class="key-list" data-testid="key-list">
+{{range .Keys}}
+  <div class="key-row key-card" data-testid="key-card" data-key-id="{{.ID}}">
+    <div>
+      <strong data-testid="key-prefix">{{.Prefix}}</strong>
+      <div class="text-muted" data-testid="key-scope-label">{{.ScopeLabel}} · created {{.CreatedAt}}</div>
+    </div>
+    <button type="button" class="btn-danger"
+            data-testid="btn-revoke-key"
+            hx-delete="/api/keys/{{.ID}}"
+            hx-confirm="Revoke this key?"
+            hx-target="#use-keys"
+            hx-swap="innerHTML">Revoke</button>
+  </div>
+{{end}}
+</div>
+{{else}}
+<p class="empty-line" data-testid="keys-empty">No API keys yet. Create one to call /v1/machines/…</p>
+{{end}}

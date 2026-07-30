@@ -166,8 +166,15 @@ func (s *Server) handleTestError(w http.ResponseWriter, r *http.Request) {
 	pd := s.pageData(r)
 	pd.Title = "Error " + strconv.Itoa(code)
 	pd.ErrorCode = &code
+	pd.ActiveNav = "home"
+	tmpl, ok := getTemplates()[templateName]
+	if !ok {
+		http.Error(w, "template not found", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(code)
-	renderTemplate(w, templateName, pd)
+	_ = tmpl.Execute(w, pd)
 }
 
 // handleTestResetRateLimit resets the token bucket for a key.

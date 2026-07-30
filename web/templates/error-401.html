@@ -1,49 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
-  <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  {{template "head" .}}
   <title>401 — GPU Mesh</title>
 </head>
 <body>
-  <nav class="topbar">
-    <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
-    <ul class="nav-links">
-      <li><a href="/" data-testid="nav-home">Home</a></li>
-      <li><a href="/use" data-testid="nav-use">Use Models</a></li>
-      <li><a href="/share" data-testid="nav-share">Share GPU</a></li>
-      <li><a href="/models" data-testid="nav-models">Models</a></li>
-      <li><a href="/about" data-testid="nav-about">About</a></li>
-    </ul>
-    <div class="nav-right">
-      {{if .LoggedIn}}
-      <span class="nav-user mono text-accent">{{.Login}}</span>
-      <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
-      {{else}}
-      <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
-      {{end}}
-    </div>
-  </nav>
-
-  <main data-testid="error-page">
-    <div class="empty-state">
-      <strong data-testid="error-code">401 — Unauthorized</strong>
-      <p>You need to sign in to access this page.</p>
-      <a href="/" class="btn-consumer btn-primary" data-testid="btn-go-home">Go home</a>
+  {{template "nav" .}}
+  <main class="page" data-testid="error-page">
+    <div class="error-page">
+      <div class="code-big" data-testid="error-code">401</div>
+      <h1 class="serif-h1" style="font-size:28px;margin-top:8px">Sign in required</h1>
+      <p>You need to sign in to view this page.</p>
+      <a href="/login" class="btn btn-primary" data-testid="btn-go-home">Sign in</a>
     </div>
   </main>
-
-  <footer data-testid="footer">
-    <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
-    &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
-  </footer>
-
-  <script src="/static/js/app.js"></script>
-  <script src="https://unpkg.com/htmx.org@2"></script>
+  {{template "footer" .}}
+  {{template "scripts" .}}
 </body>
 </html>

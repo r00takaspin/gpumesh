@@ -1,0 +1,19 @@
+<div class="section-title"><span>Members</span></div>
+{{if .Members}}
+{{range .Members}}
+<div class="member-row" data-testid="member-row">
+  <div>
+    <strong data-testid="member-login">@{{.Login}}</strong>
+    <div class="mono-muted">joined · {{.JoinedRel}}</div>
+  </div>
+  <button type="button" class="btn-danger"
+          data-testid="btn-revoke-member"
+          hx-delete="/api/machines/{{.MachineID}}/members/{{.UserID}}"
+          hx-swap="none"
+          hx-confirm="Revoke @{{.Login}}? They’ll lose access immediately."
+          hx-on::after-request="htmx.trigger(document.body, 'refreshMembers')">Revoke</button>
+</div>
+{{end}}
+{{else}}
+<p class="empty-line" data-testid="members-empty">No members yet — create an invite to share access.</p>
+{{end}}

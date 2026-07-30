@@ -1,85 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
-  <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <title>Login — GPU Mesh</title>
+  {{template "head" .}}
+  <title>Sign in — GPU Mesh</title>
 </head>
 <body>
-  <nav class="topbar">
-    <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
-    <ul class="nav-links">
-      <li><a href="/" data-testid="nav-home">Home</a></li>
-      <li><a href="/use" data-testid="nav-use">Use Models</a></li>
-      <li><a href="/share" data-testid="nav-share">Share GPU</a></li>
-      <li><a href="/models" data-testid="nav-models">Models</a></li>
-      <li><a href="/about" data-testid="nav-about">About</a></li>
-    </ul>
-    <div class="nav-right">
-      {{if .LoggedIn}}
-      <span class="nav-user mono text-accent">{{.Login}}</span>
-      <a href="/logout" class="btn btn--sm nav-logout">[Logout]</a>
-      {{else}}
-      <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary btn-sm">Sign in with GitHub</a>
+  {{template "nav" .}}
+
+  <main class="page login-main" data-testid="login-page">
+    <div data-testid="login-card">
+      <h1 class="serif-h1" style="font-size:36px" data-testid="login-title">Sign in</h1>
+      <p class="lead" style="margin-left:auto;margin-right:auto">GitHub is required to create invites and join with a PIN.</p>
+
+      {{if not .HasOAuth}}
+      <div class="banner warn mt-20" style="text-align:left" data-testid="oauth-unset">
+        GitHub sign-in isn’t configured on this server (missing GITHUB_CLIENT_ID).
+      </div>
       {{end}}
+
+      {{if .HasOAuth}}
+      <a href="/auth/github{{if .Redirect}}?redirect={{.Redirect}}{{end}}"
+         class="btn btn-primary mt-28"
+         data-testid="btn-github-login">Sign in with GitHub</a>
+      {{else}}
+      <button type="button" class="btn btn-primary mt-28" data-testid="btn-github-login" disabled>Sign in with GitHub</button>
+      {{end}}
+
+      <p class="meta center mt-16">After auth you’ll return to where you left off.</p>
     </div>
-  </nav>
 
-  <main>
-    <div class="login-page">
-      <div class="consumer-card login-card" data-testid="login-card">
-        <div class="login-ascii">
-  ___ ___ _   _   __  __        _    
- / __| _ \ | | | |  \/  |___ __| |_  
-:| (_ |  _/ |_| | | |\/| / -_|_-< ' \ 
- \___|_|  \___/  |_|  |_\___/__/_||_|
-        </div>
-
-        <p class="login-tagline">
-          One click. No password. No email.
-        </p>
-
-        {{if .HasOAuth}}
-        <a href="/auth/github" class="btn-consumer btn-primary" data-testid="btn-github-login">
-          Sign in with GitHub →
-        </a>
-        {{else}}
-        <p class="login-note text-warning">OAuth not configured. Set GITHUB_CLIENT_ID.</p>
-        {{end}}
-
-        <p class="login-note">
-          We only request <code>read:user</code> to verify your identity.
-          No repo access. No org data.
-        </p>
-      </div>
-
-      <div class="consumer-card login-info mt-2" data-testid="login-why-github">
-        <div class="card-title">Why GitHub?</div>
-        <div class="mono text-dim" style="font-size:0.75rem;line-height:1.8">
-          GPU Mesh is built by developers, for developers. You already have<br>
-          a GitHub account. No new passwords, no email verification, no<br>
-          "reset your password" emails. Just click and go.<br><br>
-          <strong class="text-accent">What happens next?</strong><br>
-          1. GitHub confirms your identity<br>
-          2. We create an account (or find your existing one)<br>
-          3. You get an API key on your dashboard<br>
-          4. Start using any OpenAI-compatible tool. Free.
-        </div>
-      </div>
+    <div class="card mt-28" style="text-align:left" data-testid="login-why-github">
+      <h2>Why GitHub?</h2>
+      <p class="text-muted mb-0">We only request <code>read:user</code> to verify your identity. No repo access. No new password.</p>
     </div>
   </main>
 
-  <footer data-testid="footer">
-    <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
-    &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
-  </footer>
-
-  <script src="/static/js/app.js"></script>
-  <script src="https://unpkg.com/htmx.org@2"></script>
+  {{template "footer" .}}
+  {{template "scripts" .}}
 </body>
 </html>

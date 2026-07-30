@@ -4,28 +4,48 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
 
-// donorView is the shared view model for donor agent cards.
-type donorView struct {
-	ProviderID      string
-	Description     string
-	Hardware        string
-	ModelCount      int
-	CurrentLoad     int
-	MaxConcurrent   int
-	Uptime          string
-	ModelList       string
-	SessionRequests int
-	SessionTokens   int
-	TokPerSec       string
+type machineStripView struct {
+	ID         string
+	Name       string
+	Hardware   string
+	Online     bool
+	ModelCount int
+	Models     string
 }
 
+type inviteListView struct {
+	ID         int64
+	MaskedPIN  string
+	Status     string
+	Uses       int
+	MaxUses    int
+	ExpiresRel string
+}
 
-// --- GET /api/consumer/stats ---
+type memberView struct {
+	UserID    int64
+	Login     string
+	MachineID string
+	JoinedRel string
+}
+
+type useMachineView struct {
+	ID           string
+	Name         string
+	OwnerLabel   string
+	Role         string
+	Online       bool
+	Models       string
+	BaseURL      string
+	DefaultModel string
+}
+
+// --- JSON APIs (owner/consumer) ---
 
 func (s *Server) handleConsumerStats(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
@@ -33,26 +53,21 @@ func (s *Server) handleConsumerStats(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-
-	// Consumer stats aggregated across all user keys.
 	keys, _ := s.store.ListKeys(userID)
 	rateLimit := s.limiter.Burst()
 	minRemaining := rateLimit
 	for _, k := range keys {
-		if r := s.limiter.Remaining(k.KeyHash); r < minRemaining {
-			minRemaining = r
+		if rem := s.limiter.Remaining(k.KeyHash); rem < minRemaining {
+			minRemaining = rem
 		}
 	}
-
 	writeJSON(w, http.StatusOK, map[string]interface{}{
 		"requests_today": rateLimit - minRemaining,
-		"tokens_today":   int64(0), // per-consumer token tracking not in MVP
+		"tokens_today":   int64(0),
 		"rate_limit":     rateLimit,
 		"rate_remaining": minRemaining,
 	})
 }
-
-// --- GET /api/donor/stats ---
 
 func (s *Server) handleOwnerStatsAPI(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
@@ -60,23 +75,19 @@ func (s *Server) handleOwnerStatsAPI(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-
 	ds, err := s.store.GetOwnerStats(userID)
 	if err != nil {
-		log.Printf("donor stats error: %v", err)
+		log.Printf("owner stats error: %v", err)
 		writeError(w, http.StatusInternalServerError, "failed to get stats")
 		return
 	}
-
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"total_requests":      ds.TotalRequests,
-		"total_tokens":        ds.TotalTokens,
+		"total_requests":       ds.TotalRequests,
+		"total_tokens":         ds.TotalTokens,
 		"total_uptime_seconds": ds.TotalUptimeSec,
-		"badge":               BadgeForTokens(ds.TotalTokens),
+		"badge":                BadgeForTokens(ds.TotalTokens),
 	})
 }
-
-// --- GET /api/donor/status ---
 
 func (s *Server) handleOwnerStatus(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
@@ -84,13 +95,12 @@ func (s *Server) handleOwnerStatus(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-
 	donors := s.registry.MachinesForUser(userID)
 	agents := make([]map[string]interface{}, 0, len(donors))
 	for _, d := range donors {
 		uptime := time.Since(d.ConnectedAt)
 		agents = append(agents, map[string]interface{}{
-			"machine_id": d.MachineID,
+			"machine_id":  d.MachineID,
 			"online":      true,
 			"models":      d.Models,
 			"load":        fmt.Sprintf("%d/%d", d.CurrentLoad, d.MaxConcurrent),
@@ -98,263 +108,187 @@ func (s *Server) handleOwnerStatus(w http.ResponseWriter, r *http.Request) {
 			"description": d.Description,
 		})
 	}
-
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"agents": agents,
-	})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"agents": agents})
 }
 
+// --- Share progressive panel ---
 
-// --- HTMX use fragments ---
-
-// handleUseDonor renders the donor tab content for /use.
-func (s *Server) handleUseDonor(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleSharePanel(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
 
-	donors := s.registry.MachinesForUser(userID)
-	stats, _ := s.store.GetOwnerStats(userID)
-	badge := BadgeForTokens(stats.TotalTokens)
-	badgeEmoji := badgeEmoji(badge)
-
-	agents := make([]donorView, len(donors))
-	for i, d := range donors {
-		uptime := time.Since(d.ConnectedAt)
-		var tokPerSec string
-		if uptime.Seconds() > 0 && d.SessionTokens > 0 {
-			tokPerSec = fmt.Sprintf("%.1f", float64(d.SessionTokens)/uptime.Seconds())
-		} else {
-			tokPerSec = "—"
-		}
-		agents[i] = donorView{
-			ProviderID:      d.MachineID,
-			Description:     d.Description,
-			Hardware:        d.Hardware,
-			ModelCount:      len(d.Models),
-			CurrentLoad:     d.CurrentLoad,
-			MaxConcurrent:   d.MaxConcurrent,
-			Uptime:          formatDuration(uptime),
-			ModelList:       joinModels(d.Models),
-			SessionRequests: d.SessionRequests,
-			SessionTokens:   d.SessionTokens,
-			TokPerSec:       tokPerSec,
-		}
-	}
-
-	// Badge progress.
-	badgeNext, badgeThreshold := nextBadge(stats.TotalTokens)
-	badgePct := 0
-	if badgeThreshold > 0 {
-		badgePct = int(stats.TotalTokens * 100 / badgeThreshold)
-	}
-	remaining := badgeThreshold - stats.TotalTokens
-
-	// Find donor-scoped key for token display.
-	// Collect all donor/both keys for the token list.
-	type donorKeyView struct {
-		ID        int64
-		KeyPrefix string
-		CreatedAt string
-	}
 	keys, _ := s.store.ListKeys(userID)
-	var donorKeys []donorKeyView
+	var providerKeyID int64
+	var tokenPrefix string
 	for _, k := range keys {
 		if k.Scope == "provider" || k.Scope == "donor" || k.Scope == "both" {
-			donorKeys = append(donorKeys, donorKeyView{
-				ID:        k.ID,
-				KeyPrefix: k.KeyPrefix,
-				CreatedAt: k.CreatedAt.Format("2006-01-02"),
-			})
-		}
-	}
-
-	tokenPrefix := "inf_xxxx"
-	if len(donorKeys) > 0 {
-		tokenPrefix = donorKeys[0].KeyPrefix
-	}
-	tokenFull := tokenPrefix + "..."
-
-	avg := 0.0
-	if stats.TotalUptimeSec > 0 {
-		avg = float64(stats.TotalTokens) / float64(stats.TotalUptimeSec)
-	}
-	avgTokensPerSec := fmt.Sprintf("%.1f", avg)
-	totalUptime := formatDuration(time.Duration(stats.TotalUptimeSec) * time.Second)
-
-	data := map[string]interface{}{
-		"Agents":           agents,
-		"Stats":             stats,
-		"TotalUptime":       totalUptime,
-		"Badge":             badge,
-		"BadgeEmoji":        badgeEmoji,
-		"BadgeNext":         badgeNext,
-		"BadgeProgress":     stats.TotalTokens,
-		"BadgeThreshold":     badgeThreshold,
-		"BadgePercent":      badgePct,
-		"BadgeRemaining":    remaining,
-		"AvgTokensPerSec":   avgTokensPerSec,
-		"TokenPrefix":       tokenPrefix,
-		"TokenFull":         tokenFull,
-		"DonorKeys":         donorKeys,
-	}
-
-	renderTemplate(w, "use-donor.html", data)
-}
-
-// handleShareSetup renders the share setup/onboarding block.
-func (s *Server) handleShareSetup(w http.ResponseWriter, r *http.Request) {
-	userID := getUserID(r)
-	if userID == 0 {
-		writeError(w, http.StatusUnauthorized, "not authenticated")
-		return
-	}
-
-	donors := s.registry.MachinesForUser(userID)
-
-	// Build coordinator WebSocket URL.
-	coordURL := s.baseURL
-	if strings.Contains(coordURL, "localhost") || strings.Contains(coordURL, "127.0.0.1") {
-		coordURL = "ws://" + strings.TrimPrefix(strings.TrimPrefix(coordURL, "https://"), "http://") + "/ws/provider"
-	} else if strings.HasPrefix(coordURL, "https://") {
-		coordURL = "wss://" + strings.TrimPrefix(coordURL, "https://") + "/ws/provider"
-	} else {
-		coordURL = "ws://" + strings.TrimPrefix(coordURL, "http://") + "/ws/provider"
-	}
-
-	// Find the first donor-scoped key for the run command.
-	keys, _ := s.store.ListKeys(userID)
-	var token string
-	for _, k := range keys {
-		if k.Scope == "provider" || k.Scope == "donor" || k.Scope == "both" {
-			token = k.KeyPrefix + "..."
+			providerKeyID = k.ID
+			tokenPrefix = k.KeyPrefix
 			break
 		}
 	}
 
+	base := strings.TrimRight(s.baseURL, "/")
+	runCmd := fmt.Sprintf("export MESH_COORDINATOR=%q\nexport MESH_TOKEN=%q\ngpumesh-provider",
+		base, tokenPrefix+"…")
 
-	data := map[string]interface{}{
-		"CoordinatorURL": coordURL,
-		"Token":          token,
-		"HasDonors":      len(donors) > 0,
-		"HasToken":       token != "",
-		"ActiveTab":      r.URL.Query().Get("os-tab-share"),
+	if providerKeyID == 0 {
+		renderTemplate(w, "share-panel.html", map[string]interface{}{
+			"State":   "no-token",
+			"BaseURL": base,
+		})
+		return
 	}
 
-	renderTemplate(w, "share-setup.html", data)
+	machines, _ := s.store.ListMachinesByOwner(userID)
+	if len(machines) == 0 {
+		renderTemplate(w, "share-panel.html", map[string]interface{}{
+			"State":         "waiting",
+			"BaseURL":       base,
+			"RunCommand":    runCmd,
+			"TokenPrefix":   tokenPrefix,
+			"ProviderKeyID": providerKeyID,
+		})
+		return
+	}
+
+	views := make([]machineStripView, 0, len(machines))
+	anyOnline := false
+	for _, m := range machines {
+		sess := s.registry.GetSession(m.ID)
+		online := sess != nil && sess.BackendOK
+		if online {
+			anyOnline = true
+		}
+		hw := ""
+		models := ""
+		count := 0
+		if sess != nil {
+			hw = sess.Hardware
+			models = joinModels(sess.Models)
+			count = len(sess.Models)
+		}
+		name := m.DisplayName
+		if name == "" {
+			name = m.ID
+		}
+		views = append(views, machineStripView{
+			ID: m.ID, Name: name, Hardware: hw, Online: online, ModelCount: count, Models: models,
+		})
+	}
+
+	invites, _ := s.store.ListInvitesByOwner(userID)
+	invViews := make([]inviteListView, 0, len(invites))
+	for _, inv := range invites {
+		invViews = append(invViews, inviteListView{
+			ID:         inv.ID,
+			MaskedPIN:  inv.MaskedPIN(),
+			Status:     inv.Status(),
+			Uses:       inv.Uses,
+			MaxUses:    inv.MaxUses,
+			ExpiresRel: formatExpiresRel(inv.ExpiresAt),
+		})
+	}
+
+	selected := views[0].ID
+	renderTemplate(w, "share-panel.html", map[string]interface{}{
+		"State":             "ready",
+		"Offline":           !anyOnline,
+		"Machines":          views,
+		"SelectedMachineID": selected,
+		"Invites":           invViews,
+		"BaseURL":           base,
+		"RunCommand":        runCmd,
+		"TokenPrefix":       tokenPrefix,
+		"ProviderKeyID":     providerKeyID,
+	})
 }
 
-// handleShareModels renders the donor model/hardware status cards.
-func (s *Server) handleShareModels(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleShareMembers(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-	donors := s.registry.MachinesForUser(userID)
-	sort.Slice(donors, func(i, j int) bool { return donors[i].Description < donors[j].Description })
-	agents := make([]donorView, len(donors))
-	for i, d := range donors {
-		uptime := time.Since(d.ConnectedAt)
-		var tokPerSec string
-		if uptime.Seconds() > 0 && d.SessionTokens > 0 {
-			tokPerSec = fmt.Sprintf("%.1f", float64(d.SessionTokens)/uptime.Seconds())
-		} else {
-			tokPerSec = "—"
+	machineID := r.URL.Query().Get("machine_id")
+	if machineID == "" {
+		machines, _ := s.store.ListMachinesByOwner(userID)
+		if len(machines) == 0 {
+			renderTemplate(w, "share-members.html", map[string]interface{}{"Members": nil})
+			return
 		}
-		agents[i] = donorView{
-			ProviderID:      d.MachineID,
-			Description:     d.Description,
-			Hardware:        d.Hardware,
-			ModelCount:      len(d.Models),
-			CurrentLoad:     d.CurrentLoad,
-			MaxConcurrent:   d.MaxConcurrent,
-			Uptime:          formatDuration(uptime),
-			ModelList:       joinModels(d.Models),
-			SessionRequests: d.SessionRequests,
-			SessionTokens:   d.SessionTokens,
-			TokPerSec:       tokPerSec,
+		machineID = machines[0].ID
+	}
+	bindings, err := s.store.ListMembers(machineID, userID)
+	if err != nil {
+		renderTemplate(w, "share-members.html", map[string]interface{}{"Members": nil})
+		return
+	}
+	members := make([]memberView, 0, len(bindings))
+	for _, b := range bindings {
+		login, _ := s.store.GetUserByID(b.MemberUserID)
+		if login == "" {
+			login = fmt.Sprintf("user-%d", b.MemberUserID)
 		}
+		members = append(members, memberView{
+			UserID:    b.MemberUserID,
+			Login:     login,
+			MachineID: machineID,
+			JoinedRel: formatRelative(b.CreatedAt),
+		})
 	}
-
-	data := map[string]interface{}{
-		"Agents": agents,
-	}
-
-	renderTemplate(w, "share-models.html", data)
+	renderTemplate(w, "share-members.html", map[string]interface{}{"Members": members})
 }
 
-// handleShareDonorStats renders stats + badge + token list (collapsed by default).
-func (s *Server) handleShareDonorStats(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleShareCreateInvite(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-
-	donors := s.registry.MachinesForUser(userID)
-	stats, _ := s.store.GetOwnerStats(userID)
-
-	// Only render if there's activity or donors connected.
-	// Always render — token management UI must be visible even with no stats.
-	_ = donors
-	_ = stats
-
-	badge := BadgeForTokens(stats.TotalTokens)
-	badgeEmoji := badgeEmoji(badge)
-
-	badgeNext, badgeThreshold := nextBadge(stats.TotalTokens)
-	badgePct := 0
-	if badgeThreshold > 0 {
-		badgePct = int(stats.TotalTokens * 100 / badgeThreshold)
+	if err := r.ParseForm(); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid form")
+		return
 	}
-	remaining := badgeThreshold - stats.TotalTokens
-
-	// Collect donor keys for the token list.
-	type donorKeyView struct {
-		ID        int64
-		KeyPrefix string
-		CreatedAt string
+	machineID := r.FormValue("machine_id")
+	maxUses, _ := strconv.Atoi(r.FormValue("max_uses"))
+	ttlDays, _ := strconv.Atoi(r.FormValue("ttl_days"))
+	if machineID == "" {
+		writeError(w, http.StatusBadRequest, "machine_id is required")
+		return
 	}
-	keys, _ := s.store.ListKeys(userID)
-	var donorKeys []donorKeyView
-	for _, k := range keys {
-		if k.Scope == "provider" || k.Scope == "donor" || k.Scope == "both" {
-			donorKeys = append(donorKeys, donorKeyView{
-				ID:        k.ID,
-				KeyPrefix: k.KeyPrefix,
-				CreatedAt: k.CreatedAt.Format("2006-01-02"),
-			})
-		}
+	if maxUses == 0 {
+		maxUses = s.inviteMaxUses
+	}
+	if ttlDays == 0 {
+		ttlDays = s.inviteTTLDays
 	}
 
-	avg := 0.0
-	if stats.TotalUptimeSec > 0 {
-		avg = float64(stats.TotalTokens) / float64(stats.TotalUptimeSec)
-	}
-	avgTokensPerSec := fmt.Sprintf("%.1f", avg)
-	totalUptime := formatDuration(time.Duration(stats.TotalUptimeSec) * time.Second)
-
-	data := map[string]interface{}{
-		"Stats":           stats,
-		"TotalUptime":     totalUptime,
-		"Badge":           badge,
-		"BadgeEmoji":      badgeEmoji,
-		"BadgeNext":       badgeNext,
-		"BadgeProgress":   stats.TotalTokens,
-		"BadgeThreshold":  badgeThreshold,
-		"BadgePercent":    badgePct,
-		"BadgeRemaining":  remaining,
-		"AvgTokensPerSec": avgTokensPerSec,
-		"DonorKeys":       donorKeys,
+	inv, pin, err := s.store.CreateInvite(machineID, userID, maxUses, ttlDays, "")
+	if err != nil {
+		log.Printf("create invite: %v", err)
+		writeError(w, http.StatusForbidden, "cannot create invite for this machine")
+		return
 	}
 
-	renderTemplate(w, "share-stats.html", data)
+	machineName := machineID
+	if m, _ := s.store.GetMachine(machineID); m != nil && m.DisplayName != "" {
+		machineName = m.DisplayName
+	}
+	joinLink := strings.TrimRight(s.baseURL, "/") + "/join?pin=" + pin
+	w.Header().Set("HX-Trigger", "refreshPanel")
+	renderTemplate(w, "share-invite-modal.html", map[string]interface{}{
+		"PIN":         pin,
+		"JoinLink":    joinLink,
+		"MaxUses":     inv.MaxUses,
+		"TTLDays":     ttlDays,
+		"MachineName": machineName,
+	})
 }
 
-// handleShareCreateToken creates a new donor token and renders a modal with it.
 func (s *Server) handleShareCreateToken(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
@@ -366,22 +300,120 @@ func (s *Server) handleShareCreateToken(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, "failed to create token")
 		return
 	}
-
-	// Build coordinator URL.
-	coordURL := s.baseURL
-	if strings.Contains(coordURL, "localhost") || strings.Contains(coordURL, "127.0.0.1") {
-		coordURL = "ws://" + strings.TrimPrefix(strings.TrimPrefix(coordURL, "https://"), "http://") + "/ws/provider"
-	} else if strings.HasPrefix(coordURL, "https://") {
-		coordURL = "wss://" + strings.TrimPrefix(coordURL, "https://") + "/ws/provider"
-	} else {
-		coordURL = "ws://" + strings.TrimPrefix(coordURL, "http://") + "/ws/provider"
-	}
-
-	w.Header().Set("HX-Trigger", "refreshStats")
+	base := strings.TrimRight(s.baseURL, "/")
+	coordURL := providerWSURL(base)
+	w.Header().Set("HX-Trigger", "refreshPanel")
 	renderTemplate(w, "share-token-modal.html", map[string]interface{}{
-		"Token":          rawKey,
-		"CoordinatorURL": coordURL,
+		"Token":           rawKey,
+		"CoordinatorURL":  coordURL,
+		"CoordinatorHTTP": base,
 	})
+}
+
+// --- Use machines / keys ---
+
+func (s *Server) handleUseMachines(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	list, err := s.store.ListAccessibleMachines(userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list machines")
+		return
+	}
+	base := strings.TrimRight(s.baseURL, "/")
+	views := make([]useMachineView, 0, len(list))
+	for _, bi := range list {
+		sess := s.registry.GetSession(bi.MachineID)
+		online := sess != nil && sess.BackendOK
+		models := ""
+		defaultModel := "llama3.2:3b"
+		if sess != nil && len(sess.Models) > 0 {
+			models = joinModels(sess.Models)
+			defaultModel = sess.Models[0]
+		}
+		ownerLabel := "owned by you"
+		if bi.Role == "member" {
+			login, _ := s.store.GetUserByID(bi.OwnerUserID)
+			if login != "" {
+				ownerLabel = "@" + login
+			} else {
+				ownerLabel = "member"
+			}
+		}
+		name := bi.DisplayName
+		if name == "" {
+			name = bi.MachineID
+		}
+		views = append(views, useMachineView{
+			ID:           bi.MachineID,
+			Name:         name,
+			OwnerLabel:   ownerLabel,
+			Role:         bi.Role,
+			Online:       online,
+			Models:       models,
+			BaseURL:      base + "/v1/machines/" + bi.MachineID,
+			DefaultModel: defaultModel,
+		})
+	}
+	renderTemplate(w, "use-machines.html", map[string]interface{}{"Machines": views})
+}
+
+func (s *Server) handleUseKeys(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	renderTemplate(w, "use-keys.html", s.keysViewData(userID, ""))
+}
+
+func (s *Server) handleUseCreateKey(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	if userID == 0 {
+		writeError(w, http.StatusUnauthorized, "not authenticated")
+		return
+	}
+	rawKey, _, err := s.store.CreateKey(userID, "consumer")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create key")
+		return
+	}
+	renderTemplate(w, "use-keys.html", s.keysViewData(userID, rawKey))
+}
+
+func (s *Server) keysViewData(userID int64, newKey string) map[string]interface{} {
+	keys, _ := s.store.ListKeys(userID)
+	type keyView struct {
+		ID         int64
+		Prefix     string
+		Scope      string
+		ScopeLabel string
+		CreatedAt  string
+	}
+	var kv []keyView
+	for _, k := range keys {
+		label := "for tools"
+		switch k.Scope {
+		case "provider", "donor":
+			label = "for provider"
+		case "both":
+			label = "for tools & provider"
+		}
+		kv = append(kv, keyView{
+			ID:         k.ID,
+			Prefix:     k.KeyPrefix,
+			Scope:      k.Scope,
+			ScopeLabel: label,
+			CreatedAt:  k.CreatedAt.Format("2006-01-02"),
+		})
+	}
+	return map[string]interface{}{
+		"Keys":   kv,
+		"NewKey": newKey,
+	}
 }
 
 // --- Helpers ---
@@ -390,7 +422,6 @@ func formatDuration(d time.Duration) string {
 	days := int(d.Hours()) / 24
 	hours := int(d.Hours()) % 24
 	minutes := int(d.Minutes()) % 60
-
 	if days > 0 {
 		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
 	}
@@ -398,36 +429,6 @@ func formatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dh %dm", hours, minutes)
 	}
 	return fmt.Sprintf("%dm", minutes)
-}
-
-func badgeEmoji(badge string) string {
-	switch badge {
-	case "platinum":
-		return "💎"
-	case "gold":
-		return "🥇"
-	case "silver":
-		return "🥈"
-	case "bronze":
-		return "🥉"
-	default:
-		return "🫐"
-	}
-}
-
-func nextBadge(tokens int64) (name string, threshold int64) {
-	switch {
-	case tokens < 1_000:
-		return "Bronze", 1_000
-	case tokens < 10_000:
-		return "Silver", 10_000
-	case tokens < 100_000:
-		return "Gold", 100_000
-	case tokens < 1_000_000:
-		return "Platinum", 1_000_000
-	default:
-		return "Max", 1_000_000
-	}
 }
 
 func joinModels(models []string) string {
@@ -441,70 +442,12 @@ func joinModels(models []string) string {
 	return s
 }
 
-// --- HTMX use fragments ---
-
-// handleUseKeys renders the API Keys tab content as an HTMX fragment.
-func (s *Server) handleUseKeys(w http.ResponseWriter, r *http.Request) {
-	userID := getUserID(r)
-	if userID == 0 {
-		writeError(w, http.StatusUnauthorized, "not authenticated")
-		return
+func providerWSURL(base string) string {
+	if strings.Contains(base, "localhost") || strings.Contains(base, "127.0.0.1") {
+		return "ws://" + strings.TrimPrefix(strings.TrimPrefix(base, "https://"), "http://") + "/ws/provider"
 	}
-	keys, _ := s.store.ListKeys(userID)
-	type keyView struct {
-		ID        int64
-		Prefix    string
-		Scope     string
-		CreatedAt string
+	if strings.HasPrefix(base, "https://") {
+		return "wss://" + strings.TrimPrefix(base, "https://") + "/ws/provider"
 	}
-	var kv []keyView
-	for _, k := range keys {
-		if k.Scope == "consumer" || k.Scope == "both" {
-			kv = append(kv, keyView{
-				ID:        k.ID,
-				Prefix:    k.KeyPrefix,
-				Scope:     k.Scope,
-				CreatedAt: k.CreatedAt.Format("2006-01-02"),
-			})
-		}
-	}
-	renderTemplate(w, "use-keys.html", map[string]interface{}{
-		"Keys": kv,
-	})
-}
-
-// handleUseCreateKey creates a new consumer key and returns the API Keys fragment.
-func (s *Server) handleUseCreateKey(w http.ResponseWriter, r *http.Request) {
-	userID := getUserID(r)
-	if userID == 0 {
-		writeError(w, http.StatusUnauthorized, "not authenticated")
-		return
-	}
-	rawKey, _, err := s.store.CreateKey(userID, "consumer")
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to create key")
-		return
-	}
-	keys, _ := s.store.ListKeys(userID)
-	type keyView struct {
-		ID        int64
-		Prefix    string
-		Scope     string
-		CreatedAt string
-	}
-	kv := make([]keyView, 0, len(keys))
-	for _, k := range keys {
-		if k.Scope == "consumer" || k.Scope == "both" {
-			kv = append(kv, keyView{
-				ID:        k.ID,
-				Prefix:    k.KeyPrefix,
-				Scope:     k.Scope,
-				CreatedAt: k.CreatedAt.Format("2006-01-02"),
-			})
-		}
-	}
-	renderTemplate(w, "use-keys.html", map[string]interface{}{
-		"Keys":    kv,
-		"NewKey":  rawKey,
-	})
+	return "ws://" + strings.TrimPrefix(base, "http://") + "/ws/provider"
 }

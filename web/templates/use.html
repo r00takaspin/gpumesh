@@ -1,346 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Use Models — GPU Mesh</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
-  <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  {{template "head" .}}
+  <title>Use — GPU Mesh</title>
 </head>
 <body>
+  {{template "nav" .}}
 
-{{if not .LoggedIn}}
-<!-- ====== LOGGED OUT ====== -->
-<nav class="topbar">
-  <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
-  <ul class="nav-links">
-    <li><a href="/" data-testid="nav-home">Home</a></li>
-    <li><a href="/use" class="active" data-testid="nav-use">Use Models</a></li>
-    <li><a href="/share" data-testid="nav-share">Share GPU</a></li>
-    <li><a href="/models" data-testid="nav-models">Models</a></li>
-    <li><a href="/about" data-testid="nav-about">About</a></li>
-  </ul>
-  <div class="nav-right">
-    <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary btn-sm" data-testid="btn-signin">Sign in with GitHub</a>
-  </div>
-</nav>
-
-<main>
-  <!-- Hero -->
-  <div class="hero" data-testid="hero-logged-out">
-    <div class="hero-logo">
-  _____ _____  _    _    __  __ ______  _____ _    _
- / ____|  __ \| |  | |  |  \/  |  ____|/ ____| |  | |
-| |  __| |__) | |  | |  | \  / | |__  | (___ | |__| |
-| | |_ |  ___/| |  | |  | |\/| |  __|  \___ \|  __  |
-| |__| | |    | |__| |  | |  | | |____ ____) | |  | |
- \_____|_|     \____/   |_|  |_|______|_____/|_|  |_|
+  {{if not .LoggedIn}}
+  <main class="page" data-testid="use-page">
+    <h1 class="serif-h1" data-testid="use-title">Your machines</h1>
+    <p class="lead">Sign in to see machines you own or joined with a PIN. Then copy a base URL into your tools.</p>
+    <div class="hero-actions">
+      <a href="/auth/github?redirect=/use" class="btn btn-primary" data-testid="btn-signin-use">Sign in with GitHub</a>
+      <a href="/join" class="btn" data-testid="cta-enter-code">Enter a code</a>
     </div>
-    <div class="hero-command">
-      [user@mesh]:~$ free_llm_inference --powered-by community_gpus<span class="blink"></span>
-    </div>
-    <h1>Free LLM inference</h1>
-    <p>Use any OpenAI-compatible tool with community GPUs. No credit card, no limits. One click to get started.</p>
-    <a href="/auth/github?redirect=/use" class="btn-consumer btn-primary">Sign in with GitHub →</a>
-  </div>
-
-  <!-- How it works -->
-  <div class="consumer-card">
-    <div class="card-title">How it works</div>
-    <div class="community-banner">
-      GPU Mesh is powered by <strong>community GPUs</strong>.
-      Enthusiasts run Ollama and share spare compute — you get free inference.
-    </div>
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-title">Sign in</div>
-        <div class="step-desc">GitHub OAuth. No password. API key created automatically.</div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-title">Pick a model</div>
-        <div class="step-desc">Browse live models from community donors. Choose any.</div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-title">Use it</div>
-        <div class="step-desc">Copy the config for your tool. It just works — OpenAI-compatible.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Live stats -->
-  <div class="stat-grid">
-    <div class="stat-box">
-      <div class="stat-num">{{.ModelsOnline}}</div>
-      <div class="stat-label">Models online</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-num">{{.DonorsOnline}}</div>
-      <div class="stat-label">Donors online</div>
-    </div>
-    <div class="stat-box">
-      <div class="stat-num">{{.RequestsToday}}</div>
-      <div class="stat-label">Requests today</div>
-    </div>
-  </div>
-</main>
-
-<footer data-testid="footer">
-  <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
-  &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
-</footer>
-
-{{else}}
-<!-- ====== LOGGED IN ====== -->
-<nav class="topbar">
-  <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
-  <ul class="nav-links">
-    <li><a href="/" data-testid="nav-home">Home</a></li>
-    <li><a href="/use" class="active" data-testid="nav-use">Use Models</a></li>
-    <li><a href="/share" data-testid="nav-share">Share GPU</a></li>
-    <li><a href="/models" data-testid="nav-models">Models</a></li>
-    <li><a href="/about" data-testid="nav-about">About</a></li>
-  </ul>
-  <div class="nav-right">
-    <span class="nav-user mono text-accent" data-testid="nav-username">{{.Login}}</span>
-    <a href="/logout" class="btn btn--sm nav-logout" data-testid="btn-logout">[Logout]</a>
-  </div>
-</nav>
-<main>
-{{if .NewKey}}
-  <!-- One-time API key display -->
-  <div class="key-strip" id="onetime-key" data-testid="one-time-key-banner">
-    <span style="font-size:11px;color:var(--orange);white-space:nowrap;margin-right:8px">⚠</span>
-    <span class="key-label">API key</span>
-    <span class="key-value">{{.NewKey}}</span>
-    <button class="key-copy" onclick="copyKey(this, '{{.NewKey}}')" data-testid="btn-copy-key">Copy</button>
-    <button class="key-copy" onclick="dismissKey()" style="margin-left:4px" title="Dismiss" data-testid="btn-dismiss-key">✕</button>
-  </div>
-  <div id="onetime-warning" class="key-warning">
-    ⚠ Copy this key now — it won't be shown again.
-  </div>
-{{end}}
-
-{{if and .LoggedIn .DefaultModel}}
-  <!-- Try it now -->
-  <div class="consumer-card" id="try-now" style="border-color:var(--accent);border-left:3px solid var(--accent);display:none" data-testid="try-it-now">
-    <div class="card-header"><div class="card-title">Try it now</div><button class="key-copy" onclick="dismissTryNow()" title="Dismiss" style="margin-left:auto">✕</button></div>
-    <p style="font-size:13px;color:var(--text-dim);margin:0 0 10px 0">Run this in your terminal — your first request in seconds.</p>
-    <pre class="code-block"><code>curl -s {{.BaseURL}}/v1/chat/completions \
-  -H "Authorization: Bearer {{if .NewKey}}{{.NewKey}}{{else if .HasKeys}}{{(index .Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"{{.DefaultModel}}","messages":[{"role":"user","content":"Hello!"}]}'</code>
-      <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-    </pre>
-{{if .NewKey}}
-    <p style="font-size:11px;color:var(--orange);margin:8px 0 0 0">This snippet includes your full key — copy now, it won't be shown again.</p>
-{{end}}
-    <p style="font-size:12px;color:var(--text-dim);margin-top:8px">Tool-specific configs (Continue.dev, Aider, Cline, etc.) for each model are in the <a href="?tab=models" onclick="switchTab('models',document.querySelector('.consumer-tab:nth-child(3)'));return false" style="color:var(--blue)">Models tab →</a></p>
-  </div>
-{{end}}
-
-  <!-- Tabs -->
-  <div class="consumer-tabs">
-    <button class="consumer-tab{{if eq .Tab "overview"}} active{{end}}" onclick="switchTab('overview', this)" data-testid="tab-overview">Overview</button>
-    <button class="consumer-tab{{if eq .Tab "keys"}} active{{end}}" onclick="switchTab('keys', this)" data-testid="tab-api-keys">API Keys</button>
-    <button class="consumer-tab{{if eq .Tab "models"}} active{{end}}" onclick="switchTab('models', this)" data-testid="tab-models">Models</button>
-  </div>
-
-  <!-- TAB: Overview -->
-  <div class="tab-panel{{if eq .Tab "overview"}} active{{end}}" id="tab-overview">
-    <div class="stat-grid" data-testid="usage-stats">
-      <div class="stat-box">
-        <div class="stat-num">{{.RequestsToday}}<span style="font-size:14px;color:var(--text-dim)">/{{.RateLimit}}</span></div>
-        <div class="stat-label">Requests today</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num">{{.TokensToday}}</div>
-        <div class="stat-label">Tokens today</div>
-      </div>
-      <div class="stat-box">
-        <div class="stat-num">{{len .Models}}</div>
-        <div class="stat-label">Models available</div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- TAB: API Keys -->
-  <div class="tab-panel{{if eq .Tab "keys"}} active{{end}}" id="tab-keys">
-    <div id="consumer-keys-list" hx-get="/use/keys" hx-trigger="load" data-testid="api-keys-list">
-      {{range .Keys}}
-      <div class="key-card">
-        <div class="key-card-row">
-          <div>
-            <div class="key-card-prefix">{{.KeyPrefix}}…</div>
-            <div class="key-card-meta">Created {{.CreatedAt.Format "2006-01-02"}} · Scope <span class="model-badge" style="font-size:10px">{{.Scope}}</span></div>
-          <button class="btn-danger-sm"
-            hx-delete="/api/keys/{{.ID}}"
-            hx-target="#consumer-keys-list"
-            hx-swap="innerHTML"
-            hx-confirm="Revoke this key?">Revoke</button>
-          </div>
-        </div>
-      </div>
-      {{end}}
-      <button class="btn-consumer btn-primary btn-sm"
-        hx-post="/use/keys"
-        hx-target="#consumer-keys-list"
-        hx-swap="innerHTML"
-        data-testid="btn-create-first-key">
-        + Create new key
-      </button>
-    </div>
-  </div>
-
-  <!-- TAB: Models -->
-  <div class="tab-panel{{if eq .Tab "models"}} active{{end}}" id="tab-models" data-testid="models-list">
-    {{if .Models}}
-    {{range $idx, $m := .Models}}
-    <div class="model-card">
-      <div class="model-card-head" onclick="toggleModel(this)">
-        <div>
-          <div class="model-name">{{$m.Name}}{{if gt $m.DonorsOnline 0}}<span class="model-badge" style="margin-left:8px">available</span>{{else}}<span class="model-badge" style="margin-left:8px;color:var(--text-dim);background:rgba(139,148,158,0.12)">unavailable</span>{{end}}</div>
-          <div class="model-meta" style="margin-top:2px">
-            <span>{{$m.DonorsOnline}} donors</span><span>Load {{printf "%.0f" $m.Load}}%</span><span>{{$m.Vendor}}</span>
-          </div>
-        </div>
-        <span style="font-size:10px;color:var(--text-dim)">▼</span>
-      </div>
-      <div class="model-configs">
-        <!-- Continue.dev -->
-        <div class="tool-row" onclick="toggleTool(this, event)">
-          <div class="tool-row-name"><span class="chevron">▶</span> Continue.dev</div>
-          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-        </div>
-        <div class="tool-snippet">
-          <pre class="code-block"><code>{
-  "models": [{
-    "title": "GPU Mesh (free)",
-    "provider": "openai",
-    "apiBase": "{{$.BaseURL}}/v1",
-    "apiKey": "{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}",
-    "model": "{{$m.Name}}"
-  }]
-}</code>
-            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-          </pre>
-        </div>
-
-        <!-- Aider -->
-        <div class="tool-row" onclick="toggleTool(this, event)">
-          <div class="tool-row-name"><span class="chevron">▶</span> Aider</div>
-          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-        </div>
-        <div class="tool-snippet">
-          <pre class="code-block"><code>aider --openai-api-base {{$.BaseURL}}/v1 \
-     --openai-api-key {{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}} \
-     --model openai/{{$m.Name}}</code>
-            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-          </pre>
-        </div>
-
-        <!-- Cline -->
-        <div class="tool-row" onclick="toggleTool(this, event)">
-          <div class="tool-row-name"><span class="chevron">▶</span> Cline</div>
-          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-        </div>
-        <div class="tool-snippet">
-          <pre class="code-block"><code>{
-  "cline.apiProvider": "openai",
-  "cline.openAiBaseUrl": "{{$.BaseURL}}/v1",
-  "cline.openAiApiKey": "{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}",
-  "cline.openAiModel": "{{$m.Name}}"
-}</code>
-            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-          </pre>
-        </div>
-
-        <!-- Open WebUI -->
-        <div class="tool-row" onclick="toggleTool(this, event)">
-          <div class="tool-row-name"><span class="chevron">▶</span> Open WebUI</div>
-          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-        </div>
-        <div class="tool-snippet">
-          <pre class="code-block"><code>OPENAI_API_BASE_URL={{$.BaseURL}}/v1
-OPENAI_API_KEY={{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}</code>
-            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-          </pre>
-        </div>
-
-        <!-- curl -->
-        <div class="tool-row" onclick="toggleTool(this, event)">
-          <div class="tool-row-name"><span class="chevron">▶</span> curl</div>
-          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-        </div>
-        <div class="tool-snippet">
-          <pre class="code-block"><code>curl -s {{$.BaseURL}}/v1/chat/completions \
-  -H "Authorization: Bearer {{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"{{$m.Name}}","messages":[{"role":"user","content":"Hi!"}]}'</code>
-            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-          </pre>
-        </div>
-
-        <!-- Python SDK -->
-        <div class="tool-row" onclick="toggleTool(this, event)">
-          <div class="tool-row-name"><span class="chevron">▶</span> Python SDK</div>
-          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-        </div>
-        <div class="tool-snippet">
-          <pre class="code-block"><code>from openai import OpenAI
-client = OpenAI(
-    base_url="{{$.BaseURL}}/v1",
-    api_key="{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}"
-)
-client.chat.completions.create(
-    model="{{$m.Name}}",
-    messages=[{"role":"user","content":"Hello!"}],
-    stream=True
-)</code>
-            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-          </pre>
-        </div>
-
-        <!-- Oh My Pi -->
-        <div class="tool-row" onclick="toggleTool(this, event)">
-          <div class="tool-row-name"><span class="chevron">▶</span> Oh My Pi</div>
-          <button class="btn-consumer btn-sm btn-ghost" onclick="event.stopPropagation();copyCode(this)">Copy</button>
-        </div>
-        <div class="tool-snippet">
-          <pre class="code-block"><code>export OPENAI_BASE_URL="{{$.BaseURL}}/v1"
-export OPENAI_API_KEY="{{if $.HasKeys}}{{(index $.Keys 0).KeyPrefix}}...{{else}}inf_your_key{{end}}"</code>
-            <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
-          </pre>
-          <div class="omp-field">
-            <span style="font-size:11px;color:var(--text-dim);white-space:nowrap">Launch:</span>
-            <code class="omp-field-code">omp run "write a hello world" --model {{$m.Name}}</code>
-            <button class="btn-consumer btn-sm btn-ghost omp-copy-btn" data-model="{{$m.Name}}" onclick="event.stopPropagation();copyOmpCmd(this)" style="white-space:nowrap">Copy</button>
-          </div>
-        </div>
+    {{template "privacy" .}}
+  </main>
+  {{else}}
+  <main class="page mid stack-lg" data-testid="use-page">
+    {{if .NewKey}}
+    <div class="banner warn" data-testid="onetime-key" id="onetime-key">
+      Copy your API key now — it won’t be shown again.
+      <span class="key" data-testid="onetime-key-value">{{.NewKey}}</span>
+      <div class="row-actions mt-12">
+        <button type="button" class="btn btn-sm" data-testid="btn-copy-onetime-key" onclick="copyText(this, '{{.NewKey}}')">Copy key</button>
+        <button type="button" class="btn btn-sm" data-testid="btn-dismiss-onetime-key" onclick="dismissKey()">Dismiss</button>
       </div>
     </div>
     {{end}}
+
+    {{if eq .Tab "keys"}}
+    <div class="section-title">
+      <h1 class="serif-h1" style="font-size:32px;margin:0" data-testid="use-title">API Keys</h1>
+      <div class="row-actions">
+        <a href="/use" class="btn btn-sm" data-testid="btn-back-machines">← Machines</a>
+      </div>
+    </div>
+    <div id="use-keys"
+         data-testid="use-keys"
+         hx-get="/use/keys"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+      <div class="waiting"><div class="spinner"></div> Loading keys…</div>
+    </div>
     {{else}}
-    <div class="empty-state">
-      <strong>No models available</strong><br>Check back soon — donors come online regularly.
+    <div class="section-title">
+      <div>
+        <h1 class="serif-h1" style="font-size:32px;margin:0" data-testid="use-title">Your machines</h1>
+        <p class="text-muted mt-8 mb-0">One base URL per machine. Change the URL in your tool to switch machines.</p>
+      </div>
+      <a href="/use?tab=keys" class="btn btn-sm" data-testid="btn-api-keys">API Keys</a>
+    </div>
+    <div id="use-machines"
+         data-testid="use-machines"
+         hx-get="/use/machines"
+         hx-trigger="load, every 10s"
+         hx-swap="innerHTML">
+      <div class="waiting"><div class="spinner"></div> Loading machines…</div>
     </div>
     {{end}}
-  </div>
-</main>
 
-<footer data-testid="footer">
-  <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
-  &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
-</footer>
-{{end}}
+    {{template "privacy" .}}
+  </main>
+  {{end}}
 
-<script src="/static/js/app.js"></script>
-<script src="https://unpkg.com/htmx.org@2"></script>
+  {{template "footer" .}}
+  {{template "scripts" .}}
 </body>
 </html>

@@ -1,17 +1,20 @@
-<div id="token-modal" data-testid="modal-donor-token" style="position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10000;display:flex;align-items:center;justify-content:center">
-  <div class="consumer-card" style="max-width:520px;width:90%;margin:0;border-color:var(--accent)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-      <div class="card-title" style="margin:0">🔑 Your donor token</div>
-      <button onclick="document.getElementById('token-modal').remove();htmx.ajax('GET','/share/setup',{target:'#share-setup'});htmx.ajax('GET','/share/donor-stats',{target:'#share-stats'})"
-        style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:20px;line-height:1" data-testid="btn-close-modal">✕</button>
+<div class="modal-backdrop" data-testid="modal-provider-token" onclick="if(event.target===this)this.remove()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="pass-label">Provider token</div>
+    <h3>Copy this token</h3>
+    <div class="banner warn mt-12">
+      Shown once — it won’t be shown again.
+      <span class="key" data-testid="provider-token-value">{{.Token}}</span>
     </div>
-    <div class="key-strip" style="margin-bottom:8px">
-      <span style="font-size:11px;color:var(--orange);margin-right:8px">⚠</span>
-      <span class="key-label">Token</span>
-      <span class="key-value" style="font-size:0.85rem">{{.Token}}</span>
-      <button class="key-copy" onclick="copyKey(this,'{{.Token}}')">Copy</button>
+    {{if .CoordinatorURL}}
+    <div class="code mt-12" data-testid="run-command">export MESH_COORDINATOR="{{.CoordinatorHTTP}}"
+export MESH_TOKEN="{{.Token}}"
+gpumesh-provider</div>
+    {{end}}
+    <div class="actions">
+      <button type="button" class="btn btn-primary" data-testid="btn-copy-provider-token" onclick="copyText(this, '{{.Token}}')">Copy token</button>
+      <button type="button" class="btn" data-testid="btn-close-token-modal"
+              onclick="this.closest('.modal-backdrop').remove(); htmx.trigger(document.body, 'refreshPanel')">Done</button>
     </div>
-    <div style="font-size:11px;color:var(--orange);margin-bottom:12px;padding:0 2px">
-      ⚠ Copy this token now — it won't be shown again.
-    </div>
+  </div>
 </div>

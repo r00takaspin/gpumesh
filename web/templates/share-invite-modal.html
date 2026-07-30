@@ -1,0 +1,19 @@
+<div class="modal-backdrop" data-testid="modal-invite-pin" onclick="if(event.target===this)this.remove()">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="pass-label">New invite</div>
+    <h3>Send this code</h3>
+    <div class="pin mt-12" data-testid="invite-pin">{{.PIN}}</div>
+    <p class="meta center" data-testid="invite-meta">{{.MaxUses}} use{{if ne .MaxUses 1}}s{{end}} · expires in {{.TTLDays}} day{{if ne .TTLDays 1}}s{{end}}{{if .MachineName}} · {{.MachineName}}{{end}}</p>
+    <div class="field mt-16">
+      <label for="join-link">Join link</label>
+      <input id="join-link" data-testid="invite-join-link" value="{{.JoinLink}}" readonly style="font-family:var(--mono);font-size:12px;letter-spacing:0">
+    </div>
+    <div class="banner warn mt-12">Shown once. Copy the PIN or link before closing.</div>
+    <div class="actions">
+      <button type="button" class="btn btn-primary" data-testid="btn-copy-pin" onclick="copyText(this, '{{.PIN}}')">Copy code</button>
+      <button type="button" class="btn" data-testid="btn-copy-join-link" onclick="copyText(this, '{{.JoinLink}}')">Copy link</button>
+    </div>
+    <button type="button" class="btn btn-ghost btn-block mt-12" data-testid="btn-close-pin-modal"
+            onclick="this.closest('.modal-backdrop').remove(); htmx.trigger(document.body, 'refreshPanel')">Done</button>
+  </div>
+</div>

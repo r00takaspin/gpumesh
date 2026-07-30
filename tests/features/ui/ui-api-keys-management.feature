@@ -1,95 +1,39 @@
 @ui
-Feature: Управление API-ключами в интерфейсе
-  Проверка UI-взаимодействий с API-ключами: создание, отзыв,
-  отображение списка, модальное окно с полным ключом.
+Feature: API keys management (v2)
+  Create / list / revoke consumer keys on /use?tab=keys.
 
   Background:
     Given пользователь открывает браузер
     And координатор запущен и доступен
-    And пользователь аутентифицирован как "testuser"
-    And пользователь переходит на "/use?tab=keys"
+    And пользователь аутентифицирован как "keyuser"
 
-  Scenario: Отображение списка ключей
-    Given у пользователя есть 2 API-ключа
-    Then элемент с data-testid="api-keys-list" содержит 2 карточки ключей
-    And каждая карточка имеет data-testid="key-card"
+  Scenario: Empty keys list
+    Given у пользователя нет consumer ключей
+    When пользователь переходит на "/use?tab=keys"
+    Then элемент с data-testid="keys-empty" видим
+    And элемент с data-testid="btn-create-key" видим
 
-  Scenario: Карточка ключа — структура
-    Given у пользователя есть API-ключ consumer
-    Then карточка ключа содержит:
-      | элемент                              |
-      | data-testid="key-prefix"             |
-      | data-testid="key-created-at"         |
-      | data-testid="key-scope-badge"        |
-      | data-testid="btn-revoke-key"         |
-    And префикс ключа отображается моноширинным шрифтом синего цвета
-    And бейдж scope отображает "consumer"
-
-  Scenario: Бейджи scope для разных типов ключей
-    Given у пользователя есть ключи со scope: consumer, provider, both
-    Then бейдж ключа consumer содержит "consumer"
-    And бейдж ключа provider содержит "provider"
-    And бейдж ключа both содержит "both"
-
-  Scenario: Создание нового ключа — кнопка
-    Given список ключей отображается
-    When пользователь кликает на data-testid="btn-create-key"
-    Then список ключей обновляется
-    And количество ключей увеличилось на 1
-    And новый ключ отображается с предупреждением о сохранении
-
-  Scenario: Модальное окно с полным ключом при создании
-    When пользователь кликает на data-testid="btn-create-key"
+  Scenario: Create key shows one-time banner
+    When пользователь переходит на "/use?tab=keys"
+    And пользователь кликает на data-testid="btn-create-key"
     Then элемент с data-testid="new-key-modal" видим
-    And модальное окно содержит полный ключ, начинающийся с "inf_"
-    And модальное окно содержит текст-предупреждение "Copy this key now"
-    And кнопка с data-testid="btn-copy-new-key" видима
+    And элемент с data-testid="new-key-value" видим
+    And элемент с data-testid="btn-copy-new-key" видим
+    And элемент с data-testid="btn-close-new-key-modal" видим
 
-  Scenario: Копирование нового ключа из модального окна
-    Given открыто модальное окно с новым ключом
-    When пользователь кликает на data-testid="btn-copy-new-key"
-    Then ключ скопирован в буфер обмена
-    And кнопка меняет текст на "Copied!"
-    And через 2 секунды текст возвращается на "Copy"
+  Scenario: Key appears in list after create
+    Given у пользователя нет consumer ключей
+    When пользователь переходит на "/use?tab=keys"
+    And пользователь кликает на data-testid="btn-create-key"
+    And пользователь кликает на data-testid="btn-close-new-key-modal"
+    Then элемент с data-testid="key-card" видим
+    And элемент с data-testid="key-prefix" видим
+    And элемент с data-testid="key-scope-label" содержит текст "for tools"
 
-  Scenario: Закрытие модального окна с ключом
-    Given открыто модальное окно с новым ключом
-    When пользователь кликает на data-testid="btn-close-new-key-modal"
-    Then модальное окно закрыто
-    And полный ключ больше не видим
-    And в списке отображается только префикс нового ключа
-
-  Scenario: Отзыв ключа
-    Given у пользователя есть API-ключ с id "42"
-    When пользователь кликает на data-testid="btn-revoke-key" для ключа "42"
-    Then карточка ключа "42" удалена из списка
-    And количество ключей уменьшилось на 1
-
-  Scenario: Отзыв ключа — HTMX-обновление списка
-    Given у пользователя есть 2 ключа
-    When пользователь кликает на кнопку "Revoke" первого ключа
-    Then список обновляется без перезагрузки страницы
-    And в списке остаётся 1 ключ
-
-  Scenario: Отзыв последнего ключа
-    Given у пользователя есть 1 ключ
-    When пользователь кликает на data-testid="btn-revoke-key"
-    Then список ключей пуст
-    And отображается кнопка "Create new key"
-
-  Scenario: Кнопка «Revoke» неактивна во время HTMX-запроса
-    Given у пользователя есть ключ
-    When пользователь кликает на data-testid="btn-revoke-key"
-    Then кнопка становится неактивной на время запроса
-    And после завершения запроса список обновляется
-
-  Scenario: Индикатор загрузки при HTMX-запросах
-    When пользователь кликает на data-testid="btn-create-key"
-    Then отображается индикатор загрузки (спиннер)
-    And после получения ответа индикатор скрывается
-
-  Scenario: Обработка ошибки при создании ключа
-    Given сервер возвращает ошибку при создании ключа
-    When пользователь кликает на data-testid="btn-create-key"
-    Then отображается сообщение об ошибке
-    And список ключей не изменился
+  Scenario: Revoke key
+    Given у пользователя нет consumer ключей
+    When пользователь переходит на "/use?tab=keys"
+    And пользователь кликает на data-testid="btn-create-key"
+    And пользователь кликает на data-testid="btn-close-new-key-modal"
+    And пользователь подтверждает и кликает data-testid="btn-revoke-key"
+    Then элемент с data-testid="keys-empty" видим

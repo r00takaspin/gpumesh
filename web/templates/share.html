@@ -1,114 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Share GPU — GPU Mesh</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
-  <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  {{template "head" .}}
+  <title>Share — GPU Mesh</title>
 </head>
 <body>
+  {{template "nav" .}}
 
-{{if not .LoggedIn}}
-<!-- ====== LOGGED OUT ====== -->
-<nav class="topbar">
-  <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
-  <ul class="nav-links">
-    <li><a href="/" data-testid="nav-home">Home</a></li>
-    <li><a href="/use" data-testid="nav-use">Use Models</a></li>
-    <li><a href="/share" class="active" data-testid="nav-share">Share GPU</a></li>
-    <li><a href="/models" data-testid="nav-models">Models</a></li>
-    <li><a href="/about" data-testid="nav-about">About</a></li>
-  </ul>
-  <div class="nav-right">
-    <a href="/auth/github?redirect=/share" class="btn-consumer btn-primary btn-sm" data-testid="btn-signin">Sign in with GitHub</a>
-  </div>
-</nav>
-
-<main>
-  <!-- Hero -->
-  <div class="hero" data-testid="hero-share">
-    <div class="hero-logo">
-  _____ _____  _    _    __  __ ______  _____ _    _
- / ____|  __ \| |  | |  |  \/  |  ____|/ ____| |  | |
-| |  __| |__) | |  | |  | \  / | |__  | (___ | |__| |
-| | |_ |  ___/| |  | |  | |\/| |  __|  \___ \|  __  |
-| |__| | |    | |__| |  | |  | | |____ ____) | |  | |
- \_____|_|     \____/   |_|  |_|______|_____/|_|  |_|
+  {{if not .LoggedIn}}
+  <main class="page" data-testid="share-page">
+    <h1 class="serif-h1" data-testid="share-title">Share your local models</h1>
+    <p class="lead">Run the provider next to Ollama, then send a PIN to friends or coworkers.</p>
+    <div class="hero-actions">
+      <a href="/auth/github?redirect=/share" class="btn btn-primary" data-testid="btn-signin-share">Sign in with GitHub</a>
     </div>
-    <h1>Share your GPU</h1>
-    <p>Run the agent, serve LLM requests, earn reputation in the mesh.</p>
-    <a href="/auth/github?redirect=/share" class="btn-consumer btn-primary">Sign in with GitHub →</a>
-  </div>
-
-  <!-- How it works -->
-  <div class="consumer-card">
-    <div class="card-title">How it works</div>
     <div class="steps">
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-title">Install Ollama</div>
-        <div class="step-desc">ollama.com — one-click install</div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-title">Pull a model</div>
-        <div class="step-desc">ollama pull llama3.2:3b</div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-title">Run the agent</div>
-        <div class="step-desc">One command, zero config</div>
-      </div>
+      <div class="step"><div class="step-num">1</div><strong>Connect provider</strong><p>One token, stable machine URL.</p></div>
+      <div class="step"><div class="step-num">2</div><strong>Create invite</strong><p>PIN + join link in two clicks.</p></div>
+      <div class="step"><div class="step-num">3</div><strong>Revoke anytime</strong><p>Cut access per member.</p></div>
     </div>
-  </div>
-</main>
+  </main>
+  {{else}}
+  <main class="page mid stack-lg" data-testid="share-page">
+    <div id="share-panel"
+         data-testid="share-panel"
+         hx-get="/share/panel"
+         hx-trigger="load, every 10s, refreshPanel from:body"
+         hx-swap="innerHTML">
+      <div class="waiting"><div class="spinner"></div> Loading…</div>
+    </div>
+  </main>
+  <div id="share-modal" data-testid="share-modal-root"></div>
+  {{end}}
 
-<footer data-testid="footer">
-  <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
-  &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
-</footer>
-
-{{else}}
-<!-- ====== LOGGED IN ====== -->
-<nav class="topbar">
-  <a href="/" class="logo" data-testid="logo">⚡ GPU Mesh</a>
-  <ul class="nav-links">
-    <li><a href="/" data-testid="nav-home">Home</a></li>
-    <li><a href="/use" data-testid="nav-use">Use Models</a></li>
-    <li><a href="/share" class="active" data-testid="nav-share">Share GPU</a></li>
-    <li><a href="/models" data-testid="nav-models">Models</a></li>
-    <li><a href="/about" data-testid="nav-about">About</a></li>
-  </ul>
-  <div class="nav-right">
-    <span class="nav-user mono text-accent" data-testid="nav-username">{{.Login}}</span>
-    <a href="/logout" class="btn btn--sm nav-logout" data-testid="btn-logout">[Logout]</a>
-  </div>
-</nav>
-
-<main>
-  <!-- PHASE 1: Setup (always visible, content changes by state) -->
-  <div id="share-setup" data-testid="share-setup" hx-get="/share/setup" hx-trigger="load, every 5s" hx-swap="outerHTML">
-    <div class="empty-state">Loading setup...</div>
-  </div>
-
-  <!-- PHASE 2: Live models panel (only when provider connected, HTMX-polled) -->
-  <div id="share-models" data-testid="share-models" hx-get="/share/models" hx-trigger="load, every 10s" hx-swap="outerHTML"></div>
-
-  <!-- PHASE 3: Stats + Badge + Tokens (only when has activity) -->
-  <div id="share-stats" data-testid="donor-stats" hx-get="/share/donor-stats" hx-trigger="load, refreshStats from:body, every 60s" hx-swap="outerHTML"></div>
-</main>
-
-<footer data-testid="footer">
-  <a href="https://github.com/r00takaspin/gpumesh" data-testid="footer-github-link">GitHub</a>
-  &nbsp;·&nbsp; Powered by community &nbsp;·&nbsp; MIT
-</footer>
-{{end}}
-
-<script src="/static/js/app.js"></script>
-<script src="https://unpkg.com/htmx.org@2"></script>
+  {{template "footer" .}}
+  {{template "scripts" .}}
 </body>
 </html>

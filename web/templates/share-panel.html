@@ -1,0 +1,177 @@
+{{if eq .State "no-token"}}
+<div>
+  <h1 class="serif-h1" style="font-size:36px" data-testid="share-title">Share your local models</h1>
+  <p class="lead">First, create a provider token for the agent on your machine.</p>
+</div>
+<div class="card mt-20" data-testid="provider-token-card">
+  <h2>Provider token</h2>
+  <p class="text-muted">The agent uses this token to connect. After the first connection you get a stable machine URL that won’t change on reconnect.</p>
+  <button type="button" class="btn btn-primary mt-16"
+          data-testid="btn-generate-token"
+          hx-post="/share/tokens"
+          hx-target="#share-modal"
+          hx-swap="innerHTML">Generate provider token</button>
+</div>
+
+{{else if eq .State "waiting"}}
+<div>
+  <h1 class="serif-h1" style="font-size:36px" data-testid="share-title">Almost there</h1>
+  <p class="lead">Run the provider on the machine with your models. This page updates when it connects.</p>
+</div>
+<div class="waiting" data-testid="waiting-provider"><div class="spinner"></div> Waiting for provider…</div>
+<div class="card" data-testid="run-command-card">
+  <h2>Run command</h2>
+  <div class="code" data-testid="run-command">{{.RunCommand}}</div>
+  <button type="button" class="btn btn-sm mt-12" data-testid="btn-copy-run-command" onclick="copyText(this, document.querySelector('[data-testid=run-command]').textContent)">Copy command</button>
+  <p class="meta">Install: <code>curl -sSfL {{.BaseURL}}/install-provider.sh | sh</code></p>
+</div>
+<button type="button" class="btn" disabled title="Machine offline" data-testid="btn-create-invite">Create invite</button>
+<details class="collapse" data-testid="setup-collapse">
+  <summary>Setup &amp; install</summary>
+  <div class="collapse-body text-muted">
+    1. Install Ollama and pull a model<br>
+    2. Install gpumesh-provider<br>
+    3. Export token and run the agent
+  </div>
+</details>
+
+{{else}}
+{{/* ready / offline / multi */}}
+<div>
+  <h1 class="serif-h1" style="font-size:36px" data-testid="share-title">Share your local models</h1>
+  <p class="lead">Create a PIN, send it in chat, revoke anytime.</p>
+</div>
+
+{{if .Offline}}
+<div class="banner warn" data-testid="offline-warning">Machine is offline. You can still create an invite — friends won’t get answers until the provider reconnects.</div>
+{{end}}
+
+<div class="card" data-testid="invite-card">
+  {{if gt (len .Machines) 1}}
+  <form hx-post="/share/invites" hx-target="#share-modal" hx-swap="innerHTML" data-testid="create-invite-form">
+    <div class="field">
+      <label for="machine_id">Machine</label>
+      <select name="machine_id" id="machine_id" data-testid="machine-select">
+        {{range .Machines}}
+        <option value="{{.ID}}">{{.Name}} · {{if .Online}}online{{else}}offline{{end}}{{if .Hardware}} · {{.Hardware}}{{end}}</option>
+        {{end}}
+      </select>
+    </div>
+    <div class="field-row mt-16">
+      <div class="field mb-0">
+        <label for="max_uses">Max uses</label>
+        <select name="max_uses" id="max_uses" data-testid="max-uses">
+          <option value="1" selected>1</option>
+          <option value="3">3</option>
+          <option value="10">10</option>
+        </select>
+      </div>
+      <div class="field mb-0">
+        <label for="ttl_days">Expires</label>
+        <select name="ttl_days" id="ttl_days" data-testid="ttl-days">
+          <option value="1">1 day</option>
+          <option value="7" selected>7 days</option>
+          <option value="30">30 days</option>
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary btn-block mt-16" data-testid="btn-create-invite">Create invite</button>
+  </form>
+  {{else}}
+  {{range .Machines}}
+  <div class="machine-row" style="background:transparent;border:0;padding:0" data-testid="machine-strip">
+    <div class="machine-info">
+      <div class="dot {{if not .Online}}off{{end}}"></div>
+      <div>
+        <strong>{{.Name}} {{if .Online}}is online{{else}}is offline{{end}}</strong>
+        <span>{{.ID}}{{if .Hardware}} · {{.Hardware}}{{end}}{{if .ModelCount}} · {{.ModelCount}} models{{end}}</span>
+      </div>
+    </div>
+    <span class="badge {{if .Online}}ok{{else}}off{{end}}" data-testid="machine-status">{{if .Online}}Online{{else}}Offline{{end}}</span>
+  </div>
+  {{end}}
+  <form hx-post="/share/invites" hx-target="#share-modal" hx-swap="innerHTML" data-testid="create-invite-form">
+    <input type="hidden" name="machine_id" value="{{.SelectedMachineID}}">
+    <div class="field-row mt-16">
+      <div class="field mb-0">
+        <label for="max_uses">Max uses</label>
+        <select name="max_uses" id="max_uses" data-testid="max-uses">
+          <option value="1" selected>1</option>
+          <option value="3">3</option>
+          <option value="10">10</option>
+        </select>
+      </div>
+      <div class="field mb-0">
+        <label for="ttl_days">Expires</label>
+        <select name="ttl_days" id="ttl_days" data-testid="ttl-days">
+          <option value="1">1 day</option>
+          <option value="7" selected>7 days</option>
+          <option value="30">30 days</option>
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary btn-block mt-16" data-testid="btn-create-invite">Create invite</button>
+  </form>
+  {{end}}
+  <p class="meta">Defaults: one use, expires in 7 days.</p>
+</div>
+
+<div data-testid="members-section"
+     hx-get="/share/members?machine_id={{.SelectedMachineID}}"
+     hx-trigger="load, every 30s, refreshMembers from:body"
+     hx-swap="innerHTML">
+  <div class="section-title"><span>Members</span></div>
+  <p class="empty-line">Loading members…</p>
+</div>
+
+<details class="collapse" data-testid="past-invites">
+  <summary>Past invites</summary>
+  <div class="collapse-body" data-testid="invites-list">
+    {{if .Invites}}
+    {{range .Invites}}
+    <div class="invite-row" data-testid="invite-row">
+      <div>
+        <strong class="mono-muted" style="font-size:13px" data-testid="invite-pin-masked">{{.MaskedPIN}}</strong>
+        <div class="text-muted">{{.Status}} · {{.Uses}}/{{.MaxUses}} uses{{if eq .Status "active"}} · expires {{.ExpiresRel}}{{end}}</div>
+      </div>
+      {{if eq .Status "active"}}
+      <button type="button" class="btn btn-sm"
+              data-testid="btn-revoke-invite"
+              hx-delete="/api/invites/{{.ID}}"
+              hx-swap="none"
+              hx-on::after-request="htmx.trigger(document.body, 'refreshPanel')">Revoke invite</button>
+      {{else}}
+      <span class="badge">{{.Status}}</span>
+      {{end}}
+    </div>
+    {{end}}
+    {{else}}
+    <p class="empty-line">No invites yet.</p>
+    {{end}}
+  </div>
+</details>
+
+<details class="collapse" data-testid="setup-collapse">
+  <summary>Setup &amp; provider token</summary>
+  <div class="collapse-body">
+    <div class="code" data-testid="provider-token-prefix">{{.TokenPrefix}}</div>
+    <div class="code mt-12" data-testid="run-command">{{.RunCommand}}</div>
+    <button type="button" class="btn btn-sm mt-12" onclick="copyText(this, document.querySelector('[data-testid=run-command]').textContent)">Copy command</button>
+  </div>
+</details>
+
+<details class="collapse" data-testid="advanced-collapse">
+  <summary>Advanced</summary>
+  <div class="collapse-body">
+    <p class="text-muted" data-testid="regen-warning">Regenerating the provider key gives you a <strong>new machine URL</strong>. Old invites, member access, and tool configs stop working.</p>
+    {{if .ProviderKeyID}}
+    <button type="button" class="btn btn-sm mt-12"
+            data-testid="btn-regenerate-key"
+            hx-post="/api/keys/{{.ProviderKeyID}}/regenerate"
+            hx-target="#share-modal"
+            hx-swap="innerHTML"
+            hx-confirm="Regenerate provider key? This creates a new machine URL and invalidates old invites.">Regenerate provider key…</button>
+    {{end}}
+  </div>
+</details>
+{{end}}

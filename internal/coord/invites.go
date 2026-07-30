@@ -283,33 +283,100 @@ func (s *Server) cancelMachineRequests(machineID string) {
 	}
 }
 
-// --- GET /join (stub page until Light calm UI) ---
+// --- GET /join + POST /join (HTMX redeem) ---
 
 func (s *Server) handleJoinPage(w http.ResponseWriter, r *http.Request) {
-	pd := s.pageDataWithStats(r)
-	pd.Tab = "join"
-	// Reuse about template shell if join.html missing — render minimal JSON-friendly page.
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	pin := r.URL.Query().Get("pin")
-	_, _ = fmt.Fprintf(w, `<!DOCTYPE html><html><head><title>Join — GPU Mesh</title></head><body>
-<h1>Join a machine</h1>
-<p>Redeem a PIN after signing in with GitHub.</p>
-<form id="join-form"><input name="pin" value="%s" placeholder="XXXX-XXXX"/><button type="submit">Join</button></form>
-<pre id="out"></pre>
-<script>
-document.getElementById('join-form').onsubmit=async(e)=>{
-  e.preventDefault();
-  const pin=e.target.pin.value;
-  const r=await fetch('/api/join',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})});
-  document.getElementById('out').textContent=await r.text();
-  if(r.ok) location.href='/use';
-};
-</script>
-<p><a href="/login?redirect=/join">Sign in with GitHub</a></p>
-</body></html>`, htmlEscape(pin))
+	pd := s.pageData(r)
+	pd.ActiveNav = "join"
+	pd.Pin = r.URL.Query().Get("pin")
+	pd.Redirect = "/join"
+	if pd.Pin != "" {
+		pd.Redirect = "/join?pin=" + pd.Pin
+	}
+	renderTemplate(w, "join.html", pd)
 }
 
-func htmlEscape(s string) string {
-	r := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;")
-	return r.Replace(s)
+func (s *Server) handleJoinHTMX(w http.ResponseWriter, r *http.Request) {
+	userID := getUserID(r)
+	if userID == 0 {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid form")
+		return
+	}
+	pin := strings.TrimSpace(r.FormValue("pin"))
+
+	ip := clientIP(r)
+	userKey := fmt.Sprintf("user:%d", userID)
+	ipKey := "ip:" + ip
+	if !s.pinLimiter.allow(userKey, ipKey) {
+		renderTemplate(w, "join-result.html", map[string]interface{}{
+			"Success":    false,
+			"Pin":        pin,
+			"ErrorTitle": "Too many attempts",
+			"ErrorMsg":   "Wait a few minutes before trying again.",
+		})
+		return
+	}
+
+	machineID, _, err := s.store.RedeemPIN(userID, pin)
+	if err != nil {
+		title, msg := joinErrorCopy(err)
+		renderTemplate(w, "join-result.html", map[string]interface{}{
+			"Success":    false,
+			"Pin":        pin,
+			"ErrorTitle": title,
+			"ErrorMsg":   msg,
+		})
+		return
+	}
+
+	rawKey, _, created, err := s.store.EnsureConsumerKey(userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to ensure API key")
+		return
+	}
+
+	name := machineID
+	models := ""
+	online := false
+	if m, _ := s.store.GetMachine(machineID); m != nil && m.DisplayName != "" {
+		name = m.DisplayName
+	}
+	if sess := s.registry.GetSession(machineID); sess != nil {
+		online = sess.BackendOK
+		models = joinModels(sess.Models)
+	}
+	baseURL := strings.TrimRight(s.baseURL, "/") + "/v1/machines/" + machineID
+	data := map[string]interface{}{
+		"Success":     true,
+		"MachineName": name,
+		"MachineID":   machineID,
+		"Models":      models,
+		"Online":      online,
+		"BaseURL":     baseURL,
+	}
+	if created {
+		data["NewKey"] = rawKey
+	}
+	renderTemplate(w, "join-result.html", data)
+}
+
+func joinErrorCopy(err error) (title, msg string) {
+	switch {
+	case errors.Is(err, ErrInvalidPin):
+		return "Invalid code", "That PIN isn’t recognized. Check for typos."
+	case errors.Is(err, ErrExpiredPin):
+		return "Code expired", "This invite expired. Ask for a new PIN."
+	case errors.Is(err, ErrExhausted):
+		return "Code already used", "This invite already hit its use limit."
+	case errors.Is(err, ErrRevokedPin):
+		return "Invite revoked", "The owner revoked this invite. Ask them for a new code."
+	case errors.Is(err, ErrMachineGone):
+		return "Machine gone", "The machine for this invite no longer exists."
+	default:
+		return "Could not join", "Something went wrong. Try again."
+	}
 }

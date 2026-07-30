@@ -1,83 +1,72 @@
 @ui
-Feature: Лендинг страница
-  Публичная главная страница `/` с hero-секцией, живой статистикой,
-  блоком «How it works» и топ-моделями.
+Feature: Landing page (v2)
+  Public home `/` with invite-first hero, demo PIN, how-it-works — no community stats.
 
   Background:
     Given пользователь открывает браузер
     And координатор запущен и доступен
 
-  Scenario: Отображение hero-секции
+  Scenario: Hero invite narrative
     When пользователь переходит на "/"
     Then заголовок страницы содержит "GPU Mesh"
-    And элемент с data-testid="hero-logo" отображает ASCII-логотип "GPU MESH"
-    And элемент с data-testid="hero-title" содержит текст "Free LLM inference"
-    And элемент с data-testid="hero-subtitle" видим
-    And элемент с data-testid="hero-cta-use" содержит текст "Use Models"
-    And элемент с data-testid="hero-cta-use" имеет href "/use"
-    And элемент с data-testid="hero-cta-share" содержит текст "Share GPU"
-    And элемент с data-testid="hero-cta-share" имеет href "/share"
+    And элемент с data-testid="hero-title" содержит текст "Share your local models with friends"
+    And элемент с data-testid="hero-lead" видим
+    And элемент с data-testid="cta-create-invite" содержит текст "Create invite"
+    And элемент с data-testid="cta-create-invite" имеет href "/share"
+    And элемент с data-testid="cta-enter-code" содержит текст "Enter a code"
+    And элемент с data-testid="cta-enter-code" имеет href "/join"
 
-  Scenario: Отображение живой статистики
+  Scenario: Example invite card is not a live code
     When пользователь переходит на "/"
-    Then элемент с data-testid="live-stats" видим
-    And элемент с data-testid="stat-models-online" отображает число
-    And элемент с data-testid="stat-donors-online" отображает число
-    And элемент с data-testid="stat-requests-today" отображает число
+    Then элемент с data-testid="example-invite" видим
+    And элемент с data-testid="demo-pin" содержит текст "7K4Q-9M2P"
+    And элемент с data-testid="cta-example-invite" имеет href "/share"
 
-  Scenario: Отображение блока «How it works»
+  Scenario: How it works steps
     When пользователь переходит на "/"
     Then элемент с data-testid="how-it-works" видим
-    And отображаются три шага: "Share", "Match", "Use"
-    And каждый шаг содержит нумерованный кружок (1, 2, 3)
+    And элемент с data-testid="step-1" содержит текст "Run the agent"
+    And элемент с data-testid="step-2" содержит текст "Share a PIN"
+    And элемент с data-testid="step-3" содержит текст "They use your URL"
 
-  Scenario: Отображение топ-моделей при наличии доноров
-    Given в реестре есть онлайн-доноры с моделями
+  Scenario: What you get section
     When пользователь переходит на "/"
-    Then секция с data-testid="top-models" видима
-    And отображается до 5 карточек моделей
-    And каждая карточка модели содержит название модели
-    And каждая карточка модели содержит количество доноров
-    And каждая карточка модели содержит бейдж "live"
+    Then элемент с data-testid="what-you-get" содержит текст "Friends only"
 
-  Scenario: Пустое состояние топ-моделей
-    Given реестр доноров пуст
+  Scenario: No community proof stats
     When пользователь переходит на "/"
-    Then секция с data-testid="top-models" видима
-    And отображается текст "No models online"
-    And присутствует ссылка "Browse all models" на "/models"
+    Then элемент с data-testid="live-stats" не видим
+    And элемент с data-testid="top-models" не видим
+    And элемент с data-testid="stat-donors-online" не видим
 
-  Scenario: Навигация — ссылка «Use Models» ведёт на /use
+  Scenario: Nav Use and Share
     When пользователь переходит на "/"
     And пользователь кликает на ссылку с data-testid="nav-use"
     Then URL страницы равен "/use"
-
-  Scenario: Навигация — ссылка «Share GPU» ведёт на /share
     When пользователь переходит на "/"
     And пользователь кликает на ссылку с data-testid="nav-share"
     Then URL страницы равен "/share"
 
-  Scenario: Навигация — логотип ведёт на "/"
-    When пользователь переходит на "/models"
+  Scenario: Logo goes home
+    When пользователь переходит на "/about"
     And пользователь кликает на логотип с data-testid="logo"
     Then URL страницы равен "/"
 
-  Scenario: Отображение футера
+  Scenario: Footer tagline
     When пользователь переходит на "/"
     Then элемент с data-testid="footer" видим
     And футер содержит ссылку на GitHub-репозиторий
-    And футер содержит текст "Powered by community"
-    And футер содержит текст "MIT"
+    And элемент с data-testid="footer-tagline" содержит текст "Share local models with friends"
+    And элемент с data-testid="footer-license" содержит текст "MIT"
 
-  Scenario: Кнопка «Sign in with GitHub» для неавторизованных
+  Scenario: Sign in for guests
     Given пользователь не аутентифицирован
     When пользователь переходит на "/"
     Then элемент с data-testid="btn-signin" видим
     And элемент с data-testid="btn-signin" содержит текст "Sign in with GitHub"
 
-  Scenario: Отображение имени пользователя для авторизованных
+  Scenario: Username when logged in
     Given пользователь аутентифицирован как "testuser"
     When пользователь переходит на "/"
-    Then элемент с data-testid="nav-username" видим
-    And элемент с data-testid="nav-username" содержит текст "testuser"
+    Then элемент с data-testid="nav-username" содержит текст "testuser"
     And элемент с data-testid="btn-logout" видим
