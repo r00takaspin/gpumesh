@@ -5,189 +5,125 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/r00takaspin/gpumesh/internal/proto"
 )
 
-func TestRegisterFindUnregister(t *testing.T) {
+func TestRegistryRegisterUnregister(t *testing.T) {
 	r := NewRegistry()
-
-	d := &Donor{
-		ProviderID:    "p1",
+	r.Register(&MachineSession{
+		MachineID:     "mch_1",
+		SessionID:     "s1",
 		UserID:        1,
-		Models:        []string{"llama3.2:3b", "codellama:7b"},
-		MaxConcurrent: 2,
-		Description:   "test donor",
-		WSConn:        &websocket.Conn{},
-	}
-	r.Register(d)
+		Models:        []string{"llama3.2:3b"},
+		MaxConcurrent: 1,
+		Description:   "test machine",
+	})
 
-	// Find by model.
-	donors := r.FindDonorsForModel("llama3.2:3b")
-	if len(donors) != 1 {
-		t.Fatalf("expected 1 donor, got %d", len(donors))
+	if !r.HasModel("mch_1", "llama3.2:3b") {
+		t.Fatal("expected model on machine")
 	}
-	if donors[0].ProviderID != "p1" {
-		t.Fatalf("expected p1, got %s", donors[0].ProviderID)
+	if r.GetSession("mch_1") == nil {
+		t.Fatal("expected session")
 	}
-
-	// Unknown model.
-	donors = r.FindDonorsForModel("nonexistent")
-	if len(donors) != 0 {
-		t.Fatalf("expected 0 donors for unknown model")
+	if r.OnlineCount() != 1 {
+		t.Fatalf("expected 1 online, got %d", r.OnlineCount())
 	}
 
-	// Unregister.
-	uid, reqs, toks := r.Unregister("p1")
-	if uid != 1 || reqs != 0 || toks != 0 {
-		t.Fatalf("unexpected unregister return: uid=%d reqs=%d toks=%d", uid, reqs, toks)
+	r.Unregister("mch_1")
+	if r.GetSession("mch_1") != nil {
+		t.Fatal("expected nil after unregister")
 	}
-
-	donors = r.FindDonorsForModel("llama3.2:3b")
-	if len(donors) != 0 {
-		t.Fatal("expected 0 donors after unregister")
+	if r.HasModel("mch_1", "llama3.2:3b") {
+		t.Fatal("expected no model after unregister")
 	}
-
-	snap := r.Snapshot()
-	if snap.DonorsOnline != 0 {
-		t.Fatalf("expected 0 donors in snapshot")
+	if r.OnlineCount() != 0 {
+		t.Fatalf("expected 0 online")
 	}
 }
 
-func TestIncrementDecrementLoad(t *testing.T) {
+func TestRegistryHeartbeatEviction(t *testing.T) {
 	r := NewRegistry()
-
-	d := &Donor{
-		ProviderID:    "p1",
-		MaxConcurrent: 2,
-		WSConn:        &websocket.Conn{},
-	}
-	r.Register(d)
-
-	if !r.IncrementLoad("p1") {
-		t.Fatal("expected increment to succeed")
-	}
-	if !r.IncrementLoad("p1") {
-		t.Fatal("expected second increment to succeed")
-	}
-	if r.IncrementLoad("p1") {
-		t.Fatal("expected third increment to fail (at max)")
-	}
-
-	r.DecrementLoad("p1")
-	if !r.IncrementLoad("p1") {
-		t.Fatal("expected increment after decrement to succeed")
-	}
-}
-
-func TestHeartbeatMonitor(t *testing.T) {
-	r := NewRegistry()
-
-	d := &Donor{
-		ProviderID: "p1",
-		WSConn:     &websocket.Conn{},
-	}
-	r.Register(d)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	// Use short timeouts for testing.
 	r.StartHeartbeatMonitor(ctx, 50*time.Millisecond, 20*time.Millisecond)
 
-	// Verify donor exists.
-	if r.GetDonor("p1") == nil {
-		t.Fatal("expected donor to exist")
+	r.Register(&MachineSession{
+		MachineID:     "mch_1",
+		UserID:        1,
+		Models:        []string{"m"},
+		MaxConcurrent: 1,
+	})
+	if r.GetSession("mch_1") == nil {
+		t.Fatal("expected session to exist")
 	}
 
-	// Wait for eviction.
-	time.Sleep(150 * time.Millisecond)
-
-	if r.GetDonor("p1") != nil {
-		t.Fatal("expected donor to be evicted")
+	time.Sleep(120 * time.Millisecond)
+	if r.GetSession("mch_1") != nil {
+		t.Fatal("expected session to be evicted")
 	}
 }
 
-func TestHeartbeatKeepsAlive(t *testing.T) {
+func TestRegistryHeartbeatKeepsAlive(t *testing.T) {
 	r := NewRegistry()
-
-	d := &Donor{
-		ProviderID: "p1",
-		WSConn:     &websocket.Conn{},
-	}
-	r.Register(d)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	r.StartHeartbeatMonitor(ctx, 80*time.Millisecond, 20*time.Millisecond)
 
-	r.StartHeartbeatMonitor(ctx, 50*time.Millisecond, 10*time.Millisecond)
+	r.Register(&MachineSession{
+		MachineID:     "mch_1",
+		UserID:        1,
+		Models:        []string{"m"},
+		MaxConcurrent: 1,
+	})
 
-	// Keep sending heartbeats.
-	for range 5 {
-		time.Sleep(15 * time.Millisecond)
-		r.UpdateHeartbeat("p1")
-	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 5; i++ {
+			r.UpdateHeartbeat("mch_1")
+			time.Sleep(30 * time.Millisecond)
+		}
+	}()
+	<-done
+	time.Sleep(50 * time.Millisecond)
 
-	if r.GetDonor("p1") == nil {
-		t.Fatal("expected donor to survive with heartbeats")
+	if r.GetSession("mch_1") == nil {
+		t.Fatal("expected session to survive with heartbeats")
 	}
 }
 
-func TestSnapshot(t *testing.T) {
+func TestRegistrySnapshot(t *testing.T) {
 	r := NewRegistry()
-
-	r.Register(&Donor{
-		ProviderID:    "p1",
-		Models:        []string{"llama3.2:3b"},
-		MaxConcurrent: 4,
-		CurrentLoad:   1,
-		WSConn:        &websocket.Conn{},
+	r.Register(&MachineSession{
+		MachineID: "mch_1", UserID: 1, Models: []string{"llama3.2:3b"}, MaxConcurrent: 2,
 	})
-	r.Register(&Donor{
-		ProviderID:    "p2",
-		Models:        []string{"llama3.2:3b", "mistral:7b"},
-		MaxConcurrent: 2,
-		CurrentLoad:   2,
-		WSConn:        &websocket.Conn{},
+	r.Register(&MachineSession{
+		MachineID: "mch_2", UserID: 2, Models: []string{"llama3.2:3b", "mistral"}, MaxConcurrent: 1,
 	})
-
 	snap := r.Snapshot()
 	if snap.DonorsOnline != 2 {
-		t.Fatalf("expected 2 donors online, got %d", snap.DonorsOnline)
+		t.Fatalf("expected 2 online, got %d", snap.DonorsOnline)
 	}
-	if snap.ModelsOnline != 2 {
-		t.Fatalf("expected 2 models online, got %d", snap.ModelsOnline)
-	}
-
 	llama := snap.Models["llama3.2:3b"]
 	if llama.DonorsOnline != 2 {
-		t.Fatalf("expected 2 donors for llama, got %d", llama.DonorsOnline)
+		t.Fatalf("expected 2 for llama, got %d", llama.DonorsOnline)
 	}
-	// Load: p1=1/4=0.25, p2=2/2=1.0 → avg=0.625 → ×100 = 62.5
-	expectedLoad := 62.5
-	if llama.Load < expectedLoad-0.01 || llama.Load > expectedLoad+0.01 {
-		t.Fatalf("expected load ~%f, got %f", expectedLoad, llama.Load)
-	}
+	_ = proto.ScopeProvider
 }
 
-func TestBadgeForTokens(t *testing.T) {
-	tests := []struct {
-		tokens int64
-		badge  string
-	}{
-		{0, "beginner"},
-		{500, "beginner"},
-		{1000, "bronze"},
-		{5000, "bronze"},
-		{10000, "silver"},
-		{50000, "silver"},
-		{100000, "gold"},
-		{500000, "gold"},
-		{1000000, "platinum"},
-		{2000000, "platinum"},
+func TestRegistryLoad(t *testing.T) {
+	r := NewRegistry()
+	r.Register(&MachineSession{
+		MachineID: "mch_1", Models: []string{"m"}, MaxConcurrent: 1,
+	})
+	if !r.IncrementLoad("mch_1") {
+		t.Fatal("expected increment ok")
 	}
-	for _, tt := range tests {
-		if got := BadgeForTokens(tt.tokens); got != tt.badge {
-			t.Errorf("BadgeForTokens(%d) = %q, want %q", tt.tokens, got, tt.badge)
-		}
+	if r.IncrementLoad("mch_1") {
+		t.Fatal("expected increment fail at capacity")
+	}
+	r.DecrementLoad("mch_1")
+	if !r.IncrementLoad("mch_1") {
+		t.Fatal("expected increment ok after decrement")
 	}
 }

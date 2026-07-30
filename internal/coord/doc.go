@@ -1,3 +1,3 @@
-// Package coord implements the GPU Mesh coordinator: HTTP server,
-// WebSocket relay, model registry, rate limiting, and API key management.
+// Package coord implements the GPU Mesh coordinator (v2): HTTP/WS server,
+// hard-pin per-machine inference, machines/invites/bindings ACL, and API keys.
 package coord

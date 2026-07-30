@@ -27,11 +27,11 @@ const (
 	ErrInternal           = "internal"
 )
 
-// Timeout constants (§3.7 SPEC).
+// Timeout constants (§6.3 SPEC-v2).
 const (
 	TTFTTimeout          = 90 * time.Second  // covers cold model load (27B ~55s) + headroom
 	InterTokenTimeout    = 30 * time.Second  // slow models / chain-of-thought
-	TotalRequestTimeout  = 180 * time.Second // cold start + generation up to ~2000 tokens
+	TotalRequestTimeout  = 120 * time.Second // coordinator total request timeout
 	HeartbeatInterval    = 30 * time.Second
 	HeartbeatTimeout     = 90 * time.Second
 	HeartbeatMonitorTick = 15 * time.Second
@@ -83,10 +83,11 @@ type ErrorMsg struct {
 
 // --- Coordinator → Donor messages ---
 
-// RegisteredMsg is sent after a successful donor registration.
+// RegisteredMsg is sent after a successful provider registration.
 type RegisteredMsg struct {
-	Type       string `json:"type"`        // always "registered"
-	ProviderID string `json:"provider_id"`
+	Type       string `json:"type"`                  // always "registered"
+	MachineID  string `json:"machine_id"`            // stable machine id (v2)
+	ProviderID string `json:"provider_id,omitempty"` // ephemeral session id for logs
 }
 
 // RequestMsg is an inference request forwarded to a donor.
@@ -124,13 +125,15 @@ type ChatCompletionRequest struct {
 	Extra       json.RawMessage `json:"-"` // passthrough unknown fields
 }
 
-// ModelEntry represents one model in /v1/models response (§3.3 SPEC).
+// ModelEntry represents one model in /v1/models response (§6.1 SPEC-v2).
 type ModelEntry struct {
-	ID           string  `json:"id"`
-	Object       string  `json:"object"`       // always "model"
-	OwnedBy      string  `json:"owned_by"`     // always "community"
-	DonorsOnline int     `json:"donors_online"`
-	Load         float64 `json:"load"`
+	ID          string  `json:"id"`
+	Object      string  `json:"object"`                 // always "model"
+	OwnedBy     string  `json:"owned_by"`               // machine_id or "owner"
+	MachineID   string  `json:"machine_id,omitempty"`   // discovery only
+	MachineName string  `json:"machine_name,omitempty"` // discovery only
+	Online      bool    `json:"online"`
+	Load        float64 `json:"load"`
 }
 
 // ModelListResponse is the response for GET /v1/models.
@@ -143,9 +146,16 @@ type ModelListResponse struct {
 
 const (
 	ScopeConsumer = "consumer"
-	ScopeDonor    = "donor"
+	ScopeProvider = "provider"
 	ScopeBoth     = "both"
+	// ScopeDonor is a legacy alias accepted only during migration reads.
+	ScopeDonor = "donor"
 )
+
+// IsProviderScope returns true for provider or both (including legacy donor).
+func IsProviderScope(scope string) bool {
+	return scope == ScopeProvider || scope == ScopeDonor || scope == ScopeBoth
+}
 
 // --- Generic message envelope for raw WS reads ---
 

@@ -186,7 +186,7 @@ func (s *Server) pageData(r *http.Request) PageData {
 		// Check for donor-scoped keys.
 		keys, _ := s.store.ListKeys(uid)
 		for _, k := range keys {
-			if k.Scope == "donor" || k.Scope == "both" {
+			if k.Scope == "provider" || k.Scope == "donor" || k.Scope == "both" {
 				pd.HasDonorScope = true
 				break
 			}

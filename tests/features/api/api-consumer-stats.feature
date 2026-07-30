@@ -1,14 +1,13 @@
 @api
 Feature: Статистика потребителя
-  Эндпоинт GET /api/consumer/stats возвращает статистику использования API
-  для аутентифицированного пользователя: количество запросов, токенов, лимит.
+  GET /api/consumer/stats.
 
   Background:
     Given координатор запущен и доступен
     And пользователь аутентифицирован через GitHub OAuth
     And у пользователя есть API-ключ потребителя
 
-  Scenario: Получение статистики потребителя
+  Scenario: Получение статистики
     When пользователь отправляет GET-запрос на "/api/consumer/stats"
     Then статус ответа равен 200
     And тело ответа содержит поле "requests_today" типа "number"
@@ -18,26 +17,26 @@ Feature: Статистика потребителя
     And значение "rate_limit" равно 100
     And значение "rate_remaining" <= значение "rate_limit"
 
-  Scenario: Потребитель без ключей — статистика с нулевыми значениями
+  Scenario: Без ключей — нули
     Given у пользователя нет API-ключей
     When пользователь отправляет GET-запрос на "/api/consumer/stats"
     Then статус ответа равен 200
     And значение "requests_today" равно 0
     And значение "rate_remaining" равно значению "rate_limit"
 
-  Scenario: Статистика после нескольких запросов
-    Given пользователь отправил 5 запросов к "/v1/chat/completions" за последний час
+  Scenario: После запросов к /v1/models
+    Given пользователь отправил 5 запросов к "/v1/models" за последний час
     When пользователь отправляет GET-запрос на "/api/consumer/stats"
     Then статус ответа равен 200
     And значение "requests_today" >= 5
     And значение "rate_remaining" <= 95
 
-  Scenario: Статистика без аутентификации
+  Scenario: Без аутентификации — 302
     Given пользователь не аутентифицирован
     When пользователь отправляет GET-запрос на "/api/consumer/stats"
     Then статус ответа равен 302
 
-  Scenario: Статистика с истёкшей сессией
+  Scenario: Истёкшая сессия — 302
     Given сессионная cookie истекла
     When пользователь отправляет GET-запрос на "/api/consumer/stats"
     Then статус ответа равен 302

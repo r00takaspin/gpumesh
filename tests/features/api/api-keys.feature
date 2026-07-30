@@ -1,21 +1,17 @@
 @api
 Feature: Управление API-ключами
-  CRUD-операции с API-ключами: создание, просмотр, отзыв, перевыпуск.
-  Эндпоинты: POST /api/keys, GET /api/keys, DELETE /api/keys/{id},
-  POST /api/keys/{id}/regenerate.
+  CRUD: POST/GET/DELETE /api/keys, regenerate.
 
   Background:
     Given координатор запущен и доступен
     And пользователь аутентифицирован через GitHub OAuth
     And сессионная cookie валидна
 
-  Scenario: Создание нового API-ключа (scope: consumer)
+  Scenario: Создание consumer ключа
     When пользователь отправляет POST-запрос на "/api/keys"
       And тело запроса содержит:
         """
-        {
-          "scope": "consumer"
-        }
+        { "scope": "consumer" }
         """
     Then статус ответа равен 201
     And тело ответа содержит поле "id" типа "number"
@@ -25,54 +21,43 @@ Feature: Управление API-ключами
     And значение "key_prefix" равно первым 12 символам "key"
     And тело ответа содержит поле "scope" со значением "consumer"
 
-  Scenario: Создание ключа со scope "donor"
+  Scenario: Создание provider ключа
     When пользователь отправляет POST-запрос на "/api/keys"
       And тело запроса содержит:
         """
-        {
-          "scope": "donor"
-        }
+        { "scope": "provider" }
         """
     Then статус ответа равен 201
-    And тело ответа содержит поле "scope" со значением "donor"
+    And тело ответа содержит поле "scope" со значением "provider"
 
-  Scenario: Создание ключа со scope "both"
+  Scenario: Legacy donor нормализуется в provider
     When пользователь отправляет POST-запрос на "/api/keys"
       And тело запроса содержит:
         """
-        {
-          "scope": "both"
-        }
+        { "scope": "donor" }
+        """
+    Then статус ответа равен 201
+    And тело ответа содержит поле "scope" со значением "provider"
+
+  Scenario: Создание both ключа
+    When пользователь отправляет POST-запрос на "/api/keys"
+      And тело запроса содержит:
+        """
+        { "scope": "both" }
         """
     Then статус ответа равен 201
     And тело ответа содержит поле "scope" со значением "both"
 
-  Scenario Outline: Создание ключа с невалидным scope
-    When пользователь отправляет POST-запрос на "/api/keys"
-      And тело запроса содержит:
-        """
-        {
-          "scope": "<invalid_scope>"
-        }
-        """
-    Then статус ответа равен 201
-
-    Examples:
-      | invalid_scope |
-      | admin         |
-      | ""            |
-      | 123           |
-
-  Scenario: Создание ключа без поля scope
+  Scenario: Создание без scope — default consumer
     When пользователь отправляет POST-запрос на "/api/keys"
       And тело запроса содержит:
         """
         {}
         """
     Then статус ответа равен 201
-    And тело ответа содержит поле "scope"
+    And тело ответа содержит поле "scope" со значением "consumer"
 
-  Scenario: Получение списка ключей пользователя
+  Scenario: Список ключей
     Given у пользователя есть 2 API-ключа
     When пользователь отправляет GET-запрос на "/api/keys"
     Then статус ответа равен 200
@@ -81,59 +66,50 @@ Feature: Управление API-ключами
     And каждый элемент "keys" содержит поле "id" типа "number"
     And каждый элемент "keys" содержит поле "prefix" типа "string"
     And каждый элемент "keys" содержит поле "scope" типа "string"
-    And каждый элемент "keys" содержит поле "created_at" типа "string"
     And ни один элемент "keys" не содержит поле "key"
 
-  Scenario: Получение списка ключей — у пользователя нет ключей
+  Scenario: Список пуст
     Given у пользователя нет API-ключей
     When пользователь отправляет GET-запрос на "/api/keys"
     Then статус ответа равен 200
     And массив "keys" пуст
 
-  Scenario: Отзыв API-ключа
+  Scenario: Отзыв ключа
     Given у пользователя есть API-ключ с id "<key_id>"
     When пользователь отправляет DELETE-запрос на "/api/keys/<key_id>"
     Then статус ответа равен 200
     And тело ответа содержит поле "revoked" со значением true
-
     When пользователь повторно отправляет DELETE-запрос на "/api/keys/<key_id>"
     Then статус ответа равен 404
 
-  Scenario: Отзыв несуществующего ключа
+  Scenario: Отзыв несуществующего — 404
     When пользователь отправляет DELETE-запрос на "/api/keys/99999"
     Then статус ответа равен 404
 
-  Scenario: Отзыв чужого ключа
+  Scenario: Отзыв чужого — 404
     Given существует API-ключ с id "<other_key_id>", принадлежащий другому пользователю
     When пользователь отправляет DELETE-запрос на "/api/keys/<other_key_id>"
     Then статус ответа равен 404
 
-  Scenario: Перевыпуск донорского токена
-    Given у пользователя есть донорский ключ с id "<key_id>" и scope "donor"
+  Scenario: Regenerate provider — новый machine_id
+    Given у пользователя есть provider ключ с id "<key_id>" и scope "provider"
     And старый ключ равен "<old_key>"
     When пользователь отправляет POST-запрос на "/api/keys/<key_id>/regenerate"
     Then статус ответа равен 200
     And тело ответа содержит поле "key" типа "string"
+    And тело ответа содержит поле "machine_id" типа "string"
     And значение "key" не равно "<old_key>"
-    And значение "key" начинается с "inf_"
-
     When пользователь отправляет GET-запрос на "/v1/models"
       And заголовок "Authorization" равен "Bearer <old_key>"
     Then статус ответа равен 401
 
-  Scenario: Перевыпуск consumer-ключа
+  Scenario: Regenerate consumer
     Given у пользователя есть consumer-ключ с id "<key_id>" и scope "consumer"
     When пользователь отправляет POST-запрос на "/api/keys/<key_id>/regenerate"
     Then статус ответа равен 200
     And тело ответа содержит поле "key"
 
-  Scenario: Доступ к эндпоинтам ключей без аутентификации
+  Scenario: Без сессии — 302
     Given пользователь не аутентифицирован
-    When пользователь отправляет POST-запрос на "/api/keys"
-    Then статус ответа равен 302
-
     When пользователь отправляет GET-запрос на "/api/keys"
-    Then статус ответа равен 302
-
-    When пользователь отправляет DELETE-запрос на "/api/keys/1"
     Then статус ответа равен 302

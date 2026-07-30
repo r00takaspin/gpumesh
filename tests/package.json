@@ -7,8 +7,8 @@
     "test:ui": "cucumber-js -p ui"
   },
   "devDependencies": {
-    "@cucumber/cucumber": "latest",
-    "playwright": "latest"
+    "@cucumber/cucumber": "^10.9.0",
+    "playwright": "^1.49.1"
   },
   "dependencies": {
     "ws": "^8.21.1"

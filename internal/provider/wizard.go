@@ -33,7 +33,7 @@ func RunWizard(stdin io.Reader, stdout io.Writer, cfg *Config) error {
    │     GPU MESH — setup wizard      │
    └──────────────────────────────────┘`+wzReset+`
 
-`+wzDim+`   configure your donor agent`+wzReset+`
+`+wzDim+`   configure your provider agent`+wzReset+`
 
 `)
 
@@ -115,7 +115,7 @@ func RunWizard(stdin io.Reader, stdout io.Writer, cfg *Config) error {
 
 	// 4. Token.
 	if cfg.Token == "" {
-		_, _ = fmt.Fprintf(stdout, "\n"+wzYellow+"⚡"+wzReset+" No token configured. Enter token ["+wzDim+"optional"+wzReset+"]: ")
+		_, _ = fmt.Fprintf(stdout, "\n"+wzYellow+"⚡"+wzReset+" Provider token from /share ["+wzDim+"optional"+wzReset+"]: ")
 		if !scanner.Scan() {
 			return fmt.Errorf("input interrupted")
 		}

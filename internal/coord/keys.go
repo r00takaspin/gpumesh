@@ -32,6 +32,9 @@ func (s *Server) handleCreateKey(w http.ResponseWriter, r *http.Request) {
 	if scope == "" {
 		scope = proto.ScopeConsumer
 	}
+	if scope == proto.ScopeDonor {
+		scope = proto.ScopeProvider
+	}
 
 	rawKey, keyID, err := s.store.CreateKey(userID, scope)
 	if err != nil {
@@ -154,13 +157,39 @@ func (s *Server) handleRegenerateKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	scope := oldKey.Scope
+	if scope == proto.ScopeDonor {
+		scope = proto.ScopeProvider
+	}
+
 	// Create new key with same scope.
-	rawKey, newKeyID, err := s.store.CreateKey(userID, oldKey.Scope)
+	rawKey, newKeyID, err := s.store.CreateKey(userID, scope)
 	if err != nil {
 		log.Printf("regenerate: create error: %v", err)
 		writeError(w, http.StatusInternalServerError, "failed to create key")
 		return
 	}
+
+	var newMachineID string
+	if proto.IsProviderScope(scope) {
+		// Regenerating a provider key creates a new machine_id (§4.5).
+		oldMachine, _ := s.store.GetMachineByProviderKeyID(keyID)
+		displayName := "machine"
+		if oldMachine != nil {
+			displayName = oldMachine.DisplayName
+		}
+		m, err := s.store.CreateMachineOnKeyRegen(userID, newKeyID, displayName)
+		if err != nil {
+			log.Printf("regenerate: create machine error: %v", err)
+		} else if m != nil {
+			newMachineID = m.ID
+			// Disconnect any live session on the old machine.
+			if oldMachine != nil {
+				s.registry.Unregister(oldMachine.ID)
+			}
+		}
+	}
+
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Trigger", "refreshStats")
 		renderTemplate(w, "share-token-modal.html", map[string]interface{}{
@@ -168,11 +197,15 @@ func (s *Server) handleRegenerateKey(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	resp := map[string]interface{}{
 		"id":         newKeyID,
 		"key":        rawKey,
 		"key_prefix": rawKey[:12],
-		"scope":      oldKey.Scope,
+		"scope":      scope,
 		"warning":    "Copy this key now. It will not be shown again.",
-	})
+	}
+	if newMachineID != "" {
+		resp["machine_id"] = newMachineID
+	}
+	writeJSON(w, http.StatusOK, resp)
 }

@@ -8,7 +8,6 @@ import (
 )
 
 // ConfigFromEnv reads server configuration from environment variables.
-// Loads .env file first if present (env vars take precedence).
 func ConfigFromEnv() Config {
 	loadDotEnv(".env")
 
@@ -18,20 +17,33 @@ func ConfigFromEnv() Config {
 			rateLimit = n
 		}
 	}
-	affinityTTL := 120
-	if v := os.Getenv("MESH_AFFINITY_TTL"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-			affinityTTL = n
+	inviteTTL := 7
+	if v := os.Getenv("MESH_INVITE_TTL_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			inviteTTL = n
 		}
 	}
-	cfg := Config{
-		Addr:        envOrDefault("MESH_ADDR", ":8080"),
-		DBPath:      envOrDefault("MESH_DB", "data/gpumesh.db"),
-		BaseURL:     envOrDefault("MESH_BASE_URL", "http://localhost:8080"),
-		RateLimit:   rateLimit,
-		AffinityTTL: affinityTTL,
+	inviteMaxUses := 1
+	if v := os.Getenv("MESH_INVITE_MAX_USES"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			inviteMaxUses = n
+		}
 	}
-	return cfg
+	pinAttemptLimit := 10
+	if v := os.Getenv("MESH_PIN_ATTEMPT_LIMIT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			pinAttemptLimit = n
+		}
+	}
+	return Config{
+		Addr:            envOrDefault("MESH_ADDR", ":8080"),
+		DBPath:          envOrDefault("MESH_DB", "data/gpumesh.db"),
+		BaseURL:         envOrDefault("MESH_BASE_URL", "http://localhost:8080"),
+		RateLimit:       rateLimit,
+		InviteTTLDays:   inviteTTL,
+		InviteMaxUses:   inviteMaxUses,
+		PinAttemptLimit: pinAttemptLimit,
+	}
 }
 
 func envOrDefault(key, def string) string {
@@ -41,8 +53,6 @@ func envOrDefault(key, def string) string {
 	return def
 }
 
-// loadDotEnv reads KEY=VALUE pairs from path and sets them via os.Setenv
-// if not already set in the environment. Skips comments and empty lines.
 func loadDotEnv(path string) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -56,7 +66,6 @@ func loadDotEnv(path string) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		// Support KEY=VALUE and export KEY=VALUE
 		line = strings.TrimPrefix(line, "export ")
 		k, v, ok := strings.Cut(line, "=")
 		if !ok {
@@ -64,11 +73,9 @@ func loadDotEnv(path string) {
 		}
 		k = strings.TrimSpace(k)
 		v = strings.TrimSpace(v)
-		// Remove surrounding quotes.
 		if len(v) >= 2 && ((v[0] == '"' && v[len(v)-1] == '"') || (v[0] == '\'' && v[len(v)-1] == '\'')) {
 			v = v[1 : len(v)-1]
 		}
-		// Don't override existing env vars.
 		if os.Getenv(k) == "" {
 			_ = os.Setenv(k, v)
 		}

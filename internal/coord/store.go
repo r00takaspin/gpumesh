@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -22,14 +24,70 @@ type APIKey struct {
 	RevokedAt *time.Time
 }
 
-// DonorStats represents persistent donor statistics.
-type DonorStats struct {
-	UserID            int64
-	TotalRequests     int64
-	TotalTokens       int64
-	TotalUptimeSec    int64
-	LastSeenAt        *time.Time
+// OwnerStats represents persistent owner/provider statistics.
+type OwnerStats struct {
+	UserID         int64
+	TotalRequests  int64
+	TotalTokens    int64
+	TotalUptimeSec int64
+	LastSeenAt     *time.Time
 }
+
+// Machine is a stable logical machine bound to a provider key.
+type Machine struct {
+	ID            string
+	OwnerUserID   int64
+	ProviderKeyID int64
+	DisplayName   string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+// Invite is a PIN invite for a machine.
+type Invite struct {
+	ID          int64
+	MachineID   string
+	OwnerUserID int64
+	PinHash     string
+	PinPrefix   string
+	MaxUses     int
+	Uses        int
+	ExpiresAt   time.Time
+	RevokedAt   *time.Time
+	CreatedAt   time.Time
+	Label       string
+}
+
+// Binding grants a member access to a machine.
+type Binding struct {
+	ID           int64
+	MachineID    string
+	MemberUserID int64
+	InviteID     *int64
+	CreatedAt    time.Time
+	RevokedAt    *time.Time
+}
+
+// BindingInfo is a machine accessible to a user (owned or member).
+type BindingInfo struct {
+	MachineID   string
+	DisplayName string
+	OwnerUserID int64
+	Role        string // "owner" or "member"
+	CreatedAt   time.Time
+}
+
+// Redeem errors (§4.4 SPEC-v2).
+var (
+	ErrInvalidPin  = errors.New("invalid_pin")
+	ErrExpiredPin  = errors.New("expired")
+	ErrExhausted   = errors.New("exhausted")
+	ErrRevokedPin  = errors.New("revoked")
+	ErrMachineGone = errors.New("machine_gone")
+)
+
+// PIN alphabet without 0/O/1/I/L.
+const pinAlphabet = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 
 // Store manages persistent state via SQLite.
 type Store struct {
@@ -43,7 +101,6 @@ func NewStore(path string) (*Store, error) {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
 
-	// Performance pragmas.
 	_, _ = db.Exec("PRAGMA journal_mode=WAL")
 	_, _ = db.Exec("PRAGMA foreign_keys=ON")
 	_, _ = db.Exec("PRAGMA busy_timeout=5000")
@@ -79,7 +136,7 @@ func migrate(db *sql.DB) error {
 		revoked_at TEXT
 	);
 
-	CREATE TABLE IF NOT EXISTS donor_stats (
+	CREATE TABLE IF NOT EXISTS owner_stats (
 		user_id INTEGER PRIMARY KEY REFERENCES users(id),
 		total_requests INTEGER NOT NULL DEFAULT 0,
 		total_tokens INTEGER NOT NULL DEFAULT 0,
@@ -93,9 +150,60 @@ func migrate(db *sql.DB) error {
 		created_at TEXT NOT NULL DEFAULT (datetime('now')),
 		expires_at TEXT NOT NULL
 	);
+
+	CREATE TABLE IF NOT EXISTS machines (
+		id TEXT PRIMARY KEY,
+		owner_user_id INTEGER NOT NULL REFERENCES users(id),
+		provider_key_id INTEGER NOT NULL UNIQUE REFERENCES api_keys(id),
+		display_name TEXT NOT NULL DEFAULT '',
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+	);
+
+	CREATE TABLE IF NOT EXISTS invites (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		machine_id TEXT NOT NULL REFERENCES machines(id),
+		owner_user_id INTEGER NOT NULL REFERENCES users(id),
+		pin_hash TEXT UNIQUE NOT NULL,
+		pin_prefix TEXT NOT NULL,
+		max_uses INTEGER NOT NULL DEFAULT 1,
+		uses INTEGER NOT NULL DEFAULT 0,
+		expires_at TEXT NOT NULL,
+		revoked_at TEXT,
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		label TEXT
+	);
+
+	CREATE TABLE IF NOT EXISTS bindings (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		machine_id TEXT NOT NULL REFERENCES machines(id),
+		member_user_id INTEGER NOT NULL REFERENCES users(id),
+		invite_id INTEGER REFERENCES invites(id),
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		revoked_at TEXT,
+		UNIQUE(machine_id, member_user_id)
+	);
 	`
-	_, err := db.Exec(schema)
-	return err
+	if _, err := db.Exec(schema); err != nil {
+		return err
+	}
+
+	// Migrate donor_stats → owner_stats if legacy table exists.
+	var donorExists int
+	_ = db.QueryRow(
+		`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='donor_stats'`,
+	).Scan(&donorExists)
+	if donorExists > 0 {
+		_, _ = db.Exec(`
+			INSERT OR IGNORE INTO owner_stats (user_id, total_requests, total_tokens, total_uptime_seconds, last_seen_at)
+			SELECT user_id, total_requests, total_tokens, total_uptime_seconds, last_seen_at FROM donor_stats`)
+		_, _ = db.Exec(`DROP TABLE donor_stats`)
+	}
+
+	// Migrate scope donor → provider.
+	_, _ = db.Exec(`UPDATE api_keys SET scope = 'provider' WHERE scope = 'donor'`)
+
+	return nil
 }
 
 // UpsertUser inserts a user if not present or updates login, returns the user ID.
@@ -119,13 +227,14 @@ func (s *Store) UpsertUser(githubID int64, login string) (int64, error) {
 
 // CreateKey generates a new API key, stores its SHA-256 hash, and returns the raw key.
 func (s *Store) CreateKey(userID int64, scope string) (rawKey string, keyID int64, err error) {
+	scope = normalizeScope(scope)
 	raw, err := generateAPIKey()
 	if err != nil {
 		return "", 0, fmt.Errorf("generate key: %w", err)
 	}
 
 	hash := hashKey(raw)
-	prefix := raw[:8] // first 8 chars per §5.6 SPEC
+	prefix := raw[:8]
 
 	res, err := s.db.Exec(
 		`INSERT INTO api_keys (user_id, key_hash, key_prefix, scope) VALUES (?, ?, ?, ?)`,
@@ -139,8 +248,14 @@ func (s *Store) CreateKey(userID int64, scope string) (rawKey string, keyID int6
 	if err != nil {
 		return "", 0, fmt.Errorf("last insert id: %w", err)
 	}
-	keyID = id
-	return raw, keyID, nil
+	return raw, id, nil
+}
+
+func normalizeScope(scope string) string {
+	if scope == "donor" {
+		return "provider"
+	}
+	return scope
 }
 
 // ListKeys returns all non-revoked API keys for a user.
@@ -184,12 +299,22 @@ func (s *Store) CountKeys(userID int64) (int, error) {
 }
 
 // CountKeysByScope returns the number of non-revoked API keys for a user with a given scope.
+// Counts both "provider" and legacy "donor" when asking for provider.
 func (s *Store) CountKeysByScope(userID int64, scope string) (int, error) {
+	scope = normalizeScope(scope)
 	var count int
-	err := s.db.QueryRow(
-		`SELECT COUNT(*) FROM api_keys WHERE user_id = ? AND scope = ? AND revoked_at IS NULL`,
-		userID, scope,
-	).Scan(&count)
+	var err error
+	if scope == "provider" {
+		err = s.db.QueryRow(
+			`SELECT COUNT(*) FROM api_keys WHERE user_id = ? AND scope IN ('provider','donor') AND revoked_at IS NULL`,
+			userID,
+		).Scan(&count)
+	} else {
+		err = s.db.QueryRow(
+			`SELECT COUNT(*) FROM api_keys WHERE user_id = ? AND scope = ? AND revoked_at IS NULL`,
+			userID, scope,
+		).Scan(&count)
+	}
 	return count, err
 }
 
@@ -211,7 +336,6 @@ func (s *Store) RevokeKey(userID, keyID int64) error {
 }
 
 // FindKeyByHash looks up an API key by its SHA-256 hash.
-// Returns nil if not found or revoked.
 func (s *Store) FindKeyByHash(hash string) (*APIKey, error) {
 	var k APIKey
 	var createdStr string
@@ -228,13 +352,13 @@ func (s *Store) FindKeyByHash(hash string) (*APIKey, error) {
 	}
 	k.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdStr)
 	if revokedStr != nil {
-		return nil, nil // revoked == not found for auth purposes
+		return nil, nil
 	}
+	k.Scope = normalizeScope(k.Scope)
 	return &k, nil
 }
 
-// FindKeyByID looks up a key by its ID. Returns the key even if revoked
-// (callers can check RevokedAt). Returns nil if not found.
+// FindKeyByID looks up a key by its ID.
 func (s *Store) FindKeyByID(keyID int64) (*APIKey, error) {
 	var k APIKey
 	var createdStr string
@@ -254,22 +378,23 @@ func (s *Store) FindKeyByID(keyID int64) (*APIKey, error) {
 		t, _ := time.Parse("2006-01-02 15:04:05", *revokedStr)
 		k.RevokedAt = &t
 	}
+	k.Scope = normalizeScope(k.Scope)
 	return &k, nil
 }
 
-// GetDonorStats returns persistent donor statistics for a user.
-func (s *Store) GetDonorStats(userID int64) (*DonorStats, error) {
-	var ds DonorStats
+// GetOwnerStats returns persistent owner statistics for a user.
+func (s *Store) GetOwnerStats(userID int64) (*OwnerStats, error) {
+	var ds OwnerStats
 	var lastSeen *string
 	err := s.db.QueryRow(
 		`SELECT user_id, total_requests, total_tokens, total_uptime_seconds, last_seen_at
-		 FROM donor_stats WHERE user_id = ?`, userID,
+		 FROM owner_stats WHERE user_id = ?`, userID,
 	).Scan(&ds.UserID, &ds.TotalRequests, &ds.TotalTokens, &ds.TotalUptimeSec, &lastSeen)
 	if err == sql.ErrNoRows {
-		return &DonorStats{UserID: userID}, nil
+		return &OwnerStats{UserID: userID}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("get donor stats: %w", err)
+		return nil, fmt.Errorf("get owner stats: %w", err)
 	}
 	if lastSeen != nil {
 		t, _ := time.Parse("2006-01-02 15:04:05", *lastSeen)
@@ -278,37 +403,10 @@ func (s *Store) GetDonorStats(userID int64) (*DonorStats, error) {
 	return &ds, nil
 }
 
-// ListAllDonorStats returns all donor statistics rows, ordered by total tokens descending.
-func (s *Store) ListAllDonorStats() ([]DonorStats, error) {
-	rows, err := s.db.Query(
-		`SELECT user_id, total_requests, total_tokens, total_uptime_seconds, last_seen_at
-		 FROM donor_stats ORDER BY total_tokens DESC`,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("list all donor stats: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var result []DonorStats
-	for rows.Next() {
-		var ds DonorStats
-		var lastSeen *string
-		if err := rows.Scan(&ds.UserID, &ds.TotalRequests, &ds.TotalTokens, &ds.TotalUptimeSec, &lastSeen); err != nil {
-			return nil, fmt.Errorf("list all donor stats: %w", err)
-		}
-		if lastSeen != nil {
-			t, _ := time.Parse("2006-01-02 15:04:05", *lastSeen)
-			ds.LastSeenAt = &t
-		}
-		result = append(result, ds)
-	}
-	return result, rows.Err()
-}
-
-// UpdateDonorStats increments persistent donor counters.
-func (s *Store) UpdateDonorStats(userID int64, requests, tokens, uptimeSec int64) error {
+// UpdateOwnerStats increments persistent owner counters.
+func (s *Store) UpdateOwnerStats(userID int64, requests, tokens, uptimeSec int64) error {
 	_, err := s.db.Exec(
-		`INSERT INTO donor_stats (user_id, total_requests, total_tokens, total_uptime_seconds, last_seen_at)
+		`INSERT INTO owner_stats (user_id, total_requests, total_tokens, total_uptime_seconds, last_seen_at)
 		 VALUES (?, ?, ?, ?, datetime('now'))
 		 ON CONFLICT(user_id) DO UPDATE SET
 		   total_requests = total_requests + excluded.total_requests,
@@ -318,14 +416,505 @@ func (s *Store) UpdateDonorStats(userID int64, requests, tokens, uptimeSec int64
 		userID, requests, tokens, uptimeSec,
 	)
 	if err != nil {
-		return fmt.Errorf("update donor stats: %w", err)
+		return fmt.Errorf("update owner stats: %w", err)
 	}
 	return nil
 }
 
+// --- Machines ---
+
+// UpsertMachineByProviderKey returns the stable machine for a provider key, creating one if needed.
+func (s *Store) UpsertMachineByProviderKey(ownerUserID, providerKeyID int64, displayName string) (*Machine, error) {
+	existing, err := s.GetMachineByProviderKeyID(providerKeyID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		if displayName != "" && displayName != existing.DisplayName {
+			_, _ = s.db.Exec(
+				`UPDATE machines SET display_name = ?, updated_at = datetime('now') WHERE id = ?`,
+				displayName, existing.ID,
+			)
+			existing.DisplayName = displayName
+		}
+		return existing, nil
+	}
+
+	id, err := generateMachineID()
+	if err != nil {
+		return nil, err
+	}
+	if displayName == "" {
+		displayName = "machine"
+	}
+	_, err = s.db.Exec(
+		`INSERT INTO machines (id, owner_user_id, provider_key_id, display_name)
+		 VALUES (?, ?, ?, ?)`,
+		id, ownerUserID, providerKeyID, displayName,
+	)
+	if err != nil {
+		// Race: another connection may have created it.
+		existing, err2 := s.GetMachineByProviderKeyID(providerKeyID)
+		if err2 == nil && existing != nil {
+			return existing, nil
+		}
+		return nil, fmt.Errorf("insert machine: %w", err)
+	}
+	return s.GetMachine(id)
+}
+
+// CreateMachineOnKeyRegen creates a new machine row for a regenerated provider key.
+func (s *Store) CreateMachineOnKeyRegen(ownerUserID, newProviderKeyID int64, displayName string) (*Machine, error) {
+	return s.UpsertMachineByProviderKey(ownerUserID, newProviderKeyID, displayName)
+}
+
+// GetMachine returns a machine by id.
+func (s *Store) GetMachine(id string) (*Machine, error) {
+	var m Machine
+	var createdStr, updatedStr string
+	err := s.db.QueryRow(
+		`SELECT id, owner_user_id, provider_key_id, display_name, created_at, updated_at
+		 FROM machines WHERE id = ?`, id,
+	).Scan(&m.ID, &m.OwnerUserID, &m.ProviderKeyID, &m.DisplayName, &createdStr, &updatedStr)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get machine: %w", err)
+	}
+	m.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdStr)
+	m.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedStr)
+	return &m, nil
+}
+
+// GetMachineByProviderKeyID returns the machine for a provider key, if any.
+func (s *Store) GetMachineByProviderKeyID(keyID int64) (*Machine, error) {
+	var m Machine
+	var createdStr, updatedStr string
+	err := s.db.QueryRow(
+		`SELECT id, owner_user_id, provider_key_id, display_name, created_at, updated_at
+		 FROM machines WHERE provider_key_id = ?`, keyID,
+	).Scan(&m.ID, &m.OwnerUserID, &m.ProviderKeyID, &m.DisplayName, &createdStr, &updatedStr)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get machine by key: %w", err)
+	}
+	m.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdStr)
+	m.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedStr)
+	return &m, nil
+}
+
+// ListMachinesByOwner returns all machines owned by a user.
+func (s *Store) ListMachinesByOwner(ownerUserID int64) ([]Machine, error) {
+	rows, err := s.db.Query(
+		`SELECT id, owner_user_id, provider_key_id, display_name, created_at, updated_at
+		 FROM machines WHERE owner_user_id = ? ORDER BY created_at DESC`,
+		ownerUserID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list machines: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []Machine
+	for rows.Next() {
+		var m Machine
+		var createdStr, updatedStr string
+		if err := rows.Scan(&m.ID, &m.OwnerUserID, &m.ProviderKeyID, &m.DisplayName, &createdStr, &updatedStr); err != nil {
+			return nil, err
+		}
+		m.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdStr)
+		m.UpdatedAt, _ = time.Parse("2006-01-02 15:04:05", updatedStr)
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// CanAccessMachine returns true if user is owner or has an active binding.
+func (s *Store) CanAccessMachine(userID int64, machineID string) (bool, error) {
+	m, err := s.GetMachine(machineID)
+	if err != nil {
+		return false, err
+	}
+	if m == nil {
+		return false, nil
+	}
+	if m.OwnerUserID == userID {
+		return true, nil
+	}
+	var n int
+	err = s.db.QueryRow(
+		`SELECT COUNT(*) FROM bindings
+		 WHERE machine_id = ? AND member_user_id = ? AND revoked_at IS NULL`,
+		machineID, userID,
+	).Scan(&n)
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+// --- Invites ---
+
+// CreateInvite creates a new invite and returns the invite plus plaintext PIN (once).
+func (s *Store) CreateInvite(machineID string, ownerUserID int64, maxUses, ttlDays int, label string) (*Invite, string, error) {
+	m, err := s.GetMachine(machineID)
+	if err != nil {
+		return nil, "", err
+	}
+	if m == nil || m.OwnerUserID != ownerUserID {
+		return nil, "", fmt.Errorf("machine not found or not owned")
+	}
+	if maxUses < 1 {
+		maxUses = 1
+	}
+	if maxUses > 10 {
+		maxUses = 10
+	}
+	if ttlDays < 1 {
+		ttlDays = 7
+	}
+
+	pin, err := generatePIN()
+	if err != nil {
+		return nil, "", err
+	}
+	pinHash := hashPIN(pin)
+	prefix := pin[:4]
+
+	expiresAt := time.Now().UTC().Add(time.Duration(ttlDays) * 24 * time.Hour)
+	res, err := s.db.Exec(
+		`INSERT INTO invites (machine_id, owner_user_id, pin_hash, pin_prefix, max_uses, uses, expires_at, label)
+		 VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
+		machineID, ownerUserID, pinHash, prefix, maxUses,
+		expiresAt.Format("2006-01-02 15:04:05"), nullIfEmpty(label),
+	)
+	if err != nil {
+		return nil, "", fmt.Errorf("insert invite: %w", err)
+	}
+	id, _ := res.LastInsertId()
+	inv, err := s.GetInvite(id)
+	if err != nil {
+		return nil, "", err
+	}
+	return inv, pin, nil
+}
+
+func nullIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+// GetInvite returns an invite by id.
+func (s *Store) GetInvite(id int64) (*Invite, error) {
+	var inv Invite
+	var expiresStr, createdStr string
+	var revokedStr, label *string
+	err := s.db.QueryRow(
+		`SELECT id, machine_id, owner_user_id, pin_hash, pin_prefix, max_uses, uses, expires_at, revoked_at, created_at, label
+		 FROM invites WHERE id = ?`, id,
+	).Scan(&inv.ID, &inv.MachineID, &inv.OwnerUserID, &inv.PinHash, &inv.PinPrefix,
+		&inv.MaxUses, &inv.Uses, &expiresStr, &revokedStr, &createdStr, &label)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get invite: %w", err)
+	}
+	inv.ExpiresAt, _ = time.Parse("2006-01-02 15:04:05", expiresStr)
+	inv.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdStr)
+	if revokedStr != nil {
+		t, _ := time.Parse("2006-01-02 15:04:05", *revokedStr)
+		inv.RevokedAt = &t
+	}
+	if label != nil {
+		inv.Label = *label
+	}
+	return &inv, nil
+}
+
+// ListInvitesByOwner returns invites created by the owner.
+func (s *Store) ListInvitesByOwner(ownerUserID int64) ([]Invite, error) {
+	rows, err := s.db.Query(
+		`SELECT id, machine_id, owner_user_id, pin_hash, pin_prefix, max_uses, uses, expires_at, revoked_at, created_at, label
+		 FROM invites WHERE owner_user_id = ? ORDER BY created_at DESC`,
+		ownerUserID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list invites: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []Invite
+	for rows.Next() {
+		var inv Invite
+		var expiresStr, createdStr string
+		var revokedStr, label *string
+		if err := rows.Scan(&inv.ID, &inv.MachineID, &inv.OwnerUserID, &inv.PinHash, &inv.PinPrefix,
+			&inv.MaxUses, &inv.Uses, &expiresStr, &revokedStr, &createdStr, &label); err != nil {
+			return nil, err
+		}
+		inv.ExpiresAt, _ = time.Parse("2006-01-02 15:04:05", expiresStr)
+		inv.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdStr)
+		if revokedStr != nil {
+			t, _ := time.Parse("2006-01-02 15:04:05", *revokedStr)
+			inv.RevokedAt = &t
+		}
+		if label != nil {
+			inv.Label = *label
+		}
+		out = append(out, inv)
+	}
+	return out, rows.Err()
+}
+
+// RevokeInvite marks an invite as revoked.
+func (s *Store) RevokeInvite(ownerUserID, inviteID int64) error {
+	res, err := s.db.Exec(
+		`UPDATE invites SET revoked_at = datetime('now')
+		 WHERE id = ? AND owner_user_id = ? AND revoked_at IS NULL`,
+		inviteID, ownerUserID,
+	)
+	if err != nil {
+		return fmt.Errorf("revoke invite: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("invite not found or already revoked")
+	}
+	return nil
+}
+
+// RedeemPIN creates/reactivates a binding for the member. Returns machine_id and whether a new consumer key is needed.
+func (s *Store) RedeemPIN(memberUserID int64, pin string) (machineID string, inviteID int64, err error) {
+	pin = normalizePIN(pin)
+	if !validPINFormat(pin) {
+		return "", 0, ErrInvalidPin
+	}
+	pinHash := hashPIN(pin)
+
+	var inv Invite
+	var expiresStr string
+	var revokedStr *string
+	err = s.db.QueryRow(
+		`SELECT id, machine_id, owner_user_id, pin_hash, pin_prefix, max_uses, uses, expires_at, revoked_at
+		 FROM invites WHERE pin_hash = ?`, pinHash,
+	).Scan(&inv.ID, &inv.MachineID, &inv.OwnerUserID, &inv.PinHash, &inv.PinPrefix,
+		&inv.MaxUses, &inv.Uses, &expiresStr, &revokedStr)
+	if err == sql.ErrNoRows {
+		return "", 0, ErrInvalidPin
+	}
+	if err != nil {
+		return "", 0, fmt.Errorf("lookup pin: %w", err)
+	}
+	if revokedStr != nil {
+		return "", 0, ErrRevokedPin
+	}
+	inv.ExpiresAt, _ = time.Parse("2006-01-02 15:04:05", expiresStr)
+	if time.Now().UTC().After(inv.ExpiresAt) {
+		return "", 0, ErrExpiredPin
+	}
+	if inv.Uses >= inv.MaxUses {
+		return "", 0, ErrExhausted
+	}
+
+	m, err := s.GetMachine(inv.MachineID)
+	if err != nil {
+		return "", 0, err
+	}
+	if m == nil {
+		return "", 0, ErrMachineGone
+	}
+
+	// Owner redeem: no-op binding, still count as success.
+	if m.OwnerUserID == memberUserID {
+		_, _ = s.db.Exec(`UPDATE invites SET uses = uses + 1 WHERE id = ? AND uses < max_uses`, inv.ID)
+		return inv.MachineID, inv.ID, nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return "", 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	res, err := tx.Exec(`UPDATE invites SET uses = uses + 1 WHERE id = ? AND uses < max_uses AND revoked_at IS NULL`, inv.ID)
+	if err != nil {
+		return "", 0, err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return "", 0, ErrExhausted
+	}
+
+	_, err = tx.Exec(
+		`INSERT INTO bindings (machine_id, member_user_id, invite_id)
+		 VALUES (?, ?, ?)
+		 ON CONFLICT(machine_id, member_user_id) DO UPDATE SET
+		   revoked_at = NULL,
+		   invite_id = excluded.invite_id,
+		   created_at = CASE WHEN bindings.revoked_at IS NOT NULL THEN datetime('now') ELSE bindings.created_at END`,
+		inv.MachineID, memberUserID, inv.ID,
+	)
+	if err != nil {
+		return "", 0, fmt.Errorf("upsert binding: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return "", 0, err
+	}
+	return inv.MachineID, inv.ID, nil
+}
+
+// --- Bindings ---
+
+// ListAccessibleMachines returns owned + member machines for a user.
+func (s *Store) ListAccessibleMachines(userID int64) ([]BindingInfo, error) {
+	var out []BindingInfo
+
+	owned, err := s.ListMachinesByOwner(userID)
+	if err != nil {
+		return nil, err
+	}
+	for _, m := range owned {
+		out = append(out, BindingInfo{
+			MachineID:   m.ID,
+			DisplayName: m.DisplayName,
+			OwnerUserID: m.OwnerUserID,
+			Role:        "owner",
+			CreatedAt:   m.CreatedAt,
+		})
+	}
+
+	rows, err := s.db.Query(
+		`SELECT b.machine_id, m.display_name, m.owner_user_id, b.created_at
+		 FROM bindings b
+		 JOIN machines m ON m.id = b.machine_id
+		 WHERE b.member_user_id = ? AND b.revoked_at IS NULL
+		 ORDER BY b.created_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list bindings: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var bi BindingInfo
+		var createdStr string
+		if err := rows.Scan(&bi.MachineID, &bi.DisplayName, &bi.OwnerUserID, &createdStr); err != nil {
+			return nil, err
+		}
+		bi.Role = "member"
+		bi.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdStr)
+		out = append(out, bi)
+	}
+	return out, rows.Err()
+}
+
+// ListMembers returns active member bindings for a machine (owner only).
+func (s *Store) ListMembers(machineID string, ownerUserID int64) ([]Binding, error) {
+	m, err := s.GetMachine(machineID)
+	if err != nil {
+		return nil, err
+	}
+	if m == nil || m.OwnerUserID != ownerUserID {
+		return nil, fmt.Errorf("machine not found or not owned")
+	}
+	rows, err := s.db.Query(
+		`SELECT id, machine_id, member_user_id, invite_id, created_at, revoked_at
+		 FROM bindings WHERE machine_id = ? AND revoked_at IS NULL`,
+		machineID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []Binding
+	for rows.Next() {
+		var b Binding
+		var createdStr string
+		var revokedStr *string
+		var inviteID sql.NullInt64
+		if err := rows.Scan(&b.ID, &b.MachineID, &b.MemberUserID, &inviteID, &createdStr, &revokedStr); err != nil {
+			return nil, err
+		}
+		if inviteID.Valid {
+			id := inviteID.Int64
+			b.InviteID = &id
+		}
+		b.CreatedAt, _ = time.Parse("2006-01-02 15:04:05", createdStr)
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+
+// RevokeBindingByMember lets a member remove their own binding.
+func (s *Store) RevokeBindingByMember(memberUserID int64, machineID string) error {
+	res, err := s.db.Exec(
+		`UPDATE bindings SET revoked_at = datetime('now')
+		 WHERE machine_id = ? AND member_user_id = ? AND revoked_at IS NULL`,
+		machineID, memberUserID,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("binding not found")
+	}
+	return nil
+}
+
+// RevokeMemberByOwner lets an owner revoke a member's access.
+func (s *Store) RevokeMemberByOwner(ownerUserID int64, machineID string, memberUserID int64) error {
+	m, err := s.GetMachine(machineID)
+	if err != nil {
+		return err
+	}
+	if m == nil || m.OwnerUserID != ownerUserID {
+		return fmt.Errorf("machine not found or not owned")
+	}
+	res, err := s.db.Exec(
+		`UPDATE bindings SET revoked_at = datetime('now')
+		 WHERE machine_id = ? AND member_user_id = ? AND revoked_at IS NULL`,
+		machineID, memberUserID,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("binding not found")
+	}
+	return nil
+}
+
+// EnsureConsumerKey returns an existing consumer/both key or creates a consumer key.
+// Returns rawKey only when newly created (empty string if reused).
+func (s *Store) EnsureConsumerKey(userID int64) (rawKey string, keyID int64, created bool, err error) {
+	keys, err := s.ListKeys(userID)
+	if err != nil {
+		return "", 0, false, err
+	}
+	for _, k := range keys {
+		if k.Scope == "consumer" || k.Scope == "both" {
+			return "", k.ID, false, nil
+		}
+	}
+	raw, id, err := s.CreateKey(userID, "consumer")
+	if err != nil {
+		return "", 0, false, err
+	}
+	return raw, id, true, nil
+}
+
 // --- Session management ---
 
-// CreateSession creates a session for the given user, valid for 24 hours.
 func (s *Store) CreateSession(userID int64) (token string, err error) {
 	token, err = generateSessionToken()
 	if err != nil {
@@ -341,7 +930,6 @@ func (s *Store) CreateSession(userID int64) (token string, err error) {
 	return token, nil
 }
 
-// ValidateSession returns the user ID for a valid session, or 0 if expired/invalid.
 func (s *Store) ValidateSession(token string) (int64, error) {
 	var userID int64
 	err := s.db.QueryRow(
@@ -357,13 +945,11 @@ func (s *Store) ValidateSession(token string) (int64, error) {
 	return userID, nil
 }
 
-// DeleteSession removes a session (logout).
 func (s *Store) DeleteSession(token string) error {
 	_, err := s.db.Exec(`DELETE FROM sessions WHERE token = ?`, token)
 	return err
 }
 
-// GetUserByID returns the github login for a user ID.
 func (s *Store) GetUserByID(userID int64) (githubLogin string, err error) {
 	err = s.db.QueryRow(`SELECT github_login FROM users WHERE id = ?`, userID).Scan(&githubLogin)
 	if err == sql.ErrNoRows {
@@ -375,7 +961,7 @@ func (s *Store) GetUserByID(userID int64) (githubLogin string, err error) {
 // --- Helpers ---
 
 func generateAPIKey() (string, error) {
-	b := make([]byte, 16) // 32 hex chars
+	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
@@ -390,7 +976,73 @@ func generateSessionToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+func generateMachineID() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return "mch_" + hex.EncodeToString(b), nil
+}
+
+func generatePIN() (string, error) {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	chars := make([]byte, 8)
+	for i := range chars {
+		chars[i] = pinAlphabet[int(b[i])%len(pinAlphabet)]
+	}
+	return string(chars[:4]) + "-" + string(chars[4:]), nil
+}
+
+func hashPIN(pin string) string {
+	h := sha256.Sum256([]byte(normalizePIN(pin)))
+	return hex.EncodeToString(h[:])
+}
+
+func normalizePIN(pin string) string {
+	pin = strings.TrimSpace(strings.ToUpper(pin))
+	pin = strings.ReplaceAll(pin, " ", "")
+	return pin
+}
+
+func validPINFormat(pin string) bool {
+	pin = normalizePIN(pin)
+	if len(pin) != 9 || pin[4] != '-' {
+		return false
+	}
+	for i, c := range pin {
+		if i == 4 {
+			continue
+		}
+		if !strings.ContainsRune(pinAlphabet, c) {
+			return false
+		}
+	}
+	return true
+}
+
 func hashKey(key string) string {
 	h := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(h[:])
+}
+
+// InviteStatus returns active/exhausted/expired/revoked.
+func (inv *Invite) Status() string {
+	if inv.RevokedAt != nil {
+		return "revoked"
+	}
+	if time.Now().UTC().After(inv.ExpiresAt) {
+		return "expired"
+	}
+	if inv.Uses >= inv.MaxUses {
+		return "exhausted"
+	}
+	return "active"
+}
+
+// MaskedPIN returns e.g. 7K4Q-****.
+func (inv *Invite) MaskedPIN() string {
+	return inv.PinPrefix + "-****"
 }

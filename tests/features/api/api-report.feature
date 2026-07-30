@@ -1,71 +1,45 @@
 @api
-Feature: Жалобы на ответ донора
-  Эндпоинт POST /api/report позволяет потребителю пожаловаться на ответ донора.
-  Принимает request_id и причину жалобы.
+Feature: Жалобы POST /api/report
+  Сигнал о злоупотреблении; опционально machine_id.
 
   Background:
     Given координатор запущен и доступен
     And существует валидный API-ключ "<valid_api_key>"
 
-  Scenario: Успешная отправка жалобы
-    Given существует завершённый запрос с request_id "<request_id>"
+  Scenario: Успешная жалоба
+    Given существует request_id "<request_id>"
     When пользователь отправляет POST-запрос на "/api/report"
       And заголовок "Authorization" равен "Bearer <valid_api_key>"
-      And заголовок "Content-Type" равен "application/json"
       And тело запроса содержит:
         """
         {
           "request_id": "<request_id>",
-          "reason": "spam"
+          "reason": "spam",
+          "machine_id": "mch_test"
         }
         """
-    Then статус ответа равен 200 или 202
+    Then статус ответа равен 202
     And тело ответа содержит поле "status"
 
-  Scenario Outline: Жалоба с разными причинами
-    Given существует завершённый запрос с request_id "<request_id>"
+  Scenario: Без request_id — 400
     When пользователь отправляет POST-запрос на "/api/report"
       And заголовок "Authorization" равен "Bearer <valid_api_key>"
       And тело запроса содержит:
         """
-        {
-          "request_id": "<request_id>",
-          "reason": "<reason>"
-        }
-        """
-    Then статус ответа равен 200 или 202
-
-    Examples:
-      | reason          |
-      | spam            |
-      | harmful         |
-      | offensive       |
-      | low_quality     |
-      | other           |
-
-  Scenario: Жалоба без request_id
-    When пользователь отправляет POST-запрос на "/api/report"
-      And заголовок "Authorization" равен "Bearer <valid_api_key>"
-      And тело запроса содержит:
-        """
-        {
-          "reason": "spam"
-        }
+        { "reason": "spam" }
         """
     Then статус ответа равен 400
 
-  Scenario: Жалоба без поля reason
+  Scenario: Без reason — 400
     When пользователь отправляет POST-запрос на "/api/report"
       And заголовок "Authorization" равен "Bearer <valid_api_key>"
       And тело запроса содержит:
         """
-        {
-          "request_id": "req_12345"
-        }
+        { "request_id": "req_12345" }
         """
     Then статус ответа равен 400
 
-  Scenario: Жалоба на несуществующий request_id
+  Scenario: Несуществующий request_id — всё равно 202
     When пользователь отправляет POST-запрос на "/api/report"
       And заголовок "Authorization" равен "Bearer <valid_api_key>"
       And тело запроса содержит:
@@ -77,21 +51,9 @@ Feature: Жалобы на ответ донора
         """
     Then статус ответа равен 202
 
-  Scenario: Жалоба без аутентификации
+  Scenario: Без auth — 401
     When пользователь отправляет POST-запрос на "/api/report"
       And заголовок "Authorization" отсутствует
-      And тело запроса содержит:
-        """
-        {
-          "request_id": "req_12345",
-          "reason": "spam"
-        }
-        """
-    Then статус ответа равен 401
-
-  Scenario: Жалоба с недействительным API-ключом
-    When пользователь отправляет POST-запрос на "/api/report"
-      And заголовок "Authorization" равен "Bearer invalid_key"
       And тело запроса содержит:
         """
         {

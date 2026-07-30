@@ -32,7 +32,7 @@ type Config struct {
 	ReconnectMax    time.Duration
 }
 
-// Agent is the donor agent that connects to the coordinator and proxies Ollama requests.
+// Agent is the provider agent that connects to the coordinator and proxies Ollama requests.
 type Agent struct {
 	cfg    Config
 	conn   *websocket.Conn
@@ -109,7 +109,7 @@ func NewAgent(cfg Config) *Agent {
 // Run connects to the coordinator and starts the request processing loop.
 func (a *Agent) Run(ctx context.Context) error {
 	if a.cfg.Token == "" {
-		return fmt.Errorf("no token provided. Get one at https://gpumesh.net/dashboard")
+		return fmt.Errorf("no token provided. Get a provider token at /share")
 	}
 
 	backoff := a.cfg.ReconnectMin
@@ -211,7 +211,11 @@ func (a *Agent) connect(ctx context.Context) error {
 	}
 
 	a.providerID = reg.ProviderID
-	log.Printf("\033[32m⚡\033[0m \033[1mregistered\033[0m provider_id=%s", a.providerID)
+	if reg.MachineID != "" {
+		log.Printf("\033[32m⚡\033[0m \033[1mregistered\033[0m machine_id=%s session_id=%s", reg.MachineID, a.providerID)
+	} else {
+		log.Printf("\033[32m⚡\033[0m \033[1mregistered\033[0m provider_id=%s", a.providerID)
+	}
 
 	// Start heartbeat loop.
 	heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)

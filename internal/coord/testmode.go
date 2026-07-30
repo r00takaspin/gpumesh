@@ -94,9 +94,11 @@ func (s *Server) handleTestSessionToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]string{
-		"token":  token,
-		"cookie": "gpumesh_session=" + token,
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"token":   token,
+		"cookie":  "gpumesh_session=" + token,
+		"user_id": userID,
+		"login":   login,
 	})
 }
 
@@ -182,13 +184,13 @@ func (s *Server) handleTestResetRateLimit(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]string{"status": "reset"})
 }
 
-// handleTestSetDonorLoad sets the current load of a donor in the registry.
-// POST /test/set-donor-load?provider=<id>&load=<N>
-func (s *Server) handleTestSetDonorLoad(w http.ResponseWriter, r *http.Request) {
-	providerID := r.URL.Query().Get("provider")
+// handleTestSetMachineLoad sets the current load of a machine session.
+// POST /test/set-machine-load?machine=<id>&load=<N>
+func (s *Server) handleTestSetMachineLoad(w http.ResponseWriter, r *http.Request) {
+	machineID := r.URL.Query().Get("machine")
 	loadStr := r.URL.Query().Get("load")
-	if providerID == "" || loadStr == "" {
-		writeError(w, http.StatusBadRequest, "provider and load params required")
+	if machineID == "" || loadStr == "" {
+		writeError(w, http.StatusBadRequest, "machine and load params required")
 		return
 	}
 	load, err := strconv.Atoi(loadStr)
@@ -196,11 +198,11 @@ func (s *Server) handleTestSetDonorLoad(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "invalid load")
 		return
 	}
-	donor := s.registry.GetDonor(providerID)
-	if donor == nil {
-		writeError(w, http.StatusNotFound, "donor not found")
+	sess := s.registry.GetSession(machineID)
+	if sess == nil {
+		writeError(w, http.StatusNotFound, "machine not found")
 		return
 	}
-	donor.CurrentLoad = load
+	sess.CurrentLoad = load
 	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "load": load})
 }

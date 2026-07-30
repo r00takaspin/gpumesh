@@ -29,10 +29,10 @@ func main() {
 		configFlag      string
 	)
 	flag.StringVar(&coordinatorFlag, "coordinator", "", "coordinator WebSocket URL")
-	flag.StringVar(&tokenFlag, "token", "", "donor authentication token")
+	flag.StringVar(&tokenFlag, "token", "", "provider authentication token")
 	flag.StringVar(&ollamaFlag, "ollama-url", "", "Ollama base URL")
 	flag.StringVar(&modelsFlag, "models", "", "comma-separated model whitelist (default: auto-discover)")
-	flag.StringVar(&descFlag, "description", "", "public donor description")
+	flag.StringVar(&descFlag, "description", "", "machine description")
 	flag.IntVar(&maxConcFlag, "max-concurrent", 0, "max concurrent requests")
 	flag.BoolVar(&wizardFlag, "wizard", false, "force interactive wizard")
 	flag.BoolVar(&noWizardFlag, "no-wizard", false, "skip wizard even if config incomplete")
@@ -178,10 +178,10 @@ func printBanner(cfg provider.Config) {
 	host, _ := os.Hostname()
 	banner := bold + green + `
    ┌──────────────────────────────────┐
-   │     GPU MESH — donor agent       │
+   │     GPU MESH — provider agent    │
    └──────────────────────────────────┘` + reset + `
 
-` + dim + `   peer-to-peer LLM inference mesh` + reset + `
+` + dim + `   share your GPU via PIN invites` + reset + `
 
 ` + yellow + `⚡` + reset + ` agent:    ` + bold + cfg.Description + reset + `
 ` + blue + `⌬` + reset + ` endpoint: ` + dim + cfg.CoordinatorURL + reset + `

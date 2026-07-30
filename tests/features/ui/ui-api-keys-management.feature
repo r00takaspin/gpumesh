@@ -26,9 +26,9 @@ Feature: Управление API-ключами в интерфейсе
     And бейдж scope отображает "consumer"
 
   Scenario: Бейджи scope для разных типов ключей
-    Given у пользователя есть ключи со scope: consumer, donor, both
+    Given у пользователя есть ключи со scope: consumer, provider, both
     Then бейдж ключа consumer содержит "consumer"
-    And бейдж ключа donor содержит "donor"
+    And бейдж ключа provider содержит "provider"
     And бейдж ключа both содержит "both"
 
   Scenario: Создание нового ключа — кнопка

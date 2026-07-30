@@ -54,14 +54,14 @@ func (s *Server) handleConsumerStats(w http.ResponseWriter, r *http.Request) {
 
 // --- GET /api/donor/stats ---
 
-func (s *Server) handleDonorStatsAPI(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleOwnerStatsAPI(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
 
-	ds, err := s.store.GetDonorStats(userID)
+	ds, err := s.store.GetOwnerStats(userID)
 	if err != nil {
 		log.Printf("donor stats error: %v", err)
 		writeError(w, http.StatusInternalServerError, "failed to get stats")
@@ -78,19 +78,19 @@ func (s *Server) handleDonorStatsAPI(w http.ResponseWriter, r *http.Request) {
 
 // --- GET /api/donor/status ---
 
-func (s *Server) handleDonorStatus(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleOwnerStatus(w http.ResponseWriter, r *http.Request) {
 	userID := getUserID(r)
 	if userID == 0 {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
 
-	donors := s.registry.DonorsForUser(userID)
+	donors := s.registry.MachinesForUser(userID)
 	agents := make([]map[string]interface{}, 0, len(donors))
 	for _, d := range donors {
 		uptime := time.Since(d.ConnectedAt)
 		agents = append(agents, map[string]interface{}{
-			"provider_id": d.ProviderID,
+			"machine_id": d.MachineID,
 			"online":      true,
 			"models":      d.Models,
 			"load":        fmt.Sprintf("%d/%d", d.CurrentLoad, d.MaxConcurrent),
@@ -115,8 +115,8 @@ func (s *Server) handleUseDonor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	donors := s.registry.DonorsForUser(userID)
-	stats, _ := s.store.GetDonorStats(userID)
+	donors := s.registry.MachinesForUser(userID)
+	stats, _ := s.store.GetOwnerStats(userID)
 	badge := BadgeForTokens(stats.TotalTokens)
 	badgeEmoji := badgeEmoji(badge)
 
@@ -130,7 +130,7 @@ func (s *Server) handleUseDonor(w http.ResponseWriter, r *http.Request) {
 			tokPerSec = "—"
 		}
 		agents[i] = donorView{
-			ProviderID:      d.ProviderID,
+			ProviderID:      d.MachineID,
 			Description:     d.Description,
 			Hardware:        d.Hardware,
 			ModelCount:      len(d.Models),
@@ -162,7 +162,7 @@ func (s *Server) handleUseDonor(w http.ResponseWriter, r *http.Request) {
 	keys, _ := s.store.ListKeys(userID)
 	var donorKeys []donorKeyView
 	for _, k := range keys {
-		if k.Scope == "donor" || k.Scope == "both" {
+		if k.Scope == "provider" || k.Scope == "donor" || k.Scope == "both" {
 			donorKeys = append(donorKeys, donorKeyView{
 				ID:        k.ID,
 				KeyPrefix: k.KeyPrefix,
@@ -212,7 +212,7 @@ func (s *Server) handleShareSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	donors := s.registry.DonorsForUser(userID)
+	donors := s.registry.MachinesForUser(userID)
 
 	// Build coordinator WebSocket URL.
 	coordURL := s.baseURL
@@ -228,7 +228,7 @@ func (s *Server) handleShareSetup(w http.ResponseWriter, r *http.Request) {
 	keys, _ := s.store.ListKeys(userID)
 	var token string
 	for _, k := range keys {
-		if k.Scope == "donor" || k.Scope == "both" {
+		if k.Scope == "provider" || k.Scope == "donor" || k.Scope == "both" {
 			token = k.KeyPrefix + "..."
 			break
 		}
@@ -253,7 +253,7 @@ func (s *Server) handleShareModels(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-	donors := s.registry.DonorsForUser(userID)
+	donors := s.registry.MachinesForUser(userID)
 	sort.Slice(donors, func(i, j int) bool { return donors[i].Description < donors[j].Description })
 	agents := make([]donorView, len(donors))
 	for i, d := range donors {
@@ -265,7 +265,7 @@ func (s *Server) handleShareModels(w http.ResponseWriter, r *http.Request) {
 			tokPerSec = "—"
 		}
 		agents[i] = donorView{
-			ProviderID:      d.ProviderID,
+			ProviderID:      d.MachineID,
 			Description:     d.Description,
 			Hardware:        d.Hardware,
 			ModelCount:      len(d.Models),
@@ -294,8 +294,8 @@ func (s *Server) handleShareDonorStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	donors := s.registry.DonorsForUser(userID)
-	stats, _ := s.store.GetDonorStats(userID)
+	donors := s.registry.MachinesForUser(userID)
+	stats, _ := s.store.GetOwnerStats(userID)
 
 	// Only render if there's activity or donors connected.
 	// Always render — token management UI must be visible even with no stats.
@@ -321,7 +321,7 @@ func (s *Server) handleShareDonorStats(w http.ResponseWriter, r *http.Request) {
 	keys, _ := s.store.ListKeys(userID)
 	var donorKeys []donorKeyView
 	for _, k := range keys {
-		if k.Scope == "donor" || k.Scope == "both" {
+		if k.Scope == "provider" || k.Scope == "donor" || k.Scope == "both" {
 			donorKeys = append(donorKeys, donorKeyView{
 				ID:        k.ID,
 				KeyPrefix: k.KeyPrefix,
@@ -361,7 +361,7 @@ func (s *Server) handleShareCreateToken(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusUnauthorized, "not authenticated")
 		return
 	}
-	rawKey, _, err := s.store.CreateKey(userID, "donor")
+	rawKey, _, err := s.store.CreateKey(userID, "provider")
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to create token")
 		return

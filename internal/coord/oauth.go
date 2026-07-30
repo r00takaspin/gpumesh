@@ -111,7 +111,7 @@ func (s *Server) handleGitHubCallback(w http.ResponseWriter, r *http.Request) {
 			redirect = redirect + "?new=1"
 		}
 	case "/share":
-		n, _ := s.store.CountKeysByScope(userID, "donor")
+		n, _ := s.store.CountKeysByScope(userID, "provider")
 		if n == 0 {
 			redirect = redirect + "?new=1"
 		}
@@ -229,11 +229,11 @@ func (s *Server) handleShare(w http.ResponseWriter, r *http.Request) {
 	pd.BaseURL = s.baseURL
 
 	if userID != 0 {
-		// Auto-create donor key if none exists (first visit after OAuth).
+		// Auto-create provider key if none exists (first visit after OAuth).
 		if r.URL.Query().Get("new") == "1" {
-			n, _ := s.store.CountKeysByScope(userID, "donor")
+			n, _ := s.store.CountKeysByScope(userID, "provider")
 			if n == 0 {
-				rawKey, _, err := s.store.CreateKey(userID, "donor")
+				rawKey, _, err := s.store.CreateKey(userID, "provider")
 				if err == nil {
 					pd.NewKey = rawKey
 				}

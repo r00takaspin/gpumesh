@@ -58,9 +58,9 @@ func TestCreateAndListKeys(t *testing.T) {
 		t.Fatalf("expected key length 36, got %d", len(raw1))
 	}
 
-	_, _, err = s.CreateKey(userID, "donor")
+	_, _, err = s.CreateKey(userID, "provider")
 	if err != nil {
-		t.Fatalf("CreateKey donor: %v", err)
+		t.Fatalf("CreateKey provider: %v", err)
 	}
 
 	keys, err := s.ListKeys(userID)
@@ -149,26 +149,25 @@ func TestRevokeKeyWrongUser(t *testing.T) {
 	}
 }
 
-func TestDonorStats(t *testing.T) {
+func TestOwnerStats(t *testing.T) {
 	s := newTestStore(t)
 	userID, _ := s.UpsertUser(6, "frank")
 
-	// Fresh stats should be zero.
-	ds, err := s.GetDonorStats(userID)
+	ds, err := s.GetOwnerStats(userID)
 	if err != nil {
-		t.Fatalf("GetDonorStats: %v", err)
+		t.Fatalf("GetOwnerStats: %v", err)
 	}
 	if ds.TotalRequests != 0 || ds.TotalTokens != 0 || ds.TotalUptimeSec != 0 {
 		t.Fatal("expected zero stats")
 	}
 
-	if err := s.UpdateDonorStats(userID, 10, 500, 60); err != nil {
-		t.Fatalf("UpdateDonorStats: %v", err)
+	if err := s.UpdateOwnerStats(userID, 10, 500, 60); err != nil {
+		t.Fatalf("UpdateOwnerStats: %v", err)
 	}
 
-	ds, err = s.GetDonorStats(userID)
+	ds, err = s.GetOwnerStats(userID)
 	if err != nil {
-		t.Fatalf("GetDonorStats after update: %v", err)
+		t.Fatalf("GetOwnerStats after update: %v", err)
 	}
 	if ds.TotalRequests != 10 {
 		t.Fatalf("expected 10 requests, got %d", ds.TotalRequests)
@@ -180,11 +179,10 @@ func TestDonorStats(t *testing.T) {
 		t.Fatalf("expected 60 uptime, got %d", ds.TotalUptimeSec)
 	}
 
-	// Second update accumulates.
-	if err := s.UpdateDonorStats(userID, 5, 200, 30); err != nil {
-		t.Fatalf("UpdateDonorStats second: %v", err)
+	if err := s.UpdateOwnerStats(userID, 5, 200, 30); err != nil {
+		t.Fatalf("UpdateOwnerStats second: %v", err)
 	}
-	ds, _ = s.GetDonorStats(userID)
+	ds, _ = s.GetOwnerStats(userID)
 	if ds.TotalRequests != 15 {
 		t.Fatalf("expected accumulated 15 requests, got %d", ds.TotalRequests)
 	}
@@ -226,5 +224,91 @@ func TestSessions(t *testing.T) {
 	uid, _ = s.ValidateSession(token)
 	if uid != 0 {
 		t.Fatal("expected 0 after delete")
+	}
+}
+
+func TestMachinesInvitesBindings(t *testing.T) {
+	s := newTestStore(t)
+	ownerID, _ := s.UpsertUser(100, "owner")
+	memberID, _ := s.UpsertUser(101, "member")
+
+	_, keyID, err := s.CreateKey(ownerID, "provider")
+	if err != nil {
+		t.Fatalf("CreateKey: %v", err)
+	}
+
+	m, err := s.UpsertMachineByProviderKey(ownerID, keyID, "home-lab")
+	if err != nil {
+		t.Fatalf("UpsertMachine: %v", err)
+	}
+	if m.ID == "" || m.DisplayName != "home-lab" {
+		t.Fatalf("unexpected machine: %+v", m)
+	}
+
+	m2, err := s.UpsertMachineByProviderKey(ownerID, keyID, "home-lab")
+	if err != nil || m2.ID != m.ID {
+		t.Fatalf("expected stable machine id, got %v %v", m2, err)
+	}
+
+	ok, err := s.CanAccessMachine(ownerID, m.ID)
+	if err != nil || !ok {
+		t.Fatal("owner should access")
+	}
+	ok, _ = s.CanAccessMachine(memberID, m.ID)
+	if ok {
+		t.Fatal("member should not access yet")
+	}
+
+	inv, pin, err := s.CreateInvite(m.ID, ownerID, 1, 7, "for friend")
+	if err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	if pin == "" || inv.ID == 0 {
+		t.Fatal("expected pin and invite")
+	}
+
+	machineID, _, err := s.RedeemPIN(memberID, pin)
+	if err != nil || machineID != m.ID {
+		t.Fatalf("RedeemPIN: %v %s", err, machineID)
+	}
+
+	ok, _ = s.CanAccessMachine(memberID, m.ID)
+	if !ok {
+		t.Fatal("member should access after redeem")
+	}
+
+	// Exhausted
+	_, _, err = s.RedeemPIN(memberID, pin)
+	if err != ErrExhausted {
+		t.Fatalf("expected exhausted, got %v", err)
+	}
+
+	list, err := s.ListAccessibleMachines(memberID)
+	if err != nil || len(list) != 1 {
+		t.Fatalf("expected 1 binding, got %v %v", list, err)
+	}
+
+	if err := s.RevokeMemberByOwner(ownerID, m.ID, memberID); err != nil {
+		t.Fatalf("RevokeMember: %v", err)
+	}
+	ok, _ = s.CanAccessMachine(memberID, m.ID)
+	if ok {
+		t.Fatal("member should not access after revoke")
+	}
+}
+
+func TestScopeDonorNormalizedToProvider(t *testing.T) {
+	s := newTestStore(t)
+	userID, _ := s.UpsertUser(200, "norm")
+	raw, _, err := s.CreateKey(userID, "donor")
+	if err != nil {
+		t.Fatal(err)
+	}
+	k, err := s.FindKeyByHash(hashKey(raw))
+	if err != nil || k == nil {
+		t.Fatal("key not found")
+	}
+	if k.Scope != "provider" {
+		t.Fatalf("expected provider, got %s", k.Scope)
 	}
 }

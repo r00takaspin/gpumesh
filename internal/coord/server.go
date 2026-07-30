@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
@@ -21,34 +20,28 @@ type Server struct {
 	store    *Store
 	registry *Registry
 	limiter  *RateLimiter
+	pinLimiter *pinLimiter
 	baseURL  string
 	srv      *http.Server
 
-	startTime time.Time
-	// Daily counters (reset at midnight).
+	inviteTTLDays   int
+	inviteMaxUses   int
+	pinAttemptLimit int
+
+	startTime     time.Time
 	requestsToday int64
 	tokensToday   int64
-
-	// Sticky consumer→donor affinity for KV-cache reuse.
-	affinity    map[int64]consumerAffinity
-	affinityMu  sync.RWMutex
-	affinityTTL time.Duration
-}
-
-// consumerAffinity tracks a sticky consumer→donor binding for KV-cache reuse.
-type consumerAffinity struct {
-	ProviderID string
-	Model      string
-	ExpiresAt  time.Time
 }
 
 // Config holds server configuration.
 type Config struct {
-	Addr        string
-	DBPath      string
-	BaseURL     string
-	RateLimit   int // requests per hour per key
-	AffinityTTL int // seconds, sticky consumer→donor affinity (0 = default 120)
+	Addr            string
+	DBPath          string
+	BaseURL         string
+	RateLimit       int // requests per hour per key
+	InviteTTLDays   int
+	InviteMaxUses   int
+	PinAttemptLimit int
 }
 
 // NewServer creates a new coordinator server.
@@ -61,30 +54,39 @@ func NewServer(cfg Config) (*Server, error) {
 	if cfg.RateLimit <= 0 {
 		cfg.RateLimit = 100
 	}
+	if cfg.InviteTTLDays <= 0 {
+		cfg.InviteTTLDays = 7
+	}
+	if cfg.InviteMaxUses <= 0 {
+		cfg.InviteMaxUses = 1
+	}
+	if cfg.PinAttemptLimit <= 0 {
+		cfg.PinAttemptLimit = 10
+	}
 
 	s := &Server{
 		addr:            cfg.Addr,
 		store:           store,
 		registry:        NewRegistry(),
 		limiter:         RateLimitHourly(cfg.RateLimit),
+		pinLimiter:      newPinLimiter(cfg.PinAttemptLimit),
 		baseURL:         cfg.BaseURL,
 		startTime:       time.Now(),
-		affinity:        make(map[int64]consumerAffinity),
-		affinityTTL:     time.Duration(cfg.AffinityTTL) * time.Second,
+		inviteTTLDays:   cfg.InviteTTLDays,
+		inviteMaxUses:   cfg.InviteMaxUses,
+		pinAttemptLimit: cfg.PinAttemptLimit,
 	}
 
 	mux := http.NewServeMux()
 
 	// Public pages.
 	mux.HandleFunc("GET /", s.corsMiddleware(s.handleIndex))
-	mux.HandleFunc("GET /models", s.corsMiddleware(s.handleModelsPage))
+	mux.HandleFunc("GET /models", s.redirectUse) // public catalog removed in v2
 	mux.HandleFunc("GET /about", s.corsMiddleware(s.handleAbout))
+	mux.HandleFunc("GET /join", s.corsMiddleware(s.handleJoinPage))
 
-	// Use Models (auth optional, page shows two states).
 	mux.HandleFunc("GET /use", s.corsMiddleware(s.handleUse))
-	// Share GPU (auth optional).
 	mux.HandleFunc("GET /share", s.corsMiddleware(s.handleShare))
-	// Redirect old dashboard to /use.
 	mux.HandleFunc("GET /dashboard", s.redirectUse)
 
 	// OAuth.
@@ -93,11 +95,12 @@ func NewServer(cfg Config) (*Server, error) {
 	mux.HandleFunc("GET /auth/github/callback", s.handleGitHubCallback)
 	mux.HandleFunc("GET /logout", s.handleLogout)
 
-	// OpenAI-compatible API.
+	// OpenAI-compatible API (v2 per-machine).
 	mux.HandleFunc("GET /v1/models", s.corsMiddleware(s.requireAPIKey(s.handleAPIModels)))
-	mux.HandleFunc("POST /v1/chat/completions", s.corsMiddleware(s.requireAPIKey(s.handleAPIChatCompletions)))
+	mux.HandleFunc("GET /v1/machines/{machine_id}/models", s.corsMiddleware(s.requireAPIKey(s.handleMachineModels)))
+	mux.HandleFunc("POST /v1/machines/{machine_id}/chat/completions", s.corsMiddleware(s.requireAPIKey(s.handleMachineChatCompletions)))
+	mux.HandleFunc("POST /v1/chat/completions", s.corsMiddleware(s.requireAPIKey(s.handleLegacyChatCompletions)))
 	mux.HandleFunc("OPTIONS /v1/", s.handleCORS)
-	// Return 404 for unknown /v1/ and /api/ paths.
 	mux.HandleFunc("GET /v1/", s.corsMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
 	}))
@@ -111,43 +114,49 @@ func NewServer(cfg Config) (*Server, error) {
 		writeError(w, http.StatusNotFound, "not found")
 	}))
 	mux.HandleFunc("GET /ws/provider", s.handleWSProvider)
-	// API key management (auth required).
+
+	// API key management.
 	mux.HandleFunc("POST /api/keys", s.requireAuth(s.handleCreateKey))
 	mux.HandleFunc("GET /api/keys", s.requireAuth(s.handleListKeys))
 	mux.HandleFunc("DELETE /api/keys/{id}", s.requireAuth(s.handleRevokeKey))
 	mux.HandleFunc("POST /api/keys/{id}/regenerate", s.requireAuth(s.handleRegenerateKey))
 
-	// Abuse reporting (API key auth).
 	mux.HandleFunc("POST /api/report", s.requireAPIKey(s.handleReport))
 
-	// Frontend data API.
+	// Stats.
 	mux.HandleFunc("GET /api/consumer/stats", s.requireAuth(s.handleConsumerStats))
-	mux.HandleFunc("GET /api/donor/stats", s.requireAuth(s.handleDonorStatsAPI))
-	mux.HandleFunc("GET /api/donor/status", s.requireAuth(s.handleDonorStatus))
+	mux.HandleFunc("GET /api/owner/stats", s.requireAuth(s.handleOwnerStatsAPI))
+	mux.HandleFunc("GET /api/owner/status", s.requireAuth(s.handleOwnerStatus))
 
-	// HTMX fragments.
+	// Invites / bindings.
+	mux.HandleFunc("POST /api/invites", s.requireAuth(s.handleCreateInvite))
+	mux.HandleFunc("GET /api/invites", s.requireAuth(s.handleListInvites))
+	mux.HandleFunc("DELETE /api/invites/{id}", s.requireAuth(s.handleRevokeInvite))
+	mux.HandleFunc("POST /api/join", s.requireAuth(s.handleJoin))
+	mux.HandleFunc("GET /api/bindings", s.requireAuth(s.handleListBindings))
+	mux.HandleFunc("DELETE /api/bindings/{machine_id}", s.requireAuth(s.handleRevokeBinding))
+	mux.HandleFunc("DELETE /api/machines/{machine_id}/members/{user_id}", s.requireAuth(s.handleRevokeMember))
+
+	// HTMX fragments (existing v1 templates; keep working).
 	mux.HandleFunc("GET /use/keys", s.requireAuth(s.handleUseKeys))
 	mux.HandleFunc("POST /use/keys", s.requireAuth(s.handleUseCreateKey))
 	mux.HandleFunc("GET /use/donor", s.requireAuth(s.handleUseDonor))
 	mux.HandleFunc("GET /share/setup", s.requireAuth(s.handleShareSetup))
 	mux.HandleFunc("GET /share/models", s.requireAuth(s.handleShareModels))
 	mux.HandleFunc("GET /share/donor-stats", s.requireAuth(s.handleShareDonorStats))
+	mux.HandleFunc("GET /share/stats", s.requireAuth(s.handleShareDonorStats))
 	mux.HandleFunc("POST /share/tokens", s.requireAuth(s.handleShareCreateToken))
 
-	// Health check.
 	mux.HandleFunc("GET /health", s.handleHealth)
 
-	// Test mode endpoints (only active when TEST_MODE=true).
 	mux.HandleFunc("GET /test/session", testModeOnly(s.handleTestSession))
 	mux.HandleFunc("GET /test/session-token", testModeOnly(s.handleTestSessionToken))
 	mux.HandleFunc("GET /test/error", testModeOnly(s.handleTestError))
 	mux.HandleFunc("POST /test/reset-rate-limit", testModeOnly(s.handleTestResetRateLimit))
-	mux.HandleFunc("POST /test/set-donor-load", testModeOnly(s.handleTestSetDonorLoad))
+	mux.HandleFunc("POST /test/set-machine-load", testModeOnly(s.handleTestSetMachineLoad))
 
-	// Provider install script.
 	mux.HandleFunc("GET /install-provider.sh", s.handleInstallScript)
 
-	// Static files.
 	staticFS, _ := fs.Sub(web.EmbeddedFS, "static")
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
@@ -161,11 +170,9 @@ func NewServer(cfg Config) (*Server, error) {
 
 // ListenAndServe starts the server and blocks until shutdown.
 func (s *Server) ListenAndServe() error {
-	// Start heartbeat monitor.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	s.registry.StartHeartbeatMonitor(ctx, proto.HeartbeatTimeout, proto.HeartbeatMonitorTick)
-	// Periodic uptime persistence for connected donors.
 	go func() {
 		ticker := time.NewTicker(60 * time.Second)
 		defer ticker.Stop()
@@ -174,14 +181,13 @@ func (s *Server) ListenAndServe() error {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				for _, d := range s.registry.AllDonors() {
-					_ = s.store.UpdateDonorStats(d.UserID, 0, 0, 60)
+				for _, sess := range s.registry.AllSessions() {
+					_ = s.store.UpdateOwnerStats(sess.UserID, 0, 0, 60)
 				}
 			}
 		}
 	}()
 
-	// Graceful shutdown.
 	go func() {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -197,7 +203,6 @@ func (s *Server) ListenAndServe() error {
 	return s.srv.ListenAndServe()
 }
 
-// corsMiddleware adds CORS headers for /v1/* endpoints.
 func (s *Server) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -210,7 +215,6 @@ func (s *Server) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// handleCORS responds to preflight requests.
 func (s *Server) handleCORS(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
@@ -218,27 +222,20 @@ func (s *Server) handleCORS(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// --- Stub handlers ---
-
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
 }
+
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "index.html", s.pageDataWithStats(r))
-}
-
-func (s *Server) handleModelsPage(w http.ResponseWriter, r *http.Request) {
-	renderTemplate(w, "models.html", s.pageDataWithStats(r))
 }
 
 func (s *Server) handleAbout(w http.ResponseWriter, r *http.Request) {
 	renderTemplate(w, "about.html", s.pageDataWithStats(r))
 }
 
-
 func (s *Server) redirectUse(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/use", http.StatusMovedPermanently)
 }
-
