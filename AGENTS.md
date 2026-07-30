@@ -31,6 +31,13 @@ SPEC-v2 wins. If SPEC-v2 is ambiguous, default to the interpretation that preser
 > - Ты НЕ решаешь сам когда коммитить/пушить. Даже если сделал правку и кажется очевидным — СПРОСИ.
 > - `git push dokku` = PRODUCTION (gpumesh.net). Спрашивай ОТДЕЛЬНО.
 
+### Commit messages — NO Cursor co-author
+
+- **НИКОГДА** не добавляй в коммиты `Co-authored-by: Cursor`, `Co-authored-by: cursoragent@cursor.com` и любые другие Cursor/agent trailers.
+- Сообщение коммита = только смысл изменения (subject + optional body). Без маркетинга IDE.
+- После `git commit` сразу проверь: `git log -1 --format=%B` — если trailer появился сам, **сразу** `git commit --amend` и вырежи его (до push; amend после push на `main` только с явного разрешения на force).
+- При истории уже с этими trailer’ами: rebase/filter и вырезать, затем force-with-lease **только** если пользователь явно просит почистить историю.
+
 - Make changes to files, but wait for the user's command before touching git.
 - Before deploying: ALWAYS build (`go build ./...`) and vet (`go vet ./...`).
 - On deploy: push to origin `main` first; GitHub Actions (`.github/workflows/deploy.yml`) pushes to Dokku with **`branch: main`** (Dokku deploy branch). Push to `master` updates git but does **not** rebuild the container.
