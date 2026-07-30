@@ -2,6 +2,7 @@ package coord
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -35,10 +36,11 @@ type MachineSession struct {
 
 // ChunkRelay carries a chunk and done flag from the provider read loop to the SSE writer.
 type ChunkRelay struct {
-	Content string
-	Done    bool
-	Err     string
-	Tokens  int
+	Content   string
+	ToolCalls json.RawMessage
+	Done      bool
+	Err       string
+	Tokens    int
 }
 
 // Registry is a thread-safe in-memory machine session registry (§10.4 SPEC-v2).

@@ -39,6 +39,22 @@ SPEC-v2 wins. If SPEC-v2 is ambiguous, default to the interpretation that preser
 - **NEVER** manually kill/rename Docker containers — use `dokku ps:rebuild gpumesh`.
 - If Dokku gets stuck or git sha is new but UI is old: `dokku ps:rebuild gpumesh` is the nuke-from-orbit fix.
 
+### Production SSH (VPS)
+
+- **Host:** `gpumesh.net` → `194.113.153.87` (root SSH; user did `ssh-copy-id`)
+- **Key:** `~/.ssh/id_ed25519_r00takaspin` with `IdentitiesOnly=yes`
+- **App:** Dokku `gpumesh`
+- **Canonical commands:**
+
+```bash
+SSH="ssh -i ~/.ssh/id_ed25519_r00takaspin -o IdentitiesOnly=yes -o BatchMode=yes root@194.113.153.87"
+$SSH 'dokku logs gpumesh -n 200'
+$SSH 'dokku ps:report gpumesh'
+```
+
+- When debugging prod (Cursor hang, 5xx, offline machine): **use this SSH**, don’t claim there is no access.
+- Still obey deploy/git rules above: logs/diagnostics OK; rebuild/restart/proxy only when the user asks or it’s clearly required to finish a requested debug.
+
 ## Local Development
 
 - `.env` contains local OAuth credentials and `MESH_BASE_URL` — **это источник правды для URL**, не хардкод IP из памяти/старых чатов.

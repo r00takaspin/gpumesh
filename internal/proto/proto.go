@@ -58,10 +58,11 @@ type HeartbeatMsg struct {
 
 // ChunkMsg is a streaming token chunk from a donor.
 type ChunkMsg struct {
-	Type      string `json:"type"`       // always "chunk"
-	RequestID string `json:"request_id"`
-	Content   string `json:"content"`
-	Done      bool   `json:"done"`
+	Type      string          `json:"type"`       // always "chunk"
+	RequestID string          `json:"request_id"`
+	Content   string          `json:"content"`
+	ToolCalls json.RawMessage `json:"tool_calls,omitempty"`
+	Done      bool            `json:"done"`
 }
 
 // ResponseMsg is a complete non-streaming response from a donor.
@@ -69,6 +70,7 @@ type ResponseMsg struct {
 	Type      string          `json:"type"`       // always "response"
 	RequestID string          `json:"request_id"`
 	Content   string          `json:"content"`
+	ToolCalls json.RawMessage `json:"tool_calls,omitempty"`
 	Model     string          `json:"model"`
 	Usage     json.RawMessage `json:"usage"`
 }
@@ -92,12 +94,14 @@ type RegisteredMsg struct {
 
 // RequestMsg is an inference request forwarded to a donor.
 type RequestMsg struct {
-	Type      string          `json:"type"`       // always "request"
-	RequestID string          `json:"request_id"`
-	Model     string          `json:"model"`
-	Messages  json.RawMessage `json:"messages"`
-	Stream    bool            `json:"stream"`
-	Options   json.RawMessage `json:"options,omitempty"`
+	Type       string          `json:"type"`       // always "request"
+	RequestID  string          `json:"request_id"`
+	Model      string          `json:"model"`
+	Messages   json.RawMessage `json:"messages"`
+	Stream     bool            `json:"stream"`
+	Tools      json.RawMessage `json:"tools,omitempty"`
+	ToolChoice json.RawMessage `json:"tool_choice,omitempty"`
+	Options    json.RawMessage `json:"options,omitempty"`
 }
 
 // CancelMsg is sent to a donor to cancel an in-progress request.
@@ -122,6 +126,8 @@ type ChatCompletionRequest struct {
 	Temperature float64         `json:"temperature,omitempty"`
 	TopP        float64         `json:"top_p,omitempty"`
 	MaxTokens   int             `json:"max_tokens,omitempty"`
+	Tools       json.RawMessage `json:"tools,omitempty"`
+	ToolChoice  json.RawMessage `json:"tool_choice,omitempty"`
 	Extra       json.RawMessage `json:"-"` // passthrough unknown fields
 }
 

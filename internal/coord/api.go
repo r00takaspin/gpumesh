@@ -180,6 +180,9 @@ func (s *Server) handleMachineChatCompletions(w http.ResponseWriter, r *http.Req
 		req.Model = req.Model[idx+1:]
 	}
 
+	log.Printf("chat: machine_id=%s model=%s stream=%v tools=%v msgs_bytes=%d ua=%q",
+		machineID, req.Model, req.Stream, len(req.Tools) > 0, len(req.Messages), r.UserAgent())
+
 	atomic.AddInt64(&s.requestsToday, 1)
 
 	sess := s.registry.GetSession(machineID)
@@ -228,6 +231,7 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no") // disable nginx proxy buffering for SSE
 	w.WriteHeader(http.StatusOK)
 
 	flusher, ok := w.(http.Flusher)
@@ -248,12 +252,14 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 	}
 
 	requestMsg := proto.RequestMsg{
-		Type:      proto.TypeRequest,
-		RequestID: requestID,
-		Model:     req.Model,
-		Messages:  req.Messages,
-		Stream:    true,
-		Options:   buildOptions(req),
+		Type:       proto.TypeRequest,
+		RequestID:  requestID,
+		Model:      req.Model,
+		Messages:   req.Messages,
+		Stream:     true,
+		Tools:      req.Tools,
+		ToolChoice: req.ToolChoice,
+		Options:    buildOptions(req),
 	}
 	if err := sess.SendWS(requestMsg); err != nil {
 		log.Printf("chat: send request error: %v", err)
@@ -272,6 +278,7 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 	interTokenTimer := time.NewTimer(proto.InterTokenTimeout)
 	interTokenTimer.Stop()
 	var firstTokenReceived bool
+	var sawToolCalls bool
 	created := time.Now().Unix()
 
 	for {
@@ -342,6 +349,32 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 				interTokenTimer.Reset(proto.InterTokenTimeout)
 			}
 
+			if len(cr.ToolCalls) > 0 {
+				sawToolCalls = true
+			}
+			// Skip empty keepalives (no content / tool_calls) — Cursor treats long empty SSE as hang.
+			if !cr.Done && cr.Content == "" && len(cr.ToolCalls) == 0 {
+				continue
+			}
+
+			delta := map[string]interface{}{}
+			if cr.Content != "" {
+				delta["content"] = cr.Content
+			}
+			if len(cr.ToolCalls) > 0 {
+				var toolCalls interface{}
+				if err := json.Unmarshal(cr.ToolCalls, &toolCalls); err == nil {
+					delta["tool_calls"] = normalizeStreamToolCallDeltas(toolCalls)
+				}
+			}
+			var finish interface{}
+			if cr.Done {
+				if sawToolCalls {
+					finish = "tool_calls"
+				} else {
+					finish = "stop"
+				}
+			}
 			chunk := map[string]interface{}{
 				"id":      "chatcmpl-" + requestID,
 				"object":  "chat.completion.chunk",
@@ -350,13 +383,10 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 				"choices": []map[string]interface{}{
 					{
 						"index":         0,
-						"delta":         map[string]string{"content": cr.Content},
-						"finish_reason": nil,
+						"delta":         delta,
+						"finish_reason": finish,
 					},
 				},
-			}
-			if cr.Done {
-				chunk["choices"].([]map[string]interface{})[0]["finish_reason"] = "stop"
 			}
 			data, _ := json.Marshal(chunk)
 			_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
@@ -414,12 +444,14 @@ func (s *Server) sendNonStreamingRequest(ctx context.Context, sess *MachineSessi
 	defer sess.UnregisterChunkChannel(requestID)
 
 	requestMsg := proto.RequestMsg{
-		Type:      proto.TypeRequest,
-		RequestID: requestID,
-		Model:     req.Model,
-		Messages:  req.Messages,
-		Stream:    false,
-		Options:   buildOptions(req),
+		Type:       proto.TypeRequest,
+		RequestID:  requestID,
+		Model:      req.Model,
+		Messages:   req.Messages,
+		Stream:     false,
+		Tools:      req.Tools,
+		ToolChoice: req.ToolChoice,
+		Options:    buildOptions(req),
 	}
 	if err := sess.SendWS(requestMsg); err != nil {
 		return nil, fmt.Errorf("send request: %w", err)
@@ -440,15 +472,24 @@ func (s *Server) sendNonStreamingRequest(ctx context.Context, sess *MachineSessi
 		if cr.Err != "" {
 			return nil, fmt.Errorf("provider error: %s", cr.Err)
 		}
+		message := map[string]interface{}{
+			"role":    "assistant",
+			"content": cr.Content,
+		}
+		finish := "stop"
+		if len(cr.ToolCalls) > 0 {
+			var toolCalls interface{}
+			if err := json.Unmarshal(cr.ToolCalls, &toolCalls); err == nil {
+				message["tool_calls"] = toolCalls
+				finish = "tool_calls"
+			}
+		}
 		return map[string]interface{}{
 			"choices": []map[string]interface{}{
 				{
-					"index": 0,
-					"message": map[string]string{
-						"role":    "assistant",
-						"content": cr.Content,
-					},
-					"finish_reason": "stop",
+					"index":         0,
+					"message":       message,
+					"finish_reason": finish,
 				},
 			},
 			"usage": map[string]int{
@@ -463,6 +504,25 @@ func (s *Server) sendNonStreamingRequest(ctx context.Context, sess *MachineSessi
 func (s *Server) sendSSEDone(w http.ResponseWriter, flusher http.Flusher) {
 	_, _ = fmt.Fprintf(w, "data: [DONE]\n\n")
 	flusher.Flush()
+}
+
+// normalizeStreamToolCallDeltas ensures OpenAI streaming deltas include index.
+func normalizeStreamToolCallDeltas(toolCalls interface{}) interface{} {
+	arr, ok := toolCalls.([]interface{})
+	if !ok {
+		return toolCalls
+	}
+	for i, item := range arr {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if _, has := m["index"]; !has {
+			m["index"] = i
+		}
+		arr[i] = m
+	}
+	return arr
 }
 
 func buildOptions(req *proto.ChatCompletionRequest) json.RawMessage {

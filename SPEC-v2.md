@@ -369,10 +369,11 @@ Authorization: Bearer <api_key>
 Content-Type: application/json
 ```
 
-Тело — OpenAI-совместимое (`model`, `messages`, `stream`, `temperature`, …).  
-Поле `model` уходит в Ollama как есть (после возможного strip префикса `openai/` как в v1 §3.5 шаг 0 — сохранить для LiteLLM/Aider).
+Тело — OpenAI-совместимое (`model`, `messages`, `stream`, `temperature`, `tools`, `tool_choice`, …).  
+Поле `model` уходит в Ollama как есть (после возможного strip префикса `openai/` как в v1 §3.5 шаг 0 — сохранить для LiteLLM/Aider).  
+`tools` / `tool_choice` прокидываются в Ollama; ответные `tool_calls` возвращаются в OpenAI-форме (`finish_reason: tool_calls` когда применимо). Нужно для Cursor Ask/Agent и других tool-calling харнесов.
 
-Streaming: SSE. Non-stream: JSON.
+Streaming: SSE (`X-Accel-Buffering: no`; пустые content-keepalives не шлём). Non-stream: JSON.
 
 **Legacy пути v1 (поведение v2):**
 

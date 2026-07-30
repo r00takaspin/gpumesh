@@ -409,7 +409,8 @@ func (a *Agent) handleStreamingResponse(requestID string, body io.Reader) {
 
 		var chunk struct {
 			Message struct {
-				Content string `json:"content"`
+				Content   string          `json:"content"`
+				ToolCalls json.RawMessage `json:"tool_calls"`
 			} `json:"message"`
 			Done bool `json:"done"`
 		}
@@ -425,10 +426,12 @@ func (a *Agent) handleStreamingResponse(requestID string, body io.Reader) {
 			return
 		}
 
+		toolCalls := normalizeToolCalls(chunk.Message.ToolCalls)
 		if err := a.writeWS(conn, proto.ChunkMsg{
 			Type:      proto.TypeChunk,
 			RequestID: requestID,
 			Content:   chunk.Message.Content,
+			ToolCalls: toolCalls,
 			Done:      chunk.Done,
 		}); err != nil {
 			log.Printf("write chunk error: %v", err)
@@ -450,11 +453,12 @@ func (a *Agent) handleNonStreamingResponse(requestID, model string, body io.Read
 
 	var ollamaResp struct {
 		Message struct {
-			Content string `json:"content"`
+			Content   string          `json:"content"`
+			ToolCalls json.RawMessage `json:"tool_calls"`
 		} `json:"message"`
-		TotalDuration      int64 `json:"total_duration"`
-		PromptEvalCount    int   `json:"prompt_eval_count"`
-		EvalCount          int   `json:"eval_count"`
+		TotalDuration   int64 `json:"total_duration"`
+		PromptEvalCount int   `json:"prompt_eval_count"`
+		EvalCount       int   `json:"eval_count"`
 	}
 	if err := json.Unmarshal(data, &ollamaResp); err != nil {
 		log.Printf("ollama response parse error: %v", err)
@@ -474,17 +478,67 @@ func (a *Agent) handleNonStreamingResponse(requestID, model string, body io.Read
 		return
 	}
 
+	toolCalls := normalizeToolCalls(ollamaResp.Message.ToolCalls)
 	if err := a.writeWS(conn, proto.ResponseMsg{
 		Type:      proto.TypeResponse,
 		RequestID: requestID,
 		Content:   ollamaResp.Message.Content,
+		ToolCalls: toolCalls,
 		Model:     model,
 		Usage:     usage,
 	}); err != nil {
 		log.Printf("write response error: %v", err)
 	} else {
-		log.Printf("handleNonStreamingResponse: sent response_id=%s content_len=%d", requestID, len(ollamaResp.Message.Content))
+		log.Printf("handleNonStreamingResponse: sent response_id=%s content_len=%d tool_calls=%v",
+			requestID, len(ollamaResp.Message.Content), len(toolCalls) > 0)
 	}
+}
+
+// normalizeToolCalls maps Ollama tool_calls into OpenAI chat.completions shape.
+func normalizeToolCalls(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var incoming []map[string]interface{}
+	if err := json.Unmarshal(raw, &incoming); err != nil || len(incoming) == 0 {
+		return nil
+	}
+	out := make([]map[string]interface{}, 0, len(incoming))
+	for i, tc := range incoming {
+		fn, _ := tc["function"].(map[string]interface{})
+		if fn == nil {
+			continue
+		}
+		name, _ := fn["name"].(string)
+		args := fn["arguments"]
+		switch v := args.(type) {
+		case map[string]interface{}, []interface{}:
+			b, _ := json.Marshal(v)
+			args = string(b)
+		case nil:
+			args = "{}"
+		}
+		id, _ := tc["id"].(string)
+		if id == "" {
+			id = fmt.Sprintf("call_%d", i)
+		}
+		out = append(out, map[string]interface{}{
+			"id":   id,
+			"type": "function",
+			"function": map[string]interface{}{
+				"name":      name,
+				"arguments": args,
+			},
+		})
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return nil
+	}
+	return b
 }
 
 // sendToOllama sends a chat completion request to the local Ollama instance.
@@ -493,6 +547,12 @@ func (a *Agent) sendToOllama(ctx context.Context, msg proto.RequestMsg) (*http.R
 		"model":    msg.Model,
 		"messages": msg.Messages,
 		"stream":   msg.Stream,
+	}
+	if len(msg.Tools) > 0 {
+		ollamaReq["tools"] = msg.Tools
+	}
+	if len(msg.ToolChoice) > 0 {
+		ollamaReq["tool_choice"] = msg.ToolChoice
 	}
 
 	// Merge options.

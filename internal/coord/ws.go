@@ -207,7 +207,7 @@ func (s *Server) relayChunk(machineID string, msg proto.ChunkMsg) {
 		return
 	}
 	select {
-	case ch <- ChunkRelay{Content: msg.Content, Done: msg.Done}:
+	case ch <- ChunkRelay{Content: msg.Content, ToolCalls: msg.ToolCalls, Done: msg.Done}:
 	default:
 	}
 	if msg.Done {
@@ -240,7 +240,7 @@ func (s *Server) relayResponse(machineID string, msg proto.ResponseMsg) {
 		return
 	}
 	select {
-	case ch <- ChunkRelay{Content: msg.Content, Tokens: usage.CompletionTokens}:
+	case ch <- ChunkRelay{Content: msg.Content, ToolCalls: msg.ToolCalls, Tokens: usage.CompletionTokens}:
 	default:
 		log.Printf("relayResponse: channel full for request_id=%s", msg.RequestID)
 	}
