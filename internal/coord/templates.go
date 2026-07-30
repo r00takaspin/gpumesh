@@ -114,11 +114,6 @@ func (s *Server) pageData(r *http.Request) PageData {
 	return pd
 }
 
-// pageDataWithStats is kept for callers; v2 pages no longer show community stats.
-func (s *Server) pageDataWithStats(r *http.Request) PageData {
-	return s.pageData(r)
-}
-
 func formatRelative(t time.Time) string {
 	d := time.Since(t)
 	switch {
