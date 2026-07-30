@@ -27,6 +27,7 @@ type PageData struct {
 	HasProviderScope bool
 	HasDonorScope    bool // legacy alias for HasProviderScope
 	Tab              string
+	SetupMachineID   string
 	Keys             []APIKey
 	RateLimit        int
 	BaseURL          string

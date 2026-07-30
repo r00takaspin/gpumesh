@@ -1,3 +1,53 @@
+{{define "provider-os-setup"}}
+<div data-testid="provider-os-setup">
+  <div class="snippet-tabs" data-testid="provider-os-tabs">
+    <button type="button" class="on" data-os="unix" onclick="switchProviderOS(this, 'unix')">macOS / Linux</button>
+    <button type="button" data-os="windows" onclick="switchProviderOS(this, 'windows')">Windows</button>
+  </div>
+  <div data-os-panel="unix" data-testid="provider-os-unix">
+    <p class="text-muted mt-12 mb-0">Install</p>
+    <div class="code mt-8" data-testid="install-unix">{{.InstallUnix}}</div>
+    <button type="button" class="btn btn-sm mt-12" data-testid="btn-copy-install-unix" onclick="copyText(this, this.parentElement.querySelector('[data-testid=install-unix]').textContent)">Copy install</button>
+    <p class="text-muted mt-16 mb-0">Run (paste your provider token)</p>
+    <div class="code mt-8" data-testid="run-command">{{.RunCommandUnix}}</div>
+    <button type="button" class="btn btn-sm mt-12" data-testid="btn-copy-run-command" onclick="copyText(this, this.parentElement.querySelector('[data-testid=run-command]').textContent)">Copy command</button>
+  </div>
+  <div class="hidden" data-os-panel="windows" data-testid="provider-os-windows">
+    <p class="text-muted mt-12 mb-0">Install (PowerShell)</p>
+    <div class="code mt-8" data-testid="install-windows">{{.InstallWindows}}</div>
+    <button type="button" class="btn btn-sm mt-12" data-testid="btn-copy-install-windows" onclick="copyText(this, this.parentElement.querySelector('[data-testid=install-windows]').textContent)">Copy install</button>
+    <p class="text-muted mt-16 mb-0">Run (paste your provider token)</p>
+    <div class="code mt-8" data-testid="run-command-windows">{{.RunCommandWindows}}</div>
+    <button type="button" class="btn btn-sm mt-12" data-testid="btn-copy-run-windows" onclick="copyText(this, this.parentElement.querySelector('[data-testid=run-command-windows]').textContent)">Copy command</button>
+  </div>
+  <p class="meta mt-12">Replace <code>YOUR_PROVIDER_TOKEN</code> with the token from Generate or Regenerate — it’s shown only once.</p>
+</div>
+{{end}}
+
+{{define "provider-token-actions"}}
+<div class="mt-16" data-testid="provider-token-actions">
+  <p class="text-muted mb-0">Token</p>
+  <div class="code mt-8" data-testid="provider-token-prefix">{{.TokenPrefix}}…</div>
+  <p class="text-muted mt-12" data-testid="regen-warning">Regenerating gives a <strong>new machine URL</strong>. Revoking stops sharing until you generate a new token.</p>
+  <div class="row-actions mt-12">
+    {{if .ProviderKeyID}}
+    <button type="button" class="btn btn-sm btn-primary"
+            data-testid="btn-regenerate-key"
+            hx-post="/api/keys/{{.ProviderKeyID}}/regenerate"
+            hx-target="#share-modal"
+            hx-swap="innerHTML"
+            hx-confirm="Regenerate provider key? This creates a new machine URL and invalidates old invites.">Regenerate…</button>
+    <button type="button" class="btn btn-sm btn-danger"
+            data-testid="btn-revoke-provider-key"
+            hx-delete="/api/keys/{{.ProviderKeyID}}"
+            hx-headers='{"X-Share-Panel":"1"}'
+            hx-swap="none"
+            hx-confirm="Revoke provider token? Sharing stops and this machine disappears from Use until you generate a new token.">Revoke token…</button>
+    {{end}}
+  </div>
+</div>
+{{end}}
+
 {{if eq .State "no-token"}}
 <div>
   <h1 class="serif-h1" style="font-size:36px" data-testid="share-title">Share your local models</h1>
@@ -20,20 +70,11 @@
 </div>
 <div class="waiting" data-testid="waiting-provider"><div class="spinner"></div> Waiting for provider…</div>
 <div class="card" data-testid="run-command-card">
-  <h2>Run command</h2>
-  <div class="code" data-testid="run-command">{{.RunCommand}}</div>
-  <button type="button" class="btn btn-sm mt-12" data-testid="btn-copy-run-command" onclick="copyText(this, document.querySelector('[data-testid=run-command]').textContent)">Copy command</button>
-  <p class="meta">Install: <code>curl -sSfL {{.BaseURL}}/install-provider.sh | sh</code></p>
+  <h2>Set up the provider</h2>
+  {{template "provider-os-setup" .}}
+  {{template "provider-token-actions" .}}
 </div>
 <button type="button" class="btn" disabled title="Machine offline" data-testid="btn-create-invite">Create invite</button>
-<details class="collapse" data-testid="setup-collapse">
-  <summary>Setup &amp; install</summary>
-  <div class="collapse-body text-muted">
-    1. Install Ollama and pull a model<br>
-    2. Install gpumesh-provider<br>
-    3. Export token and run the agent
-  </div>
-</details>
 
 {{else}}
 {{/* ready / offline / multi */}}
@@ -123,13 +164,13 @@
 <div data-testid="members-section"
      hx-get="/share/members?machine_id={{.SelectedMachineID}}"
      hx-trigger="load, every 30s, refreshMembers from:body"
-     hx-swap="innerHTML">
+     hx-swap="innerHTML settle:0s swap:0s">
   <div class="section-title"><span>Members</span></div>
   <p class="empty-line">Loading members…</p>
 </div>
 
-<details class="collapse" data-testid="past-invites">
-  <summary>Past invites</summary>
+<details class="collapse" data-testid="past-invites"{{if gt .ActiveInviteCount 0}} open{{end}}>
+  <summary>Invites{{if gt .ActiveInviteCount 0}} ({{.ActiveInviteCount}} active){{end}}</summary>
   <div class="collapse-body" data-testid="invites-list">
     {{if .Invites}}
     {{range .Invites}}
@@ -137,12 +178,16 @@
       <div>
         <strong class="mono-muted" style="font-size:13px" data-testid="invite-pin-masked">{{.MaskedPIN}}</strong>
         <div class="text-muted">{{.Status}} · {{.Uses}}/{{.MaxUses}} uses{{if eq .Status "active"}} · expires {{.ExpiresRel}}{{end}}</div>
+        {{if .UsedBy}}
+        <div class="text-muted" data-testid="invite-used-by">Used by {{.UsedBy}}</div>
+        {{end}}
       </div>
       {{if eq .Status "active"}}
-      <button type="button" class="btn btn-sm"
+      <button type="button" class="btn btn-sm btn-danger"
               data-testid="btn-revoke-invite"
               hx-delete="/api/invites/{{.ID}}"
               hx-swap="none"
+              hx-confirm="Revoke this invite? The PIN will stop working for new joins."
               hx-on::after-request="htmx.trigger(document.body, 'refreshPanel')">Revoke invite</button>
       {{else}}
       <span class="badge">{{.Status}}</span>
@@ -150,7 +195,7 @@
     </div>
     {{end}}
     {{else}}
-    <p class="empty-line">No invites yet.</p>
+    <p class="empty-line">No invites yet — create one above.</p>
     {{end}}
   </div>
 </details>
@@ -158,24 +203,8 @@
 <details class="collapse" data-testid="setup-collapse">
   <summary>Setup &amp; provider token</summary>
   <div class="collapse-body">
-    <div class="code" data-testid="provider-token-prefix">{{.TokenPrefix}}</div>
-    <div class="code mt-12" data-testid="run-command">{{.RunCommand}}</div>
-    <button type="button" class="btn btn-sm mt-12" onclick="copyText(this, document.querySelector('[data-testid=run-command]').textContent)">Copy command</button>
-  </div>
-</details>
-
-<details class="collapse" data-testid="advanced-collapse">
-  <summary>Advanced</summary>
-  <div class="collapse-body">
-    <p class="text-muted" data-testid="regen-warning">Regenerating the provider key gives you a <strong>new machine URL</strong>. Old invites, member access, and tool configs stop working.</p>
-    {{if .ProviderKeyID}}
-    <button type="button" class="btn btn-sm mt-12"
-            data-testid="btn-regenerate-key"
-            hx-post="/api/keys/{{.ProviderKeyID}}/regenerate"
-            hx-target="#share-modal"
-            hx-swap="innerHTML"
-            hx-confirm="Regenerate provider key? This creates a new machine URL and invalidates old invites.">Regenerate provider key…</button>
-    {{end}}
+    {{template "provider-os-setup" .}}
+    {{template "provider-token-actions" .}}
   </div>
 </details>
 {{end}}

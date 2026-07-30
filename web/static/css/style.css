@@ -175,6 +175,11 @@ footer span, .foot span { color: #a8a29e; }
 .card, .consumer-card {
   background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px;
 }
+.card-setup-focus {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+}
+.setup-panel h2 { margin-bottom: 10px; }
 .card h2, .section-title {
   font-size: 15px; font-weight: 600; margin-bottom: 14px;
 }
@@ -213,6 +218,17 @@ footer span, .foot span { color: #a8a29e; }
   font-family: var(--mono); overflow-wrap: anywhere; word-break: break-all;
 }
 .row-actions { display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+/* Keep Copy / Copied! from shifting neighbors when label changes */
+[data-testid="btn-copy-base-url"],
+[data-testid="btn-setup-tool"],
+[data-testid="btn-copy-snippet"],
+[data-testid="btn-copy-run-command"],
+[data-testid="btn-copy-pin"],
+[data-testid="btn-copy-join-link"],
+[data-testid="btn-copy-onetime-key"],
+[data-testid="btn-copy-new-key"] {
+  min-width: 8.75rem;
+}
 
 /* === Forms === */
 .join-box { display: flex; gap: 8px; flex-wrap: wrap; }

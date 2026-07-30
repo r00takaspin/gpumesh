@@ -40,6 +40,19 @@ Feature: Share owner dashboard (v2)
     When пользователь переходит на "/share"
     Then элемент с data-testid="waiting-provider" содержит текст "Waiting for provider"
     And элемент с data-testid="btn-create-invite" неактивен
+    And элемент с data-testid="provider-os-tabs" видим
+    And элемент с data-testid="run-command" содержит текст "YOUR_PROVIDER_TOKEN"
+    And элемент с data-testid="btn-revoke-provider-key" видим
+
+  Scenario: Waiting setup has Windows install
+    Given пользователь аутентифицирован как "owner-waiting-win"
+    And у пользователя есть provider токен
+    And у пользователя нет машин
+    When пользователь переходит на "/share"
+    And пользователь кликает на tab Windows в provider setup
+    Then элемент с data-testid="provider-os-windows" видим
+    And элемент с data-testid="install-windows" содержит текст "Invoke-WebRequest"
+    And элемент с data-testid="run-command-windows" содержит текст "YOUR_PROVIDER_TOKEN"
 
   Scenario: Online ready can create invite
     Given пользователь аутентифицирован как "owner-online"
@@ -71,8 +84,13 @@ Feature: Share owner dashboard (v2)
     When пользователь переходит на "/share"
     Then ссылка с data-testid="nav-share" имеет класс "on"
 
-  Scenario: Advanced regenerate warning
+  Scenario: Setup has regenerate and revoke
     Given пользователь аутентифицирован как "owner-advanced"
     And у пользователя есть provider токен и онлайн машина
     When пользователь переходит на "/share"
+    And пользователь открывает details data-testid="setup-collapse"
     Then элемент с data-testid="regen-warning" содержит текст "new machine URL"
+    And элемент с data-testid="btn-regenerate-key" видим
+    And элемент с data-testid="btn-revoke-provider-key" видим
+    And элемент с data-testid="advanced-collapse" не видим
+    And элемент с data-testid="run-command" содержит текст "YOUR_PROVIDER_TOKEN"

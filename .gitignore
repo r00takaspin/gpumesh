@@ -9,4 +9,5 @@ data/
 /gpumesh-provider.exe
 /coordinator
 /dist/
+.tmp/
 gpumesh.db

@@ -1,5 +1,5 @@
 {{if .Success}}
-<div class="banner ok" data-testid="join-success">You’re in. <strong>{{.MachineName}}</strong> is available on your Use page.</div>
+<div class="banner ok" data-testid="join-success">You’re in. <strong>{{.MachineName}}</strong> is available — next, set up curl or your editor.</div>
 {{if .NewKey}}
 <div class="banner warn mt-12" data-testid="onetime-key" id="onetime-key">
   Copy your API key now — it won’t be shown again.
@@ -16,7 +16,7 @@
     </div>
   </div>
   <div class="hero-actions">
-    <a href="/use" class="btn btn-primary" data-testid="btn-go-use">Go to Use</a>
+    <a href="/use?setup={{.MachineID}}" class="btn btn-primary" data-testid="btn-go-use">Go to Use</a>
     <button type="button" class="btn" data-testid="btn-copy-base-url" onclick="copyText(this, '{{.BaseURL}}')">Copy base URL</button>
   </div>
 </div>

@@ -11,6 +11,7 @@ class GpumeshWorld {
     this.body = null;
     this.testState = new Map();
     this.lastRequest = null;
+    this._requestContexts = new Set();
   }
 
   async initBrowser() {
@@ -26,6 +27,28 @@ class GpumeshWorld {
     this.apiContext = await request.newContext({
       baseURL: this.baseUrl
     });
+    this.trackRequestContext(this.apiContext);
+  }
+
+  trackRequestContext(ctx) {
+    if (ctx) this._requestContexts.add(ctx);
+    return ctx;
+  }
+
+  async newApiContext(extra = {}) {
+    const { request } = require("playwright");
+    const ctx = await request.newContext({
+      baseURL: this.baseUrl,
+      ...extra,
+    });
+    return this.trackRequestContext(ctx);
+  }
+
+  async disposeRequestContexts() {
+    for (const ctx of this._requestContexts) {
+      try { await ctx.dispose(); } catch (_) {}
+    }
+    this._requestContexts.clear();
   }
 
   setState(key, value) { this.testState.set(key, value); }

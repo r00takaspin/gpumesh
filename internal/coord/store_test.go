@@ -297,6 +297,99 @@ func TestMachinesInvitesBindings(t *testing.T) {
 	}
 }
 
+func TestListInviteRedeemers(t *testing.T) {
+	s := newTestStore(t)
+	ownerID, _ := s.UpsertUser(400, "owner-r")
+	memberID, _ := s.UpsertUser(401, "alice")
+	_, keyID, _ := s.CreateKey(ownerID, "provider")
+	m, _ := s.UpsertMachineByProviderKey(ownerID, keyID, "box")
+	_, pin, err := s.CreateInvite(m.ID, ownerID, 3, 7, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	invites, _ := s.ListInvitesByOwner(ownerID)
+	if len(invites) != 1 {
+		t.Fatalf("expected 1 invite, got %d", len(invites))
+	}
+	if _, _, err := s.RedeemPIN(memberID, pin); err != nil {
+		t.Fatal(err)
+	}
+	redeemers, err := s.ListInviteRedeemers([]int64{invites[0].ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := redeemers[invites[0].ID]
+	if len(got) != 1 || got[0] != "alice" {
+		t.Fatalf("expected [alice], got %v", got)
+	}
+}
+
+func TestRegenerateProviderHidesOldMachine(t *testing.T) {
+	s := newTestStore(t)
+	ownerID, _ := s.UpsertUser(300, "regen-owner")
+	memberID, _ := s.UpsertUser(301, "regen-member")
+
+	_, oldKeyID, err := s.CreateKey(ownerID, "provider")
+	if err != nil {
+		t.Fatalf("CreateKey: %v", err)
+	}
+	oldMachine, err := s.UpsertMachineByProviderKey(ownerID, oldKeyID, "box")
+	if err != nil {
+		t.Fatalf("UpsertMachine: %v", err)
+	}
+	_, pin, err := s.CreateInvite(oldMachine.ID, ownerID, 1, 7, "")
+	if err != nil {
+		t.Fatalf("CreateInvite: %v", err)
+	}
+	if _, _, err := s.RedeemPIN(memberID, pin); err != nil {
+		t.Fatalf("RedeemPIN: %v", err)
+	}
+
+	if err := s.RevokeKey(ownerID, oldKeyID); err != nil {
+		t.Fatalf("RevokeKey: %v", err)
+	}
+	if err := s.RetireMachine(oldMachine.ID); err != nil {
+		t.Fatalf("RetireMachine: %v", err)
+	}
+
+	_, newKeyID, err := s.CreateKey(ownerID, "provider")
+	if err != nil {
+		t.Fatalf("CreateKey new: %v", err)
+	}
+	newMachine, err := s.CreateMachineOnKeyRegen(ownerID, newKeyID, "box")
+	if err != nil {
+		t.Fatalf("CreateMachineOnKeyRegen: %v", err)
+	}
+	if newMachine.ID == oldMachine.ID {
+		t.Fatal("expected new machine id after regen")
+	}
+
+	owned, err := s.ListMachinesByOwner(ownerID)
+	if err != nil {
+		t.Fatalf("ListMachinesByOwner: %v", err)
+	}
+	if len(owned) != 1 || owned[0].ID != newMachine.ID {
+		t.Fatalf("expected only new machine, got %+v", owned)
+	}
+
+	ok, _ := s.CanAccessMachine(ownerID, oldMachine.ID)
+	if ok {
+		t.Fatal("owner should not access retired machine")
+	}
+	ok, _ = s.CanAccessMachine(memberID, oldMachine.ID)
+	if ok {
+		t.Fatal("member should not access retired machine")
+	}
+
+	memberList, err := s.ListAccessibleMachines(memberID)
+	if err != nil {
+		t.Fatalf("ListAccessibleMachines: %v", err)
+	}
+	if len(memberList) != 0 {
+		t.Fatalf("member should have no bindings after retire, got %+v", memberList)
+	}
+}
+
 func TestScopeDonorNormalizedToProvider(t *testing.T) {
 	s := newTestStore(t)
 	userID, _ := s.UpsertUser(200, "norm")

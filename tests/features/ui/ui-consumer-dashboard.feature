@@ -21,21 +21,32 @@ Feature: Use machines dashboard (v2)
     Then элемент с data-testid="machines-empty" содержит текст "No machines yet"
     And элемент с data-testid="privacy-notice" видим
 
-  Scenario: Owned machine card with base URL
+  Scenario: Owned machine card with setup CTA
     Given пользователь аутентифицирован как "owner1"
     And у пользователя есть provider токен и онлайн машина
     When пользователь переходит на "/use"
     Then элемент с data-testid="machine-card" видим
     And элемент с data-testid="machine-name" видим
+    And элемент с data-testid="btn-setup-tool" видим
     And элемент с data-testid="btn-copy-base-url" видим
     And элемент с data-testid="machine-meta" содержит текст "owned by you"
 
-  Scenario: Snippets use per-machine path
+  Scenario: Setup panel uses per-machine path with curl default
     Given пользователь аутентифицирован как "owner-snip"
     And у пользователя есть provider токен и онлайн машина
     When пользователь переходит на "/use"
-    And пользователь кликает на data-testid="btn-toggle-snippets"
-    Then элемент с data-testid="snippets-panel" видим
+    And пользователь кликает на data-testid="btn-setup-tool"
+    Then элемент с data-testid="setup-panel" видим
+    And элемент с data-testid="snippet-code" содержит текст "/v1/machines/"
+    And элемент с data-testid="snippet-code" содержит текст "YOUR_API_KEY"
+    And элемент с data-testid="snippet-code" содержит текст "curl"
+
+  Scenario: setup query opens panel for machine
+    Given пользователь аутентифицирован как "owner-setup"
+    And у пользователя есть provider токен и онлайн машина
+    When пользователь переходит на "/use?setup={machine_id}"
+    Then элемент с data-testid="setup-panel" видим
+    And элемент с data-testid="machine-card" имеет класс "card-setup-focus"
     And элемент с data-testid="snippet-code" содержит текст "/v1/machines/"
 
   Scenario: API Keys tab

@@ -177,9 +177,9 @@ WebRTC улучшает privacy (direct path), но усложняет MVP (sign
 - При первом успешном WS-подключении с этим key создаётся (или находится) запись `machines.id = machine_id` (например `mch_` + ULID/UUID).
 - Пока используется тот же provider key, `machine_id` **не меняется** при disconnect/reconnect.
 - Runtime session id / ws conn остаётся эфемерным в памяти; маршрутизация идёт: `machine_id` → текущий online session (если есть).
-- Перевыпуск provider key (`regenerate`) → **новый** `machine_id` (старые bindings и URL устаревают; UI предупреждает).
+- Перевыпуск provider key (`regenerate`) → **новый** `machine_id` (старые invites/bindings revoke’атся, старый URL перестаёт работать; UI предупреждает). Машина со старым (revoked) provider key **не показывается** в `/use` и `/share`.
 
-Один человек может иметь несколько provider keys → несколько machines (несколько агентов).
+Один человек может иметь несколько **активных** provider keys → несколько machines (несколько агентов).
 
 ---
 
@@ -204,7 +204,7 @@ Owner может задать при создании: `max_uses` (1–10), `ttl
 1. Owner залогинен, имеет хотя бы одну machine (provider key; агент желательно online — иначе PIN создать можно, но UI показывает warning «machine offline»).
 2. `POST` create invite с привязкой к `machine_id`.
 3. Ответ один раз содержит: plaintext PIN, join link `https://<host>/join?pin=XXXX-XXXX`, expiry, max_uses.
-4. В списке дальше: masked PIN (`7K4Q-****`), status (`active` / `exhausted` / `expired` / `revoked`).
+4. В списке дальше: masked PIN (`7K4Q-****`), status (`active` / `exhausted` / `expired` / `revoked`); если PIN уже redeem’или — **Used by @login** (по `bindings.invite_id`, включая позже отозванных members).
 
 ### 4.3 Redeem (Member)
 
@@ -479,7 +479,7 @@ Heartbeat timeout: 90s без heartbeat → session offline (machine запис�
 | Метод | Путь | Статус | Описание v2 |
 |---|---|---|---|
 | `GET/POST` | `/use/keys` | R | Keys UI |
-| `GET` | `/use/machines` | N | Список bindings + copy base URL (polling ~10s) |
+| `GET` | `/use/machines` | N | Список bindings + setup panel (`?setup=` opens curl); polling ~10s |
 | `GET` | `/share/panel` | N | Progressive owner surface (§9.5): token / waiting / online / invite |
 | `POST` | `/share/tokens` | R | Create provider token (modal / fragment) |
 | `POST` | `/share/invites` | N | Create invite → PIN modal (plaintext once) |
@@ -609,15 +609,22 @@ Privacy notice обязателен.
 |---|---|---|
 | Logged out | Hero «Share your local models» + Sign in | Sign in |
 | No provider token | Generate provider token + короткий why | Generate token |
-| Token · waiting | Run command + «Waiting for provider…»; Create invite disabled | Copy run command |
+| Token · waiting | «Waiting for provider…» + Setup (OS tabs) + Create invite disabled | Copy run command |
 | Online · ready | Machine strip + Create invite (uses/TTL перед созданием) + Members | Create invite |
 | Online · 2+ machines | Компактный select машины над CTA (без отдельной секции Machines) | Create invite |
 | Machine offline | Warning; invite всё ещё можно создать (§4.2) | Create invite |
 | PIN modal | Boarding-pass PIN + Copy code + Copy link + meta; shown once | Copy |
-| Revoke confirm | Confirm dialog для member | Revoke / Cancel |
+| Revoke confirm | Confirm dialog для member / provider token | Revoke / Cancel |
 | Empty members | Одна строка empty, без большой пустой карточки | — |
 
-Свёрнуто после ready: **Past invites**, **Setup & provider token**, **Advanced** (regenerate key → новый machine URL; UI предупреждает).
+**Setup & provider token** (waiting card + свёрнуто после ready):
+
+- OS tabs: **macOS / Linux** | **Windows** — install + run с `YOUR_PROVIDER_TOKEN` (полный token только в Generate / Regenerate modal).
+- macOS/Linux: `curl …/install-provider.sh \| sh` + `export MESH_*` + `gpumesh-provider`.
+- Windows: PowerShell download `gpumesh-provider_windows_amd64.zip` с GitHub Releases + `$env:MESH_*` + `.\gpumesh-provider.exe`.
+- Token prefix + **Revoke provider token** (key revoked → machine retired → UI → no-token) + **Regenerate** (новый machine URL + one-time token modal). Отдельный Advanced collapse не нужен.
+
+После ready: **Invites** (список; active → **Revoke invite**; секция открыта, если есть active), **Setup & provider token**.
 
 Автовыбор: 1 machine → без пикера; 2+ → select.
 
@@ -625,14 +632,17 @@ Polling: machines ~10s, members ~30s.
 
 ### 9.6 `/use` (Member / self)
 
-Logged out: pitch + Sign in / Enter a code.  
+Logged out: pitch + Sign in / Enter a code — job language: set up curl or an editor (base URL + API key).  
 Logged in:
 
-1. **Machines** — cards: name, owner (`owned by you` / `@login`), online/offline, models, **Copy base URL**, snippets (curl / Continue / Cline / Python) с `/v1/machines/{id}`. Member может Remove access.
-2. **API Keys** — list / create / one-time key banner / empty (без jargon `scope:` в основном UI — «for tools» / «for provider»).
+1. **Machines** — cards: name, owner (`owned by you` / `@login`), online/offline, models.
+   - Primary: **Set up a tool** → setup panel with tabs **curl (default) / Continue / Cline / Python**. Snippet includes machine `BASE_URL` (`/v1/machines/{id}`), API key (live one-time key while banner visible, else `YOUR_API_KEY`), and model. Short one-liner: paste into the tool (curl: run as-is).
+   - Secondary: **Copy base URL**; Member: **Remove access**.
+   - After successful join: land on `/use?setup={machine_id}` — that card highlighted, setup panel open on curl.
+2. **API Keys** — list / create / one-time key banner / empty (без jargon `scope:` в основном UI — «for tools» / «for provider»). Not required for happy path when one-time key banner is shown.
 3. Empty: «No machines yet — ask a friend for a PIN, or share your own models.»
 
-Убрать таб «browse all community models». Privacy notice обязателен.
+Убрать таб «browse all community models». Privacy notice обязателен. UI не завязан на один харнес (Continue) — curl равноправен.
 
 ### 9.7 `/about`
 
@@ -859,7 +869,7 @@ OAuth secrets — как в v1 (env).
 Готово к публикации, когда воспроизводимо:
 
 1. **Owner:** provider online, видит `machine_id`, создаёт PIN, копирует join-link.
-2. **Friend (второй GitHub):** redeem PIN на `/join`, видит машину в `/use`, копирует `OPENAI_BASE_URL=/v1/machines/{id}` и API key.
+2. **Friend (второй GitHub):** redeem PIN на `/join`, переходит на `/use?setup={machine_id}`, открывает setup (curl по умолчанию или другой инструмент), копирует snippet с `OPENAI_BASE_URL=/v1/machines/{id}` и API key.
 3. **Харнес:** любой OpenAI-compatible клиент (Continue, Cline, Aider, curl, Python SDK, …) с base URL + key + именем модели как в Ollama; completion реально идёт с машины owner’а.
 4. Provider restart → тот же `machine_id`, харнес без смены base URL продолжает работать.
 5. Revoke binding → харнес получает отказ (403), без «тихого» hop на другую машину.

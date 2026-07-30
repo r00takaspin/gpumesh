@@ -506,11 +506,15 @@ func (s *Store) GetMachineByProviderKeyID(keyID int64) (*Machine, error) {
 	return &m, nil
 }
 
-// ListMachinesByOwner returns all machines owned by a user.
+// ListMachinesByOwner returns machines owned by a user whose provider key is still active.
+// Machines tied to a revoked/regenerated provider key are omitted (SPEC-v2 §3.3 / §4.5).
 func (s *Store) ListMachinesByOwner(ownerUserID int64) ([]Machine, error) {
 	rows, err := s.db.Query(
-		`SELECT id, owner_user_id, provider_key_id, display_name, created_at, updated_at
-		 FROM machines WHERE owner_user_id = ? ORDER BY created_at DESC`,
+		`SELECT m.id, m.owner_user_id, m.provider_key_id, m.display_name, m.created_at, m.updated_at
+		 FROM machines m
+		 JOIN api_keys k ON k.id = m.provider_key_id
+		 WHERE m.owner_user_id = ? AND k.revoked_at IS NULL
+		 ORDER BY m.created_at DESC`,
 		ownerUserID,
 	)
 	if err != nil {
@@ -532,7 +536,7 @@ func (s *Store) ListMachinesByOwner(ownerUserID int64) ([]Machine, error) {
 	return out, rows.Err()
 }
 
-// CanAccessMachine returns true if user is owner or has an active binding.
+// CanAccessMachine returns true if user is owner (with active provider key) or has an active binding.
 func (s *Store) CanAccessMachine(userID int64, machineID string) (bool, error) {
 	m, err := s.GetMachine(machineID)
 	if err != nil {
@@ -542,7 +546,15 @@ func (s *Store) CanAccessMachine(userID int64, machineID string) (bool, error) {
 		return false, nil
 	}
 	if m.OwnerUserID == userID {
-		return true, nil
+		var revoked sql.NullString
+		err = s.db.QueryRow(`SELECT revoked_at FROM api_keys WHERE id = ?`, m.ProviderKeyID).Scan(&revoked)
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return !revoked.Valid, nil
 	}
 	var n int
 	err = s.db.QueryRow(
@@ -554,6 +566,35 @@ func (s *Store) CanAccessMachine(userID int64, machineID string) (bool, error) {
 		return false, err
 	}
 	return n > 0, nil
+}
+
+// RetireMachine invalidates invites and bindings for a machine (used when its provider key is revoked/regenerated).
+func (s *Store) RetireMachine(machineID string) error {
+	if _, err := s.db.Exec(
+		`UPDATE invites SET revoked_at = datetime('now')
+		 WHERE machine_id = ? AND revoked_at IS NULL`, machineID,
+	); err != nil {
+		return fmt.Errorf("retire invites: %w", err)
+	}
+	if _, err := s.db.Exec(
+		`UPDATE bindings SET revoked_at = datetime('now')
+		 WHERE machine_id = ? AND revoked_at IS NULL`, machineID,
+	); err != nil {
+		return fmt.Errorf("retire bindings: %w", err)
+	}
+	return nil
+}
+
+// RetireMachineByProviderKeyID retires the machine (if any) bound to a provider key.
+func (s *Store) RetireMachineByProviderKeyID(keyID int64) error {
+	m, err := s.GetMachineByProviderKeyID(keyID)
+	if err != nil {
+		return err
+	}
+	if m == nil {
+		return nil
+	}
+	return s.RetireMachine(m.ID)
 }
 
 // --- Invites ---
@@ -635,6 +676,39 @@ func (s *Store) GetInvite(id int64) (*Invite, error) {
 		inv.Label = *label
 	}
 	return &inv, nil
+}
+
+// ListInviteRedeemers returns github logins that redeemed each invite (including later-revoked bindings).
+func (s *Store) ListInviteRedeemers(inviteIDs []int64) (map[int64][]string, error) {
+	out := make(map[int64][]string, len(inviteIDs))
+	if len(inviteIDs) == 0 {
+		return out, nil
+	}
+	placeholders := make([]string, len(inviteIDs))
+	args := make([]interface{}, len(inviteIDs))
+	for i, id := range inviteIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	q := `SELECT b.invite_id, u.github_login
+		 FROM bindings b
+		 JOIN users u ON u.id = b.member_user_id
+		 WHERE b.invite_id IN (` + strings.Join(placeholders, ",") + `)
+		 ORDER BY b.created_at ASC`
+	rows, err := s.db.Query(q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list invite redeemers: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var inviteID int64
+		var login string
+		if err := rows.Scan(&inviteID, &login); err != nil {
+			return nil, err
+		}
+		out[inviteID] = append(out[inviteID], login)
+	}
+	return out, rows.Err()
 }
 
 // ListInvitesByOwner returns invites created by the owner.
@@ -793,7 +867,8 @@ func (s *Store) ListAccessibleMachines(userID int64) ([]BindingInfo, error) {
 		`SELECT b.machine_id, m.display_name, m.owner_user_id, b.created_at
 		 FROM bindings b
 		 JOIN machines m ON m.id = b.machine_id
-		 WHERE b.member_user_id = ? AND b.revoked_at IS NULL
+		 JOIN api_keys k ON k.id = m.provider_key_id
+		 WHERE b.member_user_id = ? AND b.revoked_at IS NULL AND k.revoked_at IS NULL
 		 ORDER BY b.created_at DESC`,
 		userID,
 	)

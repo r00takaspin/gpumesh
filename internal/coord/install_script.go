@@ -62,17 +62,20 @@ echo "  The setup wizard will guide you through configuration."
 
 var installScriptTmpl = template.Must(template.New("install").Parse(installScriptTemplate))
 
+func providerDownloadBase() string {
+	if v := os.Getenv("MESH_INSTALL_SCRIPT_DOWNLOAD_BASE"); v != "" {
+		return v
+	}
+	return "https://github.com/r00takaspin/gpumesh/releases/latest/download"
+}
+
 // handleInstallScript serves the universal provider install script.
 // The download base URL is configured via MESH_INSTALL_SCRIPT_DOWNLOAD_BASE env var,
 // defaulting to the GitHub releases download URL.
 func (s *Server) handleInstallScript(w http.ResponseWriter, r *http.Request) {
-	downloadBase := os.Getenv("MESH_INSTALL_SCRIPT_DOWNLOAD_BASE")
-	if downloadBase == "" {
-		downloadBase = "https://github.com/r00takaspin/gpumesh/releases/latest/download"
-	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	if err := installScriptTmpl.Execute(w, map[string]string{
-		"DownloadBase": downloadBase,
+		"DownloadBase": providerDownloadBase(),
 	}); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	}

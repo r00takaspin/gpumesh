@@ -26,7 +26,7 @@
          data-testid="share-panel"
          hx-get="/share/panel"
          hx-trigger="load, every 10s, refreshPanel from:body"
-         hx-swap="innerHTML">
+         hx-swap="innerHTML settle:0s swap:0s">
       <div class="waiting"><div class="spinner"></div> Loading…</div>
     </div>
   </main>

@@ -34,9 +34,7 @@ Given(/^пользователь аутентифицирован через Git
 
 Given("у пользователя есть донорский токен", async function () {
   // Create a donor token via API.
-  const apiCtx = await require("playwright").request.newContext({
-    baseURL: this.baseUrl
-  });
+  const apiCtx = await this.newApiContext();
   // First ensure session.
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   const resp = await apiCtx.post("/api/keys", { data: { scope: "donor" } });
@@ -72,9 +70,7 @@ Given("в реестре есть онлайн-доноры с моделями"
   const { MockDonor } = require("../support/mock-donor");
   const md = new MockDonor(this.baseUrl);
   // Need a donor token. Create via API.
-  const apiCtx = await require("playwright").request.newContext({
-    baseURL: this.baseUrl
-  });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   const resp = await apiCtx.post("/api/keys", { data: { scope: "donor" } });
   let donorKey = "";
@@ -93,7 +89,7 @@ Given("в реестре есть онлайн-доноры с моделями"
 Given("в реестре есть модель {string} с донорами онлайн", async function (model) {
   const { MockDonor } = require("../support/mock-donor");
   const md = new MockDonor(this.baseUrl);
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   const resp = await apiCtx.post("/api/keys", { data: { scope: "donor" } });
   let donorKey = "";
@@ -112,7 +108,7 @@ Given("в реестре есть модель {string} с донорами он
 Given(/^в реестре есть модель "(.*)" с (\d+) донорами$/, async function (model, count) {
   const { MockDonor } = require("../support/mock-donor");
   const md = new MockDonor(this.baseUrl);
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   const resp = await apiCtx.post("/api/keys", { data: { scope: "donor" } });
   let donorKey = "";
@@ -144,7 +140,7 @@ Given(/^в реестре есть модель "(.*)" без доноров о�
 Given(/^в реестре есть модели "(.*)" и "(.*)"$/, async function (model1, model2) {
   const { MockDonor } = require("../support/mock-donor");
   const md = new MockDonor(this.baseUrl);
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   const resp = await apiCtx.post("/api/keys", { data: { scope: "donor" } });
   let donorKey = "";
@@ -215,13 +211,13 @@ Given(/^FAQ-вопрос с data-testid="faq-item-(\d+)" закрыт$/, async f
 
 Given("у пользователя есть API-ключи", async function () {
   // Create via API.
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   await apiCtx.post("/api/keys", { data: { scope: "consumer" } });
 });
 
 Given(/^у пользователя есть (\d+) API-ключа?$/, async function (count) {
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   for (let i = 0; i < parseInt(count); i++) {
     await apiCtx.post("/api/keys", { data: { scope: "consumer" } });
@@ -229,13 +225,13 @@ Given(/^у пользователя есть (\d+) API-ключа?$/, async func
 });
 
 Given("у пользователя есть API-ключ consumer", async function () {
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   await apiCtx.post("/api/keys", { data: { scope: "consumer" } });
 });
 
 Given(/^у пользователя есть API-ключ с id "(.*)"$/, async function (keyId) {
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   const resp = await apiCtx.post("/api/keys", { data: { scope: "consumer" } });
   if (resp.status() === 201) {
@@ -245,7 +241,7 @@ Given(/^у пользователя есть API-ключ с id "(.*)"$/, async 
 });
 
 Given(/^у пользователя есть ключи со scope: (.*)$/, async function (scopes) {
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   for (const scope of scopes.split(",").map(s => s.trim())) {
     await apiCtx.post("/api/keys", { data: { scope } });
@@ -332,7 +328,13 @@ Given("сервер возвращает ошибку при создании к
 // =============================================================================
 
 When(/^пользователь переходит на "(.*)"$/, async function (url) {
-  const resolved = url.startsWith("http") ? url : `${this.baseUrl}${url}`;
+  let path = url;
+  if (path.includes("{machine_id}")) {
+    const mid = this.getState("machine_id");
+    expect(mid).toBeTruthy();
+    path = path.replaceAll("{machine_id}", mid);
+  }
+  const resolved = path.startsWith("http") ? path : `${this.baseUrl}${path}`;
   await this.page.goto(resolved);
   await this.page.waitForLoadState("networkidle");
 });
@@ -1157,7 +1159,7 @@ Then("ключ скопирован в буфер обмена", async function 
 });
 
 Given("у пользователя есть {int} ключа", async function (count) {
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   for (let i = 0; i < count; i++) {
     await apiCtx.post("/api/keys", { data: { scope: "consumer" } });
@@ -1166,7 +1168,7 @@ Given("у пользователя есть {int} ключа", async function (c
 });
 
 Given("у пользователя есть {int} ключ", async function (count) {
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   for (let i = 0; i < count; i++) {
     await apiCtx.post("/api/keys", { data: { scope: "consumer" } });
@@ -1175,7 +1177,7 @@ Given("у пользователя есть {int} ключ", async function (cou
 });
 
 Given("у пользователя есть ключ", async function () {
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   await apiCtx.post("/api/keys", { data: { scope: "consumer" } });
   this.setState("key_count", 1);
@@ -1207,7 +1209,7 @@ Then("отображается кнопка с data-testid={string}", async func
 Given("в реестре есть модель {string} с донорами", async function (model) {
   const { MockDonor } = require("../support/mock-donor");
   const md = new MockDonor(this.baseUrl);
-  const apiCtx = await require("playwright").request.newContext({ baseURL: this.baseUrl });
+  const apiCtx = await this.newApiContext();
   await apiCtx.get(`/test/session?user=testuser&redirect=/`);
   const resp = await apiCtx.post("/api/keys", { data: { scope: "donor" } });
   let donorKey = "";
@@ -1363,23 +1365,23 @@ Given("статистика отображается", async function () {
 // v2 helpers — provider / machines / join
 // =============================================================================
 
-async function apiSession(baseUrl, login) {
-  const apiCtx = await require("playwright").request.newContext({ baseURL: baseUrl });
+async function apiSession(world, login) {
+  const apiCtx = await world.newApiContext();
   const tokResp = await apiCtx.get(`/test/session-token?user=${encodeURIComponent(login)}`);
   if (!tokResp.ok()) {
     throw new Error(`session-token failed: ${tokResp.status()}`);
   }
   const { token } = await tokResp.json();
-  await apiCtx.dispose();
-  return require("playwright").request.newContext({
-    baseURL: baseUrl,
+  try { await apiCtx.dispose(); } catch (_) {}
+  world._requestContexts.delete(apiCtx);
+  return world.newApiContext({
     extraHTTPHeaders: { Cookie: `gpumesh_session=${token}` },
   });
 }
 
 Given("у пользователя нет provider токена", async function () {
   const login = this.getState("current_login") || "owner1";
-  const apiCtx = await apiSession(this.baseUrl, login);
+  const apiCtx = await apiSession(this, login);
   const resp = await apiCtx.get("/api/keys");
   if (resp.ok()) {
     const body = await resp.json();
@@ -1394,7 +1396,7 @@ Given("у пользователя нет provider токена", async function
 
 Given("у пользователя есть provider токен", async function () {
   const login = this.getState("current_login") || "owner1";
-  const apiCtx = await apiSession(this.baseUrl, login);
+  const apiCtx = await apiSession(this, login);
   const resp = await apiCtx.post("/api/keys", { data: { scope: "provider" } });
   if (resp.status() === 201) {
     const body = await resp.json();
@@ -1411,7 +1413,7 @@ Given("у пользователя нет машин", async function () {
 
 Given("у пользователя есть provider токен и онлайн машина", async function () {
   const login = this.getState("current_login") || "owner1";
-  const apiCtx = await apiSession(this.baseUrl, login);
+  const apiCtx = await apiSession(this, login);
   let providerKey = this.getState("provider_key");
   if (!providerKey) {
     const resp = await apiCtx.post("/api/keys", { data: { scope: "provider" } });
@@ -1434,7 +1436,7 @@ Given("у пользователя есть provider токен и онлайн 
 
 Given("у пользователя есть provider токен и офлайн машина", async function () {
   const login = this.getState("current_login") || "owner1";
-  const apiCtx = await apiSession(this.baseUrl, login);
+  const apiCtx = await apiSession(this, login);
   const resp = await apiCtx.post("/api/keys", { data: { scope: "provider" } });
   const status = resp.status();
   const text = await resp.text();
@@ -1454,7 +1456,7 @@ Given("у пользователя есть provider токен и офлайн 
 
 Given("у пользователя нет consumer ключей", async function () {
   const login = this.getState("current_login") || "keyuser";
-  const apiCtx = await apiSession(this.baseUrl, login);
+  const apiCtx = await apiSession(this, login);
   const resp = await apiCtx.get("/api/keys");
   if (resp.ok()) {
     const body = await resp.json();
@@ -1469,7 +1471,7 @@ Given("у пользователя нет consumer ключей", async function
 
 Given("owner создал invite PIN", async function () {
   const machineId = this.getState("machine_id");
-  const apiCtx = await apiSession(this.baseUrl, "owner1");
+  const apiCtx = await apiSession(this, "owner1");
   const resp = await apiCtx.post("/api/invites", {
     data: { machine_id: machineId, max_uses: 3, ttl_days: 7 }
   });
@@ -1505,4 +1507,18 @@ Then(/^элемент с data-testid="(.*)" имеет значение "(.*)"$/
 
 Then(/^страница не содержит текст "(.*)"$/, async function (text) {
   await expect(this.page.locator("body")).not.toContainText(text);
+});
+
+When("пользователь кликает на tab Windows в provider setup", async function () {
+  const tab = this.page.locator('[data-testid="provider-os-tabs"] button[data-os="windows"]').first();
+  await tab.waitFor({ state: "visible", timeout: 10000 });
+  await tab.click();
+  await this.page.waitForTimeout(300);
+});
+
+When(/^пользователь открывает details data-testid="([^"]*)"$/, async function (testId) {
+  const details = this.page.locator(`details[data-testid="${testId}"]`).first();
+  await details.waitFor({ state: "attached", timeout: 10000 });
+  await details.evaluate((el) => { el.open = true; });
+  await this.page.waitForTimeout(200);
 });

@@ -190,6 +190,7 @@ func (s *Server) handleUse(w http.ResponseWriter, r *http.Request) {
 	if pd.Tab == "" {
 		pd.Tab = "machines"
 	}
+	pd.SetupMachineID = strings.TrimSpace(r.URL.Query().Get("setup"))
 
 	if userID != 0 {
 		if r.URL.Query().Get("new") == "1" {

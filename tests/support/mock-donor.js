@@ -1,5 +1,8 @@
 const WebSocket = require("ws");
 
+/** All live MockDonor instances — UI and API steps create separate ones. */
+const liveDonors = new Set();
+
 /**
  * Mock provider agent for BDD tests (SPEC-v2).
  * Connects to /ws/provider, registers, auto-answers inference requests.
@@ -11,6 +14,7 @@ class MockDonor {
     this.baseUrl = baseUrl;
     this.connections = new Map(); // machine_id → conn
     this.requestHandlers = new Map();
+    liveDonors.add(this);
   }
 
   async connect(model, token) {
@@ -28,6 +32,7 @@ class MockDonor {
       models: [model],
       load: 0,
       pendingRequests: new Map(),
+      heartbeat: null,
     };
 
     ws.on("open", () => {
@@ -64,32 +69,44 @@ class MockDonor {
     });
 
     ws.on("close", (code) => {
+      if (conn.heartbeat) {
+        clearInterval(conn.heartbeat);
+        conn.heartbeat = null;
+      }
       if (machineId) this.connections.delete(machineId);
       closeCode = code;
       registrationDone = true;
     });
 
-    const heartbeat = setInterval(() => {
+    conn.heartbeat = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "heartbeat" }));
       }
     }, 30000);
-    ws.on("close", () => clearInterval(heartbeat));
+    // Don't keep the process alive for heartbeats alone.
+    if (typeof conn.heartbeat.unref === "function") conn.heartbeat.unref();
 
     await new Promise((resolve) => {
-      const check = setInterval(() => {
-        if (registrationDone) {
-          clearInterval(check);
-          resolve();
-        }
-      }, 50);
-      setTimeout(() => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
         clearInterval(check);
+        clearTimeout(timeout);
         resolve();
-      }, 15000);
+      };
+      const check = setInterval(() => {
+        if (registrationDone) finish();
+      }, 50);
+      const timeout = setTimeout(finish, 15000);
     });
 
     if (!machineId) {
+      if (conn.heartbeat) {
+        clearInterval(conn.heartbeat);
+        conn.heartbeat = null;
+      }
+      try { ws.terminate(); } catch (_) {}
       if (wsError && wsError.message) {
         const codeMatch = wsError.message.match(/(\d{3})/);
         throw new Error(`WS connect failed: ${codeMatch ? codeMatch[1] : "400"} ${wsError.message}`);
@@ -103,16 +120,23 @@ class MockDonor {
   disconnect(machineId) {
     const conn = this.connections.get(machineId);
     if (conn) {
-      conn.ws.close();
+      if (conn.heartbeat) {
+        clearInterval(conn.heartbeat);
+        conn.heartbeat = null;
+      }
+      try { conn.ws.terminate(); } catch (_) {
+        try { conn.ws.close(); } catch (_) {}
+      }
       this.connections.delete(machineId);
     }
   }
 
   disconnectAll() {
-    for (const [, conn] of this.connections) {
-      try { conn.ws.close(); } catch (_) {}
+    for (const [id] of this.connections) {
+      this.disconnect(id);
     }
     this.connections.clear();
+    liveDonors.delete(this);
   }
 
   sendResponse(machineId, requestId, content, model, usage) {
@@ -167,4 +191,11 @@ class MockDonor {
   }
 }
 
-module.exports = { MockDonor };
+function disconnectAllMockDonors() {
+  for (const donor of [...liveDonors]) {
+    try { donor.disconnectAll(); } catch (_) {}
+  }
+  liveDonors.clear();
+}
+
+module.exports = { MockDonor, disconnectAllMockDonors };

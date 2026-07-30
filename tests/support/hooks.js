@@ -1,28 +1,35 @@
 const { Before, After, BeforeAll, AfterAll } = require("@cucumber/cucumber");
-const { execSync, spawn } = require("child_process");
+const { spawn, execFileSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
+const { disconnectAllMockDonors } = require("./mock-donor");
 
 let coordinatorProcess = null;
 const COORDINATOR_URL = process.env.COORDINATOR_URL || "http://localhost:8080";
 const TEST_DB = path.resolve(__dirname, "../../data/test-gpumesh.db");
+const COORD_BIN = path.resolve(__dirname, "../../.tmp/gpumesh-coordinator-test");
 
 // --- BeforeAll / AfterAll ---
 
-BeforeAll({ timeout: 30000 }, async function () {
+BeforeAll({ timeout: 60000 }, async function () {
   // If COORDINATOR_URL points to an external coordinator, skip startup.
   if (process.env.COORDINATOR_URL) {
-    // Verify it's reachable.
     await waitForHealth(COORDINATOR_URL);
     return;
   }
 
-  // Clean up any stale test DB.
   try { fs.unlinkSync(TEST_DB); } catch (_) {}
+  fs.mkdirSync(path.dirname(COORD_BIN), { recursive: true });
 
-  // Start coordinator in test mode.
   const repoRoot = path.resolve(__dirname, "../..");
-  coordinatorProcess = spawn("go", ["run", "./cmd/coordinator"], {
+  // Build a binary once — `go run` leaves child processes / pipe handles that hang Node after tests.
+  execFileSync("go", ["build", "-o", COORD_BIN, "./cmd/coordinator"], {
+    cwd: repoRoot,
+    stdio: "pipe",
+    env: process.env,
+  });
+
+  coordinatorProcess = spawn(COORD_BIN, [], {
     cwd: repoRoot,
     env: {
       ...process.env,
@@ -34,49 +41,30 @@ BeforeAll({ timeout: 30000 }, async function () {
       GITHUB_CLIENT_ID: "test-client-id",
       GITHUB_CLIENT_SECRET: "test-client-secret",
     },
-    stdio: ["ignore", "pipe", "pipe"],
+    // Detached process group so AfterAll can SIGKILL the whole tree; ignore stdio so pipes
+    // don't keep the cucumber event loop alive after the suite finishes.
+    stdio: "ignore",
+    detached: true,
   });
+  // Don't keep Node alive waiting on the coordinator child.
+  if (typeof coordinatorProcess.unref === "function") coordinatorProcess.unref();
 
-  let startupOutput = "";
-  coordinatorProcess.stdout.on("data", (d) => { startupOutput += d.toString(); });
-  coordinatorProcess.stderr.on("data", (d) => { startupOutput += d.toString(); });
-
-  // Wait for the coordinator to be ready.
-  await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error("Coordinator did not start within 30s.\n" + startupOutput));
-    }, 30000);
-    const check = setInterval(async () => {
-      try {
-        const res = await fetch(COORDINATOR_URL + "/health");
-        if (res.status === 200) {
-          clearTimeout(timeout);
-          clearInterval(check);
-          resolve();
-        }
-      } catch (_) {}
-    }, 500);
-  });
+  await waitForHealth(COORDINATOR_URL);
 });
 
-AfterAll({ timeout: 10000 }, async function () {
-  // Close all mock-donor WebSocket connections (keeps event loop alive).
+AfterAll({ timeout: 15000 }, async function () {
+  disconnectAllMockDonors();
+
   try {
     const apiSteps = require("../steps/api.steps");
-    if (apiSteps._getMockDonor) {
-      const md = apiSteps._getMockDonor();
-      if (md) md.disconnectAll();
-    }
+    if (apiSteps._resetMockDonor) apiSteps._resetMockDonor();
   } catch (_) {}
 
-  if (coordinatorProcess) {
-    coordinatorProcess.kill("SIGTERM");
+  if (coordinatorProcess && coordinatorProcess.pid) {
+    await killCoordinator(coordinatorProcess.pid);
     coordinatorProcess = null;
   }
   try { fs.unlinkSync(TEST_DB); } catch (_) {}
-
-  // Give the coordinator a moment to shut down.
-  await new Promise(r => setTimeout(r, 500));
 });
 
 // --- Before / After hooks ---
@@ -96,28 +84,35 @@ Before({ tags: "@ui" }, async function () {
 });
 
 After(async function () {
-  // Clean up mock-donor connections after EVERY scenario.
+  // UI steps keep MockDonor on world state; API steps use a module singleton — close both.
+  const worldDonor = this.getState && this.getState("mock_donor");
+  if (worldDonor && typeof worldDonor.disconnectAll === "function") {
+    try { worldDonor.disconnectAll(); } catch (_) {}
+  }
+  if (this.setState) this.setState("mock_donor", null);
+  disconnectAllMockDonors();
+
   try {
-    const { _getMockDonor } = require("../steps/api.steps");
-    const md = _getMockDonor();
-    if (md) {
-      md.disconnectAll();
-    }
+    const apiSteps = require("../steps/api.steps");
+    if (apiSteps._resetMockDonor) apiSteps._resetMockDonor();
   } catch (_) {}
-  // Close API context.
+
+  if (this.disposeRequestContexts) {
+    await this.disposeRequestContexts();
+  }
   if (this.apiContext) {
-    await this.apiContext.dispose();
+    try { await this.apiContext.dispose(); } catch (_) {}
     this.apiContext = null;
   }
 });
 
 After({ tags: "@ui" }, async function () {
   if (this.page) {
-    await this.page.close();
+    try { await this.page.close(); } catch (_) {}
     this.page = null;
   }
   if (this.browser) {
-    await this.browser.close();
+    try { await this.browser.close(); } catch (_) {}
     this.browser = null;
   }
 });
@@ -133,4 +128,29 @@ async function waitForHealth(url, maxRetries = 60) {
     await new Promise(r => setTimeout(r, 500));
   }
   throw new Error("Coordinator not reachable at " + url);
+}
+
+function killCoordinator(pid) {
+  return new Promise((resolve) => {
+    const tryKill = (signal) => {
+      try { process.kill(-pid, signal); } catch (_) {
+        try { process.kill(pid, signal); } catch (_) {}
+      }
+    };
+    tryKill("SIGTERM");
+    const deadline = Date.now() + 2000;
+    const check = setInterval(() => {
+      let alive = false;
+      try {
+        process.kill(pid, 0);
+        alive = true;
+      } catch (_) {}
+      if (!alive || Date.now() > deadline) {
+        clearInterval(check);
+        if (alive) tryKill("SIGKILL");
+        // Brief settle so port/handles release before Node exits.
+        setTimeout(resolve, 50);
+      }
+    }, 50);
+  });
 }

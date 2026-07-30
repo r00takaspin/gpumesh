@@ -2,9 +2,9 @@
   "name": "gpumesh-tests",
   "private": true,
   "scripts": {
-    "test": "cucumber-js",
-    "test:api": "cucumber-js -p api",
-    "test:ui": "cucumber-js -p ui"
+    "test": "cucumber-js -p api --exit && cucumber-js -p ui --exit",
+    "test:api": "cucumber-js -p api --exit",
+    "test:ui": "cucumber-js -p ui --exit"
   },
   "devDependencies": {
     "@cucumber/cucumber": "^10.9.0",

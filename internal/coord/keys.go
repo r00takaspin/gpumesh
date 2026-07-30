@@ -104,13 +104,40 @@ func (s *Server) handleRevokeKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	oldKey, err := s.store.FindKeyByID(keyID)
+	if err != nil {
+		log.Printf("revoke key: find error: %v", err)
+		writeError(w, http.StatusInternalServerError, "failed to find key")
+		return
+	}
+	if oldKey == nil || oldKey.UserID != userID {
+		writeError(w, http.StatusNotFound, "key not found")
+		return
+	}
+
 	if err := s.store.RevokeKey(userID, keyID); err != nil {
 		log.Printf("revoke key error: %v", err)
 		writeError(w, http.StatusNotFound, fmt.Sprintf("key not found: %v", err))
 		return
 	}
 
-	// HTMX: re-render the keys fragment.
+	if proto.IsProviderScope(oldKey.Scope) {
+		if m, _ := s.store.GetMachineByProviderKeyID(keyID); m != nil {
+			s.registry.Unregister(m.ID)
+		}
+		if err := s.store.RetireMachineByProviderKeyID(keyID); err != nil {
+			log.Printf("revoke key: retire machine: %v", err)
+		}
+	}
+
+	// HTMX from /share Setup: refresh the progressive panel (no-token after provider revoke).
+	if r.Header.Get("HX-Request") == "true" && r.Header.Get("X-Share-Panel") == "1" {
+		w.Header().Set("HX-Trigger", "refreshPanel")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// HTMX: re-render the keys fragment on /use.
 	if r.Header.Get("HX-Request") == "true" {
 		s.handleUseKeys(w, r)
 		return
@@ -173,16 +200,16 @@ func (s *Server) handleRegenerateKey(w http.ResponseWriter, r *http.Request) {
 		displayName := "machine"
 		if oldMachine != nil {
 			displayName = oldMachine.DisplayName
+			s.registry.Unregister(oldMachine.ID)
+			if err := s.store.RetireMachine(oldMachine.ID); err != nil {
+				log.Printf("regenerate: retire old machine: %v", err)
+			}
 		}
 		m, err := s.store.CreateMachineOnKeyRegen(userID, newKeyID, displayName)
 		if err != nil {
 			log.Printf("regenerate: create machine error: %v", err)
 		} else if m != nil {
 			newMachineID = m.ID
-			// Disconnect any live session on the old machine.
-			if oldMachine != nil {
-				s.registry.Unregister(oldMachine.ID)
-			}
 		}
 	}
 

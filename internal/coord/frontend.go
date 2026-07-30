@@ -25,6 +25,7 @@ type inviteListView struct {
 	Uses       int
 	MaxUses    int
 	ExpiresRel string
+	UsedBy     string // e.g. "@alice, @bob"; empty if unused
 }
 
 type memberView struct {
@@ -43,6 +44,7 @@ type useMachineView struct {
 	Models       string
 	BaseURL      string
 	DefaultModel string
+	SetupOpen    bool
 }
 
 // --- JSON APIs (owner/consumer) ---
@@ -132,8 +134,14 @@ func (s *Server) handleSharePanel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	base := strings.TrimRight(s.baseURL, "/")
-	runCmd := fmt.Sprintf("export MESH_COORDINATOR=%q\nexport MESH_TOKEN=%q\ngpumesh-provider",
-		base, tokenPrefix+"…")
+	downloadBase := providerDownloadBase()
+	runUnix := fmt.Sprintf("export MESH_COORDINATOR=%q\nexport MESH_TOKEN=\"YOUR_PROVIDER_TOKEN\"\ngpumesh-provider", base)
+	runWin := fmt.Sprintf("$env:MESH_COORDINATOR=%q\n$env:MESH_TOKEN=\"YOUR_PROVIDER_TOKEN\"\n.\\gpumesh-provider.exe", base)
+	installUnix := fmt.Sprintf("curl -sSfL %s/install-provider.sh | sh", base)
+	installWin := fmt.Sprintf(
+		"Invoke-WebRequest -Uri %q -OutFile gpumesh-provider.zip\nExpand-Archive gpumesh-provider.zip -DestinationPath .\n.\\gpumesh-provider.exe",
+		downloadBase+"/gpumesh-provider_windows_amd64.zip",
+	)
 
 	if providerKeyID == 0 {
 		renderTemplate(w, "share-panel.html", map[string]interface{}{
@@ -143,15 +151,23 @@ func (s *Server) handleSharePanel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setupData := map[string]interface{}{
+		"BaseURL":           base,
+		"DownloadBase":      downloadBase,
+		"RunCommandUnix":    runUnix,
+		"RunCommandWindows": runWin,
+		"InstallUnix":       installUnix,
+		"InstallWindows":    installWin,
+		"TokenPrefix":       tokenPrefix,
+		"ProviderKeyID":     providerKeyID,
+		// Backward-compatible alias for primary (unix) copy button.
+		"RunCommand": runUnix,
+	}
+
 	machines, _ := s.store.ListMachinesByOwner(userID)
 	if len(machines) == 0 {
-		renderTemplate(w, "share-panel.html", map[string]interface{}{
-			"State":         "waiting",
-			"BaseURL":       base,
-			"RunCommand":    runCmd,
-			"TokenPrefix":   tokenPrefix,
-			"ProviderKeyID": providerKeyID,
-		})
+		setupData["State"] = "waiting"
+		renderTemplate(w, "share-panel.html", setupData)
 		return
 	}
 
@@ -181,30 +197,38 @@ func (s *Server) handleSharePanel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	invites, _ := s.store.ListInvitesByOwner(userID)
-	invViews := make([]inviteListView, 0, len(invites))
+	inviteIDs := make([]int64, 0, len(invites))
 	for _, inv := range invites {
+		inviteIDs = append(inviteIDs, inv.ID)
+	}
+	redeemers, _ := s.store.ListInviteRedeemers(inviteIDs)
+	invViews := make([]inviteListView, 0, len(invites))
+	activeInvites := 0
+	for _, inv := range invites {
+		st := inv.Status()
+		if st == "active" {
+			activeInvites++
+		}
+		usedBy := formatInviteUsedBy(redeemers[inv.ID])
 		invViews = append(invViews, inviteListView{
 			ID:         inv.ID,
 			MaskedPIN:  inv.MaskedPIN(),
-			Status:     inv.Status(),
+			Status:     st,
 			Uses:       inv.Uses,
 			MaxUses:    inv.MaxUses,
 			ExpiresRel: formatExpiresRel(inv.ExpiresAt),
+			UsedBy:     usedBy,
 		})
 	}
 
 	selected := views[0].ID
-	renderTemplate(w, "share-panel.html", map[string]interface{}{
-		"State":             "ready",
-		"Offline":           !anyOnline,
-		"Machines":          views,
-		"SelectedMachineID": selected,
-		"Invites":           invViews,
-		"BaseURL":           base,
-		"RunCommand":        runCmd,
-		"TokenPrefix":       tokenPrefix,
-		"ProviderKeyID":     providerKeyID,
-	})
+	setupData["State"] = "ready"
+	setupData["Offline"] = !anyOnline
+	setupData["Machines"] = views
+	setupData["SelectedMachineID"] = selected
+	setupData["Invites"] = invViews
+	setupData["ActiveInviteCount"] = activeInvites
+	renderTemplate(w, "share-panel.html", setupData)
 }
 
 func (s *Server) handleShareMembers(w http.ResponseWriter, r *http.Request) {
@@ -324,6 +348,7 @@ func (s *Server) handleUseMachines(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	base := strings.TrimRight(s.baseURL, "/")
+	setupID := strings.TrimSpace(r.URL.Query().Get("setup"))
 	views := make([]useMachineView, 0, len(list))
 	for _, bi := range list {
 		sess := s.registry.GetSession(bi.MachineID)
@@ -356,6 +381,7 @@ func (s *Server) handleUseMachines(w http.ResponseWriter, r *http.Request) {
 			Models:       models,
 			BaseURL:      base + "/v1/machines/" + bi.MachineID,
 			DefaultModel: defaultModel,
+			SetupOpen:    setupID != "" && setupID == bi.MachineID,
 		})
 	}
 	renderTemplate(w, "use-machines.html", map[string]interface{}{"Machines": views})
@@ -440,6 +466,22 @@ func joinModels(models []string) string {
 		s += ", " + models[i]
 	}
 	return s
+}
+
+func formatInviteUsedBy(logins []string) string {
+	if len(logins) == 0 {
+		return ""
+	}
+	seen := make(map[string]bool, len(logins))
+	parts := make([]string, 0, len(logins))
+	for _, login := range logins {
+		if login == "" || seen[login] {
+			continue
+		}
+		seen[login] = true
+		parts = append(parts, "@"+login)
+	}
+	return strings.Join(parts, ", ")
 }
 
 func providerWSURL(base string) string {

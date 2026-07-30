@@ -128,8 +128,17 @@ func (s *Server) handleListInvites(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "failed to list invites")
 		return
 	}
+	inviteIDs := make([]int64, 0, len(invites))
+	for _, inv := range invites {
+		inviteIDs = append(inviteIDs, inv.ID)
+	}
+	redeemers, _ := s.store.ListInviteRedeemers(inviteIDs)
 	entries := make([]map[string]interface{}, 0, len(invites))
 	for _, inv := range invites {
+		usedBy := redeemers[inv.ID]
+		if usedBy == nil {
+			usedBy = []string{}
+		}
 		entries = append(entries, map[string]interface{}{
 			"id":         inv.ID,
 			"machine_id": inv.MachineID,
@@ -140,6 +149,7 @@ func (s *Server) handleListInvites(w http.ResponseWriter, r *http.Request) {
 			"status":     inv.Status(),
 			"label":      inv.Label,
 			"created_at": inv.CreatedAt.UTC().Format(time.RFC3339),
+			"used_by":    usedBy,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"invites": entries})

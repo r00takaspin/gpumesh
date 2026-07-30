@@ -33,7 +33,7 @@ Feature: Join with PIN (v2)
     And пользователь вводит PIN в join-форму
     And пользователь кликает на data-testid="btn-connect"
     Then элемент с data-testid="join-success" видим
-    And элемент с data-testid="btn-go-use" имеет href "/use"
+    And элемент с data-testid="btn-go-use" имеет href, содержащий "/use?setup="
 
   Scenario: Invalid PIN shows human error
     Given пользователь аутентифицирован как "member1"

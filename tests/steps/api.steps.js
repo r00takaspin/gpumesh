@@ -7,6 +7,12 @@ function getMockDonor(world) {
   if (!mockDonor) mockDonor = new MockDonor(world.baseUrl);
   return mockDonor;
 }
+function resetMockDonor() {
+  if (mockDonor) {
+    try { mockDonor.disconnectAll(); } catch (_) {}
+  }
+  mockDonor = null;
+}
 
 async function setupSession(world, login = "testuser") {
   const { request } = require("playwright");
@@ -873,3 +879,4 @@ Then("тело ответа содержит поле {string} со значен
 });
 
 module.exports._getMockDonor = () => mockDonor;
+module.exports._resetMockDonor = resetMockDonor;
