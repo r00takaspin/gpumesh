@@ -2,14 +2,11 @@ package provider
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const (
@@ -170,31 +167,12 @@ func modelsSummary(models []string) string {
 	return strings.Join(models, ", ")
 }
 
-// DiscoverModelsWithURL fetches available models from a specific Ollama URL.
+// DiscoverModelsWithURL fetches available models from a specific backend URL.
+// Uses FetchModels which tries Ollama /api/tags first, then OpenAI /v1/models.
 func DiscoverModelsWithURL(ollamaURL string) ([]string, error) {
-	client := &http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get(ollamaURL + "/api/tags")
-	if err != nil {
-		return nil, fmt.Errorf("ollama /api/tags: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	var result struct {
-		Models []struct {
-			Name string `json:"name"`
-		} `json:"models"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("parse /api/tags: %w", err)
-	}
-
-	var models []string
-	for _, m := range result.Models {
-		models = append(models, m.Name)
-	}
-	return models, nil
+	models, _, err := FetchModels(ollamaURL)
+	return models, err
 }
-
 // maskToken returns a masked version of the token for display.
 func maskToken(token string) string {
 	if token == "" {

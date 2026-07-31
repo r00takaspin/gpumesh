@@ -175,9 +175,13 @@ func (s *Server) handleMachineChatCompletions(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Strip provider prefix (openai/llama3.2 → llama3.2).
-	if idx := strings.IndexByte(req.Model, '/'); idx >= 0 {
-		req.Model = req.Model[idx+1:]
+	// Strip known provider prefixes (openai/llama3.2 → llama3.2).
+	// Must NOT strip filesystem paths like /home/user/model.gguf.
+	for _, prefix := range []string{"openai/", "anthropic/", "ollama/"} {
+		if after, ok := strings.CutPrefix(req.Model, prefix); ok {
+			req.Model = after
+			break
+		}
 	}
 
 	log.Printf("chat: machine_id=%s model=%s stream=%v tools=%v msgs_bytes=%d ua=%q",

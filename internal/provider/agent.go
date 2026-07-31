@@ -31,7 +31,7 @@ type Config struct {
 	ReconnectMax    time.Duration
 }
 
-// Agent is the provider agent that connects to the coordinator and proxies Ollama requests.
+// Agent is the provider agent that connects to the coordinator and proxies backend requests.
 type Agent struct {
 	cfg    Config
 	conn   *websocket.Conn
@@ -42,8 +42,9 @@ type Agent struct {
 	requests map[string]context.CancelFunc
 	reqMu    sync.Mutex
 
-	providerID string
-	done       chan struct{}
+	providerID  string
+	done        chan struct{}
+	backendType BackendType // Ollama or OpenAI-compatible API
 
 	writeMu    sync.Mutex // serialises writes to conn (gorilla/websocket not concurrent-safe)
 	httpClient *http.Client
@@ -357,8 +358,8 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 	a.reqMu.Unlock()
 	defer cancel()
 
-	// Send to Ollama.
-	ollamaResp, err := a.sendToOllama(reqCtx, msg)
+	// Send to backend.
+	resp, err := a.sendToBackend(reqCtx, msg)
 	if err != nil {
 		a.mu.Lock()
 		conn := a.conn
@@ -378,11 +379,11 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 		}
 		return
 	}
-	defer func() { _ = ollamaResp.Body.Close() }()
-	log.Printf("handleRequest: ollama responded status=%d", ollamaResp.StatusCode)
-	if ollamaResp.StatusCode < 200 || ollamaResp.StatusCode >= 300 {
-		errBody, _ := io.ReadAll(io.LimitReader(ollamaResp.Body, 4096))
-		log.Printf("handleRequest: ollama error body: %s", truncateForLog(string(errBody), 500))
+	defer func() { _ = resp.Body.Close() }()
+	log.Printf("handleRequest: backend responded status=%d", resp.StatusCode)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		log.Printf("handleRequest: backend error body: %s", truncateForLog(string(errBody), 500))
 		a.mu.Lock()
 		conn := a.conn
 		a.mu.Unlock()
@@ -391,40 +392,99 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 				Type:      proto.TypeError,
 				RequestID: msg.RequestID,
 				Code:      proto.ErrInternal,
-				Message:   fmt.Sprintf("ollama status %d: %s", ollamaResp.StatusCode, truncateForLog(string(errBody), 300)),
+				Message:   fmt.Sprintf("backend status %d: %s", resp.StatusCode, truncateForLog(string(errBody), 300)),
 			})
 		}
 		return
 	}
 
 	if msg.Stream {
-		a.handleStreamingResponse(msg.RequestID, ollamaResp.Body)
+		a.handleStreamingResponse(msg.RequestID, resp.Body)
 	} else {
-		a.handleNonStreamingResponse(msg.RequestID, msg.Model, ollamaResp.Body)
+		a.handleNonStreamingResponse(msg.RequestID, msg.Model, resp.Body)
 	}
 }
 
 func (a *Agent) handleStreamingResponse(requestID string, body io.Reader) {
 	scanner := bufio.NewScanner(body)
-	// Ollama returns NDJSON lines.
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
-		if len(line) == 0 {
+
+		// OpenAI SSE format: skip empty lines and "data: [DONE]" sentinel.
+		if a.backendType == BackendOpenAI {
+			if len(line) == 0 {
+				continue
+			}
+			if bytes.Equal(line, []byte("data: [DONE]")) {
+				// Send final done chunk.
+				a.mu.Lock()
+				conn := a.conn
+				a.mu.Unlock()
+				if conn != nil {
+					_ = a.writeWS(conn, proto.ChunkMsg{
+						Type:      proto.TypeChunk,
+						RequestID: requestID,
+						Done:      true,
+					})
+				}
+				return
+			}
+			// Strip "data: " prefix.
+			const prefix = "data: "
+			if bytes.HasPrefix(line, []byte(prefix)) {
+				line = line[len(prefix):]
+			} else {
+				continue
+			}
+		}
+
+		// Ollama format: empty lines skipped.
+		if a.backendType != BackendOpenAI && len(line) == 0 {
 			continue
 		}
 
-		var chunk struct {
-			Message struct {
-				Content   string          `json:"content"`
-				Thinking  string          `json:"thinking"`
-				ToolCalls json.RawMessage `json:"tool_calls"`
-			} `json:"message"`
-			Done bool `json:"done"`
-		}
-		if err := json.Unmarshal(line, &chunk); err != nil {
-			log.Printf("ollama chunk parse error: %v", err)
-			continue
+		var content string
+		var thinking string
+		var toolCalls json.RawMessage
+		var done bool
+
+		if a.backendType == BackendOpenAI {
+			var openaiChunk struct {
+				Choices []struct {
+					Delta struct {
+						Content   string          `json:"content"`
+						ToolCalls json.RawMessage `json:"tool_calls"`
+					} `json:"delta"`
+					FinishReason *string `json:"finish_reason"`
+				} `json:"choices"`
+			}
+			if err := json.Unmarshal(line, &openaiChunk); err != nil {
+				log.Printf("openai chunk parse error: %v", err)
+				continue
+			}
+			if len(openaiChunk.Choices) > 0 {
+				content = openaiChunk.Choices[0].Delta.Content
+				toolCalls = openaiChunk.Choices[0].Delta.ToolCalls
+				done = openaiChunk.Choices[0].FinishReason != nil
+			}
+		} else {
+			var ollamaChunk struct {
+				Message struct {
+					Content   string          `json:"content"`
+					Thinking  string          `json:"thinking"`
+					ToolCalls json.RawMessage `json:"tool_calls"`
+				} `json:"message"`
+				Done bool `json:"done"`
+			}
+			if err := json.Unmarshal(line, &ollamaChunk); err != nil {
+				log.Printf("ollama chunk parse error: %v", err)
+				continue
+			}
+			content = ollamaChunk.Message.Content
+			thinking = ollamaChunk.Message.Thinking
+			toolCalls = ollamaChunk.Message.ToolCalls
+			done = ollamaChunk.Done
 		}
 
 		a.mu.Lock()
@@ -434,55 +494,89 @@ func (a *Agent) handleStreamingResponse(requestID string, body io.Reader) {
 			return
 		}
 
-		// Thinking-only tokens (qwen etc.) must keep the stream alive for Cursor.
-		content := chunk.Message.Content
-		if content == "" && chunk.Message.Thinking != "" {
-			content = chunk.Message.Thinking
+		if content == "" && thinking != "" {
+			content = thinking
 		}
-		toolCalls := normalizeToolCalls(chunk.Message.ToolCalls)
+		normalizedToolCalls := normalizeToolCalls(toolCalls)
 		if err := a.writeWS(conn, proto.ChunkMsg{
 			Type:      proto.TypeChunk,
 			RequestID: requestID,
 			Content:   content,
-			ToolCalls: toolCalls,
-			Done:      chunk.Done,
+			ToolCalls: normalizedToolCalls,
+			Done:      done,
 		}); err != nil {
 			log.Printf("write chunk error: %v", err)
 			return
 		}
 
-		if chunk.Done {
+		if done {
 			return
 		}
 	}
 }
-
 func (a *Agent) handleNonStreamingResponse(requestID, model string, body io.Reader) {
 	data, err := io.ReadAll(body)
 	if err != nil {
-		log.Printf("read ollama response error: %v", err)
+		log.Printf("read backend response error: %v", err)
 		return
 	}
 
-	var ollamaResp struct {
-		Message struct {
-			Content   string          `json:"content"`
-			Thinking  string          `json:"thinking"`
-			ToolCalls json.RawMessage `json:"tool_calls"`
-		} `json:"message"`
-		TotalDuration   int64 `json:"total_duration"`
-		PromptEvalCount int   `json:"prompt_eval_count"`
-		EvalCount       int   `json:"eval_count"`
-	}
-	if err := json.Unmarshal(data, &ollamaResp); err != nil {
-		log.Printf("ollama response parse error: %v", err)
-		return
+	var content string
+	var thinking string
+	var toolCalls json.RawMessage
+	var promptEval, eval int
+
+	if a.backendType == BackendOpenAI {
+		// OpenAI-compatible format: {"choices": [{"message": {"content": "...", "tool_calls": [...]}}], "usage": {...}}
+		var openaiResp struct {
+			Choices []struct {
+				Message struct {
+					Content   string          `json:"content"`
+					ToolCalls json.RawMessage `json:"tool_calls"`
+				} `json:"message"`
+			} `json:"choices"`
+			Usage struct {
+				PromptTokens     int `json:"prompt_tokens"`
+				CompletionTokens int `json:"completion_tokens"`
+			} `json:"usage"`
+		}
+		if err := json.Unmarshal(data, &openaiResp); err != nil {
+			log.Printf("openai response parse error: %v", err)
+			return
+		}
+		if len(openaiResp.Choices) > 0 {
+			content = openaiResp.Choices[0].Message.Content
+			toolCalls = openaiResp.Choices[0].Message.ToolCalls
+		}
+		promptEval = openaiResp.Usage.PromptTokens
+		eval = openaiResp.Usage.CompletionTokens
+	} else {
+		// Ollama format: {"message": {"content": "...", "tool_calls": [...]}}
+		var ollamaResp struct {
+			Message struct {
+				Content   string          `json:"content"`
+				Thinking  string          `json:"thinking"`
+				ToolCalls json.RawMessage `json:"tool_calls"`
+			} `json:"message"`
+			TotalDuration   int64 `json:"total_duration"`
+			PromptEvalCount int   `json:"prompt_eval_count"`
+			EvalCount       int   `json:"eval_count"`
+		}
+		if err := json.Unmarshal(data, &ollamaResp); err != nil {
+			log.Printf("ollama response parse error: %v", err)
+			return
+		}
+		content = ollamaResp.Message.Content
+		thinking = ollamaResp.Message.Thinking
+		toolCalls = ollamaResp.Message.ToolCalls
+		promptEval = ollamaResp.PromptEvalCount
+		eval = ollamaResp.EvalCount
 	}
 
 	usage, _ := json.Marshal(map[string]interface{}{
-		"prompt_tokens":     ollamaResp.PromptEvalCount,
-		"completion_tokens": ollamaResp.EvalCount,
-		"total_tokens":      ollamaResp.PromptEvalCount + ollamaResp.EvalCount,
+		"prompt_tokens":     promptEval,
+		"completion_tokens": eval,
+		"total_tokens":      promptEval + eval,
 	})
 
 	a.mu.Lock()
@@ -492,27 +586,24 @@ func (a *Agent) handleNonStreamingResponse(requestID, model string, body io.Read
 		return
 	}
 
-	content := ollamaResp.Message.Content
-	if content == "" && ollamaResp.Message.Thinking != "" {
-		content = ollamaResp.Message.Thinking
+	if content == "" && thinking != "" {
+		content = thinking
 	}
-	toolCalls := normalizeToolCalls(ollamaResp.Message.ToolCalls)
+	normalizedToolCalls := normalizeToolCalls(toolCalls)
 	if err := a.writeWS(conn, proto.ResponseMsg{
 		Type:      proto.TypeResponse,
 		RequestID: requestID,
 		Content:   content,
-		ToolCalls: toolCalls,
+		ToolCalls: normalizedToolCalls,
 		Model:     model,
 		Usage:     usage,
 	}); err != nil {
 		log.Printf("write response error: %v", err)
 	} else {
 		log.Printf("handleNonStreamingResponse: sent response_id=%s content_len=%d tool_calls=%v",
-			requestID, len(ollamaResp.Message.Content), len(toolCalls) > 0)
+			requestID, len(content), len(normalizedToolCalls) > 0)
 	}
 }
-
-// normalizeToolCalls maps Ollama tool_calls into OpenAI chat.completions shape.
 func normalizeToolCalls(raw json.RawMessage) json.RawMessage {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil
@@ -558,9 +649,8 @@ func normalizeToolCalls(raw json.RawMessage) json.RawMessage {
 	}
 	return b
 }
-
-// sendToOllama sends a chat completion request to the local Ollama instance.
-func (a *Agent) sendToOllama(ctx context.Context, msg proto.RequestMsg) (*http.Response, error) {
+// sendToBackend sends a chat completion request to the local backend (Ollama or OpenAI-compatible).
+func (a *Agent) sendToBackend(ctx context.Context, msg proto.RequestMsg) (*http.Response, error) {
 	messages, err := normalizeMessagesForOllama(msg.Messages)
 	if err != nil {
 		return nil, fmt.Errorf("normalize messages: %w", err)
@@ -590,17 +680,22 @@ func (a *Agent) sendToOllama(ctx context.Context, msg proto.RequestMsg) (*http.R
 
 	body, err := json.Marshal(ollamaReq)
 	if err != nil {
-		return nil, fmt.Errorf("marshal ollama request: %w", err)
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	endpoint := "/api/chat"
+	if a.backendType == BackendOpenAI {
+		endpoint = "/v1/chat/completions"
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, "POST",
-		a.cfg.OllamaURL+"/api/chat", bytes.NewReader(body))
+		a.cfg.OllamaURL+endpoint, bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	log.Printf("sendToOllama: calling %s/api/chat model=%s", a.cfg.OllamaURL, msg.Model)
+	log.Printf("sendToBackend: calling %s%s model=%s", a.cfg.OllamaURL, endpoint, msg.Model)
 	return a.httpClient.Do(httpReq)
 }
 
@@ -724,37 +819,29 @@ func ensureArgsObject(args interface{}) interface{} {
 	}
 }
 
-// discoverModels fetches available models from Ollama.
+// discoverModels fetches available models from the backend.
+// Uses FetchModels which tries Ollama /api/tags first, then OpenAI /v1/models.
+// Also detects the backend type and stores it for later request routing.
 func (a *Agent) discoverModels() ([]string, error) {
-	resp, err := http.Get(a.cfg.OllamaURL + "/api/tags")
+	allModels, backendType, err := FetchModels(a.cfg.OllamaURL)
 	if err != nil {
-		return nil, fmt.Errorf("ollama /api/tags: %w", err)
+		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
+	a.backendType = backendType
 
-	var result struct {
-		Models []struct {
-			Name string `json:"name"`
-		} `json:"models"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("parse /api/tags: %w", err)
-	}
-
-	var models []string
-	for _, m := range result.Models {
-		// If whitelist configured, only include those.
-		if len(a.cfg.Models) > 0 {
-			for _, wl := range a.cfg.Models {
-				if wl == m.Name {
-					models = append(models, m.Name)
-					break
-				}
-			}
-		} else {
-			models = append(models, m.Name)
+	// If whitelist configured, only include those.
+	if len(a.cfg.Models) > 0 {
+		wlSet := make(map[string]bool, len(a.cfg.Models))
+		for _, wl := range a.cfg.Models {
+			wlSet[wl] = true
 		}
+		var filtered []string
+		for _, m := range allModels {
+			if wlSet[m] {
+				filtered = append(filtered, m)
+			}
+		}
+		return filtered, nil
 	}
-	return models, nil
+	return allModels, nil
 }
-
