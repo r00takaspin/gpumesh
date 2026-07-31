@@ -1,0 +1,6 @@
+run:
+  goimports: true
+  deadcode: true
+  errcheck: true
+  errcheck:
+    ignore: "\\.Error()"
