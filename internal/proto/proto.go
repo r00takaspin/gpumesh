@@ -30,7 +30,7 @@ const (
 // Timeout constants (§6.3 SPEC-v2).
 const (
 	TTFTTimeout          = 120 * time.Second // cold load + large Cursor prompts/tools
-	InterTokenTimeout    = 120 * time.Second // thinking models (qwen) can pause between tokens
+	InterTokenTimeout    = 300 * time.Second // thinking models (qwen) can pause between tokens
 	TotalRequestTimeout  = 300 * time.Second // Cursor Ask with tools + chain-of-thought
 	HeartbeatInterval    = 30 * time.Second
 	HeartbeatTimeout     = 90 * time.Second

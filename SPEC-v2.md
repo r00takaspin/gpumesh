@@ -292,8 +292,8 @@ Owner                    Coordinator                 Member
 - Нет выбора «наименее загруженной чужой ноды».
 - Нет sticky affinity между разными machines.
 - Нет прозрачного failover на другую machine того же member.
-- Если machine offline → `503` с телом вроде `{"error":"machine_offline","machine_id":"..."}`.
-- Если online, но `current_load >= max_concurrent` → `503` `machine_busy` (+ опционально `retry_after_seconds`).
+- Если machine offline → `503` с телом вроде `{"error":{"message":"machine_offline","type":"api_error","code":"machine_offline"},"machine_id":"..."}`.
+- Если online, но `current_load >= max_concurrent` → `503` `code=machine_busy` (+ опционально `retry_after_seconds`).
 - Mid-stream обрыв WS → закрыть SSE; client retries сам (как в v1 для streaming). Для non-stream: до 3 попыток **только на ту же machine** (не на другую).
 
 ### 5.4 Owner и свои машины
@@ -376,6 +376,8 @@ Content-Type: application/json
 
 Streaming: SSE (`X-Accel-Buffering: no`; пустые content-keepalives не шлём). Non-stream: JSON.
 
+Ошибки `/v1/*` и SSE error-events — **OpenAI-форма** (Cursor/Zod): `{"error":{"message":"...","type":"api_error","code":"..."}}`. Поле `error` всегда объект, не строка. После SSE error шлём `data: [DONE]`. Доп. поля (`machine_id`, …) — sibling’ы верхнего уровня.
+
 **Legacy пути v1 (поведение v2):**
 
 | Путь | Поведение v2 |
@@ -405,7 +407,7 @@ Rate limit: token bucket на API key; default `MESH_RATE_LIMIT=100` req/hour; �
 ### 6.3 Таймауты
 
 - TTFT (до первого токена): **120s** (cold load + большие промпты/tools от Cursor).
-- Inter-token: **120s** (thinking-модели вроде qwen могут молчать между чанками).
+- Inter-token: **300s** (thinking-модели вроде qwen могут молчать между чанками; не жёстче total).
 - Общий таймаут запроса: **300s**.
 - Heartbeat timeout: 90s без heartbeat → session offline (machine запись остаётся, online=false).
 - `backend_ok=false` > 5 минут → disconnect WS.
@@ -1028,7 +1030,7 @@ cline -i
 
 | Симптом | Причина | Что сделать |
 |---|---|---|
-| `Error: not found` / `{"error":"not found"}` | Base URL с лишним `/v1`, или provider id `ollama` | Base = `…/v1/machines/{id}`; `-p openai-compatible` |
+| `Error: not found` / `error.code=not found` | Base URL с лишним `/v1`, или provider id `ollama` | Base = `…/v1/machines/{id}`; `-p openai-compatible` |
 | `machine_offline` / 503 | Provider offline | Поднять `gpumesh-provider` на машине owner’а |
 | `model_not_found` | Имя модели ≠ Ollama | Id из карточки `/use` / `ollama list` |
 | `invalid API key` / 401 | Неверный/revoked consumer key | Новый key на `/use` |

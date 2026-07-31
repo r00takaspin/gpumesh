@@ -49,7 +49,7 @@ Feature: Invites и bindings
         { "pin": "AAAA-AAAA" }
         """
     Then статус ответа равен 400
-    And тело ответа содержит поле "error" со значением "invalid_pin"
+    And тело ответа содержит поле "error.code" со значением "invalid_pin"
 
   Scenario: Список bindings у member
     Given member имеет binding на "<machine_id>"

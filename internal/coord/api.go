@@ -191,27 +191,19 @@ func (s *Server) handleMachineChatCompletions(w http.ResponseWriter, r *http.Req
 
 	sess := s.registry.GetSession(machineID)
 	if sess == nil {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"error": "machine_offline",
-		})
+		writeAPIError(w, http.StatusServiceUnavailable, "machine_offline", "machine_offline", nil)
 		return
 	}
 	if !sess.BackendOK {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"error": "backend_unavailable",
-		})
+		writeAPIError(w, http.StatusServiceUnavailable, "backend_unavailable", "backend_unavailable", nil)
 		return
 	}
 	if sess.CurrentLoad >= sess.MaxConcurrent {
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
-			"error": "machine_busy",
-		})
+		writeAPIError(w, http.StatusServiceUnavailable, "machine_busy", "machine_busy", nil)
 		return
 	}
 	if !s.registry.HasModel(machineID, req.Model) {
-		writeJSON(w, http.StatusNotFound, map[string]string{
-			"error": "model_not_found",
-		})
+		writeAPIError(w, http.StatusNotFound, "model_not_found", "model_not_found", nil)
 		return
 	}
 
@@ -225,10 +217,8 @@ func (s *Server) handleMachineChatCompletions(w http.ResponseWriter, r *http.Req
 
 // handleLegacyChatCompletions returns 410 for v1 pool path.
 func (s *Server) handleLegacyChatCompletions(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusGone, map[string]string{
-		"error": "gone",
-		"message": "Use POST /v1/machines/{machine_id}/chat/completions — pool routing was removed in v2",
-	})
+	writeAPIError(w, http.StatusGone, "gone",
+		"Use POST /v1/machines/{machine_id}/chat/completions — pool routing was removed in v2", nil)
 }
 
 func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Request, sess *MachineSession, req *proto.ChatCompletionRequest, requestID string) {
@@ -250,8 +240,7 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 
 	if !s.registry.IncrementLoad(sess.MachineID) {
 		sess.UnregisterChunkChannel(requestID)
-		_, _ = fmt.Fprintf(w, "data: {\"error\":\"machine_busy\"}\n\n")
-		flusher.Flush()
+		writeSSEError(w, flusher, "machine_busy", "machine_busy")
 		return
 	}
 
@@ -268,8 +257,7 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 	if err := sess.SendWS(requestMsg); err != nil {
 		log.Printf("chat: send request error: %v", err)
 		s.registry.DecrementLoad(sess.MachineID)
-		_, _ = fmt.Fprintf(w, "data: {\"error\":\"machine_offline\"}\n\n")
-		flusher.Flush()
+		writeSSEError(w, flusher, "machine_offline", "machine_offline")
 		return
 	}
 
@@ -314,28 +302,24 @@ func (s *Server) handleStreamingCompletion(w http.ResponseWriter, r *http.Reques
 
 		case <-ttftTimer.C:
 			_ = sess.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
-			_, _ = fmt.Fprintf(w, "data: {\"error\":\"timeout waiting for first token\"}\n\n")
-			flusher.Flush()
+			writeSSEError(w, flusher, "timeout", "timeout waiting for first token")
 			s.registry.DecrementLoad(sess.MachineID)
 			return
 
 		case <-interTokenTimer.C:
 			_ = sess.SendWS(proto.CancelMsg{Type: proto.TypeCancel, RequestID: requestID})
-			_, _ = fmt.Fprintf(w, "data: {\"error\":\"inter-token timeout\"}\n\n")
-			flusher.Flush()
+			writeSSEError(w, flusher, "inter_token_timeout", "inter-token timeout")
 			s.registry.DecrementLoad(sess.MachineID)
 			return
 
 		case cr, ok := <-ch:
 			if !ok {
-				_, _ = fmt.Fprintf(w, "data: {\"error\":\"machine_offline\"}\n\n")
-				flusher.Flush()
+				writeSSEError(w, flusher, "machine_offline", "machine_offline")
 				s.registry.DecrementLoad(sess.MachineID)
 				return
 			}
 			if cr.Err != "" {
-				_, _ = fmt.Fprintf(w, "data: {\"error\":%q}\n\n", cr.Err)
-				flusher.Flush()
+				writeSSEError(w, flusher, "provider_error", cr.Err)
 				s.registry.DecrementLoad(sess.MachineID)
 				return
 			}
@@ -434,7 +418,7 @@ func (s *Server) handleNonStreamingCompletion(w http.ResponseWriter, r *http.Req
 			attempt+1, proto.MaxRetries, machineID, err)
 	}
 
-	writeJSON(w, http.StatusBadGateway, map[string]string{"error": "machine_failed"})
+	writeAPIError(w, http.StatusBadGateway, "machine_failed", "machine_failed", nil)
 }
 
 func (s *Server) sendNonStreamingRequest(ctx context.Context, sess *MachineSession, req *proto.ChatCompletionRequest, requestID string) (map[string]interface{}, error) {
@@ -510,6 +494,37 @@ func (s *Server) sendSSEDone(w http.ResponseWriter, flusher http.Flusher) {
 	flusher.Flush()
 }
 
+// openaiErrorBody is the OpenAI-compatible error envelope Cursor/Zod expect
+// (error must be an object, not a string).
+func openaiErrorBody(code, message string) map[string]interface{} {
+	if message == "" {
+		message = code
+	}
+	return map[string]interface{}{
+		"error": map[string]interface{}{
+			"message": message,
+			"type":    "api_error",
+			"code":    code,
+		},
+	}
+}
+
+func writeAPIError(w http.ResponseWriter, status int, code, message string, extra map[string]interface{}) {
+	body := openaiErrorBody(code, message)
+	for k, v := range extra {
+		body[k] = v
+	}
+	writeJSON(w, status, body)
+}
+
+func writeSSEError(w http.ResponseWriter, flusher http.Flusher, code, message string) {
+	data, _ := json.Marshal(openaiErrorBody(code, message))
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", data)
+	flusher.Flush()
+	_, _ = fmt.Fprintf(w, "data: [DONE]\n\n")
+	flusher.Flush()
+}
+
 // normalizeStreamToolCallDeltas ensures OpenAI streaming deltas include index.
 func normalizeStreamToolCallDeltas(toolCalls interface{}) interface{} {
 	arr, ok := toolCalls.([]interface{})
@@ -554,7 +569,7 @@ func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 }
 
 func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
+	writeAPIError(w, status, msg, msg, nil)
 }
 
 func generateRequestID() string {

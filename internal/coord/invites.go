@@ -187,7 +187,7 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 	userKey := fmt.Sprintf("user:%d", userID)
 	ipKey := "ip:" + ip
 	if !s.pinLimiter.allow(userKey, ipKey) {
-		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": "rate_limited"})
+		writeAPIError(w, http.StatusTooManyRequests, "rate_limited", "rate_limited", nil)
 		return
 	}
 
@@ -197,7 +197,7 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, ErrInvalidPin) || errors.Is(err, ErrExpiredPin) ||
 			errors.Is(err, ErrExhausted) || errors.Is(err, ErrRevokedPin) ||
 			errors.Is(err, ErrMachineGone) {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": code})
+			writeAPIError(w, http.StatusBadRequest, code, code, nil)
 			return
 		}
 		log.Printf("join error: %v", err)

@@ -52,7 +52,7 @@ Feature: Chat Completions (v2 hard-pin)
         }
         """
     Then статус ответа равен 404
-    And тело ответа содержит поле "error" со значением "model_not_found"
+    And тело ответа содержит поле "error.code" со значением "model_not_found"
 
   Scenario: Машина offline — 503
     Given машина "<machine_id>" offline
@@ -67,7 +67,7 @@ Feature: Chat Completions (v2 hard-pin)
         }
         """
     Then статус ответа равен 503
-    And тело ответа содержит поле "error" со значением "machine_offline"
+    And тело ответа содержит поле "error.code" со значением "machine_offline"
 
   Scenario: Нет ACL — 403
     Given пользователь не имеет доступа к машине "<other_machine_id>"
@@ -108,7 +108,7 @@ Feature: Chat Completions (v2 hard-pin)
         }
         """
     Then статус ответа равен 410
-    And тело ответа содержит поле "error" со значением "gone"
+    And тело ответа содержит поле "error.code" со значением "gone"
 
   Scenario: Машина busy — 503
     Given машина "<machine_id>" на максимальной загрузке
@@ -123,4 +123,4 @@ Feature: Chat Completions (v2 hard-pin)
         }
         """
     Then статус ответа равен 503
-    And тело ответа содержит поле "error" со значением "machine_busy"
+    And тело ответа содержит поле "error.code" со значением "machine_busy"
