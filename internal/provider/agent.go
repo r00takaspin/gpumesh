@@ -45,8 +45,9 @@ type Agent struct {
 	providerID  string
 	done        chan struct{}
 	backendType BackendType // Ollama or OpenAI-compatible API
+	backendOK  bool        // true when last backend health check succeeded
 
-	writeMu    sync.Mutex // serialises writes to conn (gorilla/websocket not concurrent-safe)
+	writeMu    sync.Mutex
 	httpClient *http.Client
 }
 
@@ -102,6 +103,7 @@ func NewAgent(cfg Config) *Agent {
 		cfg:        cfg,
 		requests:   make(map[string]context.CancelFunc),
 		done:       make(chan struct{}),
+		backendOK:  true, // assume healthy until first health check
 		httpClient: &http.Client{Timeout: proto.TotalRequestTimeout},
 	}
 }
@@ -214,6 +216,11 @@ func (a *Agent) connect(ctx context.Context) error {
 	heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)
 	defer heartbeatCancel()
 	go a.heartbeatLoop(heartbeatCtx)
+
+	// Start backend health check loop.
+	healthCtx, healthCancel := context.WithCancel(ctx)
+	defer healthCancel()
+	go a.backendHealthLoop(healthCtx)
 
 	// Read loop.
 	return a.readLoop(ctx)
@@ -358,8 +365,6 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 	a.requests[msg.RequestID] = cancel
 	a.reqMu.Unlock()
 	defer cancel()
-
-	// Send to backend.
 	resp, err := a.sendToBackend(reqCtx, msg)
 	if err != nil {
 		a.mu.Lock()
@@ -368,6 +373,11 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 		if conn != nil {
 			code := proto.ErrInternal
 			msgStr := err.Error()
+			// Distinguish connection errors (backend dead) from other failures.
+			if isConnectionError(err) {
+				code = proto.ErrBackendUnavailable
+				log.Printf("\033[31m⬡\033[0m backend unreachable: %s", msgStr)
+			}
 			if reqCtx.Err() == context.Canceled {
 				return // request cancelled, don't send error
 			}
@@ -845,4 +855,57 @@ func (a *Agent) discoverModels() ([]string, error) {
 		return filtered, nil
 	}
 	return allModels, nil
+}
+
+// isConnectionError returns true when the error indicates the backend is unreachable
+// (connection refused, DNS failure, timeout) rather than returning an HTTP error.
+func isConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "connection refused") ||
+		strings.Contains(msg, "connect:") ||
+		strings.Contains(msg, "no such host") ||
+		strings.Contains(msg, "i/o timeout") ||
+		strings.Contains(msg, "dial tcp") ||
+		strings.Contains(msg, "dial udp")
+}
+
+// backendHealthLoop periodically checks backend health by probing /health.
+// Logs status changes and updates the agent's backendOK flag.
+func (a *Agent) backendHealthLoop(ctx context.Context) {
+	check := func() bool {
+		healthURL := strings.TrimRight(a.cfg.OllamaURL, "/") + "/health"
+		client := &http.Client{Timeout: 5 * time.Second}
+		req, err := http.NewRequestWithContext(ctx, "GET", healthURL, nil)
+		if err != nil {
+			return false
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return false
+		}
+		defer resp.Body.Close()
+		return resp.StatusCode == http.StatusOK
+	}
+
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+	wasOK := true // assume healthy at start
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			ok := check()
+			a.backendOK = ok
+			if ok && !wasOK {
+				log.Printf("\033[32m⬡\033[0m backend recovered: %s", a.cfg.OllamaURL)
+			} else if !ok && wasOK {
+				log.Printf("\033[31m⬡\033[0m backend unreachable: %s (health check failed)", a.cfg.OllamaURL)
+			}
+			wasOK = ok
+		}
+	}
 }
