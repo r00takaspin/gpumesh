@@ -129,6 +129,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 
 		// Wait with backoff before retrying.
+		log.Printf("\033[33m⟳\033[0m retrying in %v...", backoff)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
