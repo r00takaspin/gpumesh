@@ -1,0 +1,7 @@
+run:
+  goimports: true
+  errcheck: true
+  // errcheck ignore rules  gocyclo: true
+  issues:
+    exclude:
+      - "Test"

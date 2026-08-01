@@ -184,7 +184,9 @@ func (s *Server) handleUse(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	pd.RateLimit = s.limiter.Burst()
+	if s.limiter != nil {
+		pd.RateLimit = s.limiter.Burst()
+	}
 	pd.BaseURL = strings.TrimRight(s.baseURL, "/")
 	pd.Tab = r.URL.Query().Get("tab")
 	if pd.Tab == "" {

@@ -56,11 +56,15 @@ func (s *Server) handleConsumerStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	keys, _ := s.store.ListKeys(userID)
-	rateLimit := s.limiter.Burst()
-	minRemaining := rateLimit
-	for _, k := range keys {
-		if rem := s.limiter.Remaining(k.KeyHash); rem < minRemaining {
-			minRemaining = rem
+	rateLimit := 0
+	minRemaining := 0
+	if s.limiter != nil {
+		rateLimit = s.limiter.Burst()
+		minRemaining = rateLimit
+		for _, k := range keys {
+			if rem := s.limiter.Remaining(k.KeyHash); rem < minRemaining {
+				minRemaining = rem
+			}
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{

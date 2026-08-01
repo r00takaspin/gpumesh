@@ -20,7 +20,7 @@ import (
 
 func (s *Server) handleAPIModels(w http.ResponseWriter, r *http.Request) {
 	keyHash, _ := r.Context().Value(ctxKeyAPIKeyHash).(string)
-	if keyHash != "" {
+	if s.limiter != nil && keyHash != "" {
 		allowed, remaining := s.limiter.Allow(keyHash)
 		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
 		if !allowed {
@@ -106,7 +106,7 @@ func (s *Server) handleMachineModels(w http.ResponseWriter, r *http.Request) {
 	}
 
 	keyHash, _ := r.Context().Value(ctxKeyAPIKeyHash).(string)
-	if keyHash != "" {
+	if s.limiter != nil && keyHash != "" {
 		allowed, remaining := s.limiter.Allow(keyHash)
 		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
 		if !allowed {
@@ -153,12 +153,14 @@ func (s *Server) handleMachineChatCompletions(w http.ResponseWriter, r *http.Req
 	}
 
 	keyHash, _ := r.Context().Value(ctxKeyAPIKeyHash).(string)
-	allowed, remaining := s.limiter.Allow(keyHash)
-	w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
-	if !allowed {
-		w.Header().Set("Retry-After", "3600")
-		writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
-		return
+	if s.limiter != nil {
+		allowed, remaining := s.limiter.Allow(keyHash)
+		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
+		if !allowed {
+			w.Header().Set("Retry-After", "3600")
+			writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
+			return
+		}
 	}
 
 	var req proto.ChatCompletionRequest

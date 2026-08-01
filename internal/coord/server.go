@@ -51,7 +51,7 @@ func NewServer(cfg Config) (*Server, error) {
 		return nil, err
 	}
 
-	if cfg.RateLimit <= 0 {
+	if cfg.RateLimit < 0 {
 		cfg.RateLimit = 100
 	}
 	if cfg.InviteTTLDays <= 0 {
@@ -64,11 +64,17 @@ func NewServer(cfg Config) (*Server, error) {
 		cfg.PinAttemptLimit = 10
 	}
 
+
+	var limiter *RateLimiter
+	if cfg.RateLimit > 0 {
+		limiter = RateLimitHourly(cfg.RateLimit)
+	}
+
 	s := &Server{
 		addr:            cfg.Addr,
 		store:           store,
 		registry:        NewRegistry(),
-		limiter:         RateLimitHourly(cfg.RateLimit),
+		limiter:         limiter,
 		pinLimiter:      newPinLimiter(cfg.PinAttemptLimit),
 		baseURL:         cfg.BaseURL,
 		startTime:       time.Now(),
