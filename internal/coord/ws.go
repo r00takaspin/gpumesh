@@ -194,6 +194,7 @@ func (s *Server) readLoop(sess *MachineSession) {
 				log.Printf("ws: invalid chunk: %v", err)
 				continue
 			}
+			log.Printf("ws: chunk machine_id=%s request_id=%s done=%v content_len=%d", sess.MachineID, msg.RequestID, msg.Done, len(msg.Content))
 			s.relayChunk(sess.MachineID, msg)
 
 		case proto.TypeResponse:
@@ -225,17 +226,20 @@ func (s *Server) readLoop(sess *MachineSession) {
 func (s *Server) relayChunk(machineID string, msg proto.ChunkMsg) {
 	sess := s.registry.GetSession(machineID)
 	if sess == nil {
+		log.Printf("relayChunk: session not found machine_id=%s request_id=%s", machineID, msg.RequestID)
 		return
 	}
 	sess.mu.Lock()
 	ch, ok := sess.chunkCh[msg.RequestID]
 	sess.mu.Unlock()
 	if !ok {
+		log.Printf("relayChunk: no chunk channel machine_id=%s request_id=%s", machineID, msg.RequestID)
 		return
 	}
 	select {
 	case ch <- ChunkRelay{Content: msg.Content, ToolCalls: msg.ToolCalls, Done: msg.Done}:
 	default:
+		log.Printf("relayChunk: channel full machine_id=%s request_id=%s", machineID, msg.RequestID)
 	}
 	if msg.Done {
 		sess.UnregisterChunkChannel(msg.RequestID)
