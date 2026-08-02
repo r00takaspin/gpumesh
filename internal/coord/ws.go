@@ -111,12 +111,39 @@ func (s *Server) handleWSProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = conn.SetReadDeadline(time.Time{})
-	readDone := make(chan struct{})
+	// WebSocket keepalive: ping every 30s, expect pong within 90s.
+	pongWait := 90 * time.Second
+	pingPeriod := 30 * time.Second
+	conn.SetReadDeadline(time.Now().Add(pongWait))
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+	pingDone := make(chan struct{})
 	go func() {
-		s.readLoop(sess)
-		close(readDone)
+		ticker := time.NewTicker(pingPeriod)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-pingDone:
+				return
+			case <-ticker.C:
+				sess.writeMu.Lock()
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					sess.writeMu.Unlock()
+					return
+				}
+				sess.writeMu.Unlock()
+			}
+		}
 	}()
+
+ 	readDone := make(chan struct{})
+ 	go func() {
+ 		s.readLoop(sess)
+ 		close(readDone)
+		close(pingDone)
+ 	}()
 
 	<-readDone
 
