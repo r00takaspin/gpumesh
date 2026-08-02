@@ -13,7 +13,7 @@ func ConfigFromEnv() Config {
 
 	rateLimit := 100
 	if v := os.Getenv("MESH_RATE_LIMIT"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
 			rateLimit = n
 		}
 	}
