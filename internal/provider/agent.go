@@ -418,6 +418,35 @@ func (a *Agent) handleRequest(ctx context.Context, msg proto.RequestMsg) {
 
 func (a *Agent) handleStreamingResponse(requestID string, body io.Reader) {
 	scanner := bufio.NewScanner(body)
+	// Increase buffer from default 64KB to 1MB — Ollama final chunk with timing stats
+	// can exceed 64KB, and bufio.ErrTooLong silently aborts the scan.
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	sentDone := false
+	defer func() {
+		if sentDone {
+			return
+		}
+		// Scanner exited without sending a done chunk — either error or unexpected EOF.
+		err := scanner.Err()
+		if err != nil {
+			log.Printf("handleStreamingResponse: scanner error for request_id=%s: %v", requestID, err)
+		} else {
+			log.Printf("handleStreamingResponse: stream ended without done chunk request_id=%s", requestID)
+		}
+		// Send error to coordinator so it doesn't hang waiting for done.
+		a.mu.Lock()
+		conn := a.conn
+		a.mu.Unlock()
+		if conn != nil {
+			_ = a.writeWS(conn, proto.ErrorMsg{
+				Type:      proto.TypeError,
+				RequestID: requestID,
+				Code:      proto.ErrInternal,
+				Message:   "stream ended unexpectedly",
+			})
+		}
+	}()
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -439,6 +468,7 @@ func (a *Agent) handleStreamingResponse(requestID string, body io.Reader) {
 						Done:      true,
 					})
 				}
+				sentDone = true
 				return
 			}
 			// Strip "data: " prefix.
@@ -521,6 +551,7 @@ func (a *Agent) handleStreamingResponse(requestID string, body io.Reader) {
 		}
 
 		if done {
+			sentDone = true
 			return
 		}
 	}
