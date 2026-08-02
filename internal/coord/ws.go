@@ -116,9 +116,9 @@ func (s *Server) handleWSProvider(w http.ResponseWriter, r *http.Request) {
 	// WebSocket keepalive: ping every 30s, expect pong within 90s.
 	pongWait := 90 * time.Second
 	pingPeriod := 30 * time.Second
-	conn.SetReadDeadline(time.Now().Add(pongWait))
+	_ = conn.SetReadDeadline(time.Now().Add(pongWait))
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(pongWait))
+		_ = conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
 	pingDone := make(chan struct{})
