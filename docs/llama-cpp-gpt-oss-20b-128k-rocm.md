@@ -454,11 +454,44 @@ llama.cpp/build/bin/llama-server \
   --batch-size 4096 \
   --ubatch-size 1024 \
   --cache-prompt \
-  --cache-ram 4096 \
+  --cache-ram -1 \
+  --cache-idle-slots \
   --reasoning off \
   --host 127.0.0.1 \
   --port 8080
 ```
+
+> **Важно:** `--cache-ram 0` = кеш **выключен**. `-1` = безлимитный. Это самая частая причина неработающего кеша.
+
+### Кеш между диалогами: стратегия 2 слота + MaxConcurrent=1
+
+Prompt cache сохраняет KV-кеш неактивных слотов в RAM. При 1 слоте кеш затирается каждым новым запросом. Решение — 2 слота + `MaxConcurrent=1` в провайдере:
+
+- llama-server: `--parallel 2 --ctx-size 65536` (2 слота × 32K)
+- Provider `~/.gpumesh.json`: `"MaxConcurrent": 1`
+
+Координатор шлёт запросы строго по одному. Первый диалог занимает слот 0, второй — слот 1. Когда слот 0 освобождается, его KV уходит в prompt cache. При возврате к диалогу 0 — восстановление из кеша, prefill ~100 ms.
+
+```bash
+# 2 слота, q4_0 (влезает в 16 GB), кеш включён
+HSA_OVERRIDE_GFX_VERSION=11.0.1 \
+LD_LIBRARY_PATH="$HOME/rocm-shim/lib:/opt/rocm/lib:$LD_LIBRARY_PATH" \
+llama.cpp/build/bin/llama-server \
+  --model ~/models/gpt-oss-20b-q4km/gpt-oss-20b-RotorQuant-Q4_K_M.gguf \
+  --ctx-size 65536 \
+  --parallel 2 \
+  --n-gpu-layers 24 \
+  --cache-type-k q4_0 \
+  --cache-type-v q4_0 \
+  --batch-size 4096 \
+  --ubatch-size 1024 \
+  --cache-prompt \
+  --cache-ram -1 \
+  --cache-idle-slots \
+  --reasoning off \
+  --host 127.0.0.1 \
+  --port 8080
+ ```
 ## Структура файлов после настройки
 
 ```
