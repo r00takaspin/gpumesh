@@ -13,6 +13,22 @@
 | ОС | Arch Linux, ROCm 7.2.0 |
 | llama.cpp | 0.18.0 (сборка из исходников) |
 
+### Критично: `HSA_OVERRIDE_GFX_VERSION`
+
+Без этой переменной llama-server **не видит GPU**, даже если `rocminfo` его показывает. Причина: gfx1101 нет в списке известных таргетов внутри hip runtime для данной версии ROCm.
+
+```bash
+# Проверка: без переменной — пусто
+llama-server --list-devices
+# → ggml_cuda_init: failed to initialize ROCm: no ROCm-capable device is detected
+
+# С переменной — GPU найден
+HSA_OVERRIDE_GFX_VERSION=11.0.1 llama-server --list-devices
+# → ROCm0: AMD Radeon RX 7800 XT (16368 MiB, 16170 MiB free)
+```
+
+**Всегда** добавляйте `HSA_OVERRIDE_GFX_VERSION=11.0.1` при запуске llama-server и при сборке.
+
 ## Почему это сложно
 
 GPT-OSS-20B — это MoE-модель: 21B общих параметров, 4B активных на токен. В квантизации Q4_K_M веса занимают **15 ГБ**. KV-кеш при 128K в FP16 — ещё **6.4 ГБ**. Итого >21 ГБ — не влезает в 16 ГБ VRAM.
@@ -72,19 +88,19 @@ cp opt/rocm/lib/cmake/amd_comgr/* ~/rocm-shim/lib/cmake/amd_comgr/
 cp -a opt/rocm/lib/libamd_comgr* ~/rocm-shim/lib/
 mkdir -p ~/rocm-shim/include/amd_comgr
 cp opt/rocm/include/amd_comgr/amd_comgr.h ~/rocm-shim/include/amd_comgr/
-```
-
 Затем добавить shim в `CMAKE_PREFIX_PATH`:
 
 ```bash
 cmake -B build ... -DCMAKE_PREFIX_PATH="/home/$USER/rocm-shim;/opt/rocm"
 ```
 
-И при запуске:
+Этот же shim нужен и при **запуске** (не только при сборке) — `libamd_comgr.so` загружается динамически. Если каталог `~/rocm-shim` не существует (свежая система, очистка), создайте его заново по инструкции выше или распакуйте comgr в `~/.local/lib/rocm`:
 
 ```bash
-export LD_LIBRARY_PATH="/home/$USER/rocm-shim/lib:/opt/rocm/lib:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="$HOME/rocm-shim/lib:/opt/rocm/lib:$LD_LIBRARY_PATH"
+export HSA_OVERRIDE_GFX_VERSION=11.0.1
 ```
+
 
 ## Шаг 3: Загрузка модели
 
@@ -138,43 +154,81 @@ KV-кеш GPT-OSS-20B при 8K (FP16): 0.40 ГБ → при 128K: **6.4 ГБ**.
 
 ## Шаг 5: Запуск сервера
 
+**Рекомендованный вариант: все слои на GPU, 64K контекст.**
+
 ```bash
 GGUF=~/models/gpt-oss-20b-q4km/gpt-oss-20b-RotorQuant-Q4_K_M.gguf
 
 LD_LIBRARY_PATH="$HOME/rocm-shim/lib:/opt/rocm/lib:$LD_LIBRARY_PATH" \
 llama.cpp/build/bin/llama-server \
   --model "$GGUF" \
-  --ctx-size 131072 \
+  --ctx-size 65536 \
+  --n-gpu-layers 99 \
   --cache-type-k q4_0 \
   --cache-type-v q4_0 \
   --host 127.0.0.1 \
-  --port 8080
+  --port 8080 \
+  --parallel 1 \
+  --reasoning-budget 4096
 ```
+
+### Вариант: Multi-slot (parallel=3, 32K на слот)
+
+`--ctx-size` задаёт **общий** размер KV-кеша. На каждый слот приходится `ctx_size / n_parallel`.
+Чтобы получить 32K на слот при `--parallel 3`, нужно `--ctx-size 98304` (32 768 × 3).
+Если указать `--ctx-size 32768 --parallel 3`, каждый слот получит лишь ~10 922 токена.
+
+С 3 слотами KV-кеш занимает больше — используйте `-ngl auto`, чтобы авто-фит выгрузил часть слоёв на CPU. С `q8_0` KV-кешем flash attention **работает** (в отличие от `q4_0`, где FA-буферы вызывают OOM).
+
+```bash
+GGUF=~/models/gpt-oss-20b-q4km/gpt-oss-20b-RotorQuant-Q4_K_M.gguf
+
+HSA_OVERRIDE_GFX_VERSION=11.0.1 \
+LD_LIBRARY_PATH="$HOME/rocm-shim/lib:/opt/rocm/lib:$LD_LIBRARY_PATH" \
+llama.cpp/build/bin/llama-server \
+  --model "$GGUF" \
+  --ctx-size 98304 \
+  --parallel 3 \
+  --n-gpu-layers auto \
+  --cache-type-k q8_0 \
+  --cache-type-v q8_0 \
+  --flash-attn on \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --reasoning-budget 4096
+```
+
+Результат: 3 слота × 32 768 токенов, q8_0 KV-кеш, flash attention включён.
+
+Если нужен полный 128K контекст — убрать `--n-gpu-layers 99` и `--ctx-size 65536`, вернуть `--ctx-size 131072`. Авто-фит выгрузит 2–3 слоя на CPU, скорость на большом контексте упадёт до 2–6 tok/s.
 
 ### Ключевые флаги
 
 | Флаг | Назначение |
 |------|-----------|
-| `--ctx-size 131072` | 128 × 1024 — контекст, кратность 1024 обязательна |
-| `--cache-type-k q4_0` | Квантизация ключей KV-кеша до 4 бит |
-| `--cache-type-v q4_0` | Квантизация значений KV-кеша до 4 бит |
-| `--flash-attn on` | **Не использовать!** Вызвал OOM — доп. буферы FA не влезли |
+| `--ctx-size N` | Общий размер KV-кеша. **На слот:** `N / parallel`. Для 32K/слот при 3 параллельных: `--ctx-size 98304`. Округляется вниз до числа кратного `parallel`. |
+| `--parallel N` | Количество слотов (одновременных запросов). **По умолчанию 4** — если не указан, KV-кеш фрагментируется. `--parallel 1` для одного диалога, `--parallel 3` для многопользовательского режима. |
+| `--n-gpu-layers N` | Слоёв на GPU. `99` = все 28 слоёв. `auto` = авто-фит под VRAM. При multi-slot или большом контексте `auto` безопаснее. |
+| `--cache-type-k TYPE` | Квантизация K-кеша: `q4_0` (4-бит, мин. VRAM), `q8_0` (8-бит, баланс качество/VRAM), `f16` (без потерь). |
+| `--cache-type-v TYPE` | Квантизация V-кеша — то же что для K. |
+| `--flash-attn on` | Flash Attention. С `q4_0` KV-кешем — OOM. С `q8_0` и `-ngl auto` — **работает**. Тест: включать только если хватает VRAM. |
+| `--reasoning-budget N` | Лимит на раздумья для GPT-OSS. Без него модель уходит в бесконечное рассуждение. |
+| `HSA_OVERRIDE_GFX_VERSION` | **Обязательно** `=11.0.1` для RX 7800 XT. Без этого llama.cpp не видит GPU. |
+### Почему не 128K
 
-### Что не было использовано
+Конфигурация со 128K контекстом (`--ctx-size 131072`) возможна только без `--n-gpu-layers`: авто-фит выгружает 2–3 слоя на CPU, освобождая VRAM под полуторный KV-кеш. На коротких запросах разница незаметна (30–65 tok/s), но при заполнении контекста до 65K+ токенов каждый новый токен гоняет attention через CPU-слои, и скорость падает до 2–6 tok/s.
 
-- **`--n-gpu-layers`** — не задан. Авто-фит сам решает, сколько слоёв на GPU, сколько в RAM. Модель имеет ~28 слоёв; часть уходит в RAM при нехватке VRAM.
-- **`--no-mmap`** — не задан. Лог рекомендует его для тензоров на CPU, но работает и без него.
+С 64K и всеми слоями на GPU скорость стабильна на любом заполнении контекста. Для большинства задач 64K достаточно.
 
 ### Лог успешного запуска
 
 ```
-llama_model_loader: tensor overrides to CPU are used with mmap enabled
-load_model: initializing, n_slots = 4, n_ctx_slot = 131072, kv_unified = 'true'
+load_model: initializing, n_slots = 1, n_ctx_slot = 65536, kv_unified = 'true'
 llama_server: model loaded
 llama_server: listening on http://127.0.0.1:8080
 ```
 
-Строка `tensor overrides to CPU` — норма: часть весов не влезла в VRAM и ушла в RAM.
+VRAM: 94% занято. `n_slots = 1` — один активный диалог.
 
 ## Шаг 6: Проверка
 
@@ -259,20 +313,49 @@ rocm-smi --showmemuse
 
 ## Возможные проблемы
 
+### GPU не обнаружен (`no ROCm-capable device`)
+
+**Симптом:** `ggml_cuda_init: failed to initialize ROCm: no ROCm-capable device is detected`, хотя `rocminfo` показывает GPU.
+
+**Причины и решения (проверять по порядку):**
+1. **Не установлен `HSA_OVERRIDE_GFX_VERSION=11.0.1`** — самая частая причина. Добавить в окружение.
+2. **`comgr` сломан** — `pacman -Qikk comgr` покажет missing files. Решение: переустановить (`sudo pacman -S comgr`) или распаковать вручную (см. Workaround в Шаге 2).
+3. **Нет прав на `/dev/kfd` и `/dev/dri/render*`** — пользователь должен быть в группе `render` и `video`.
+
+### Flash Attention: не ускоряет GPT-OSS
+
+С `q8_0` KV-кешем flash attention работает без OOM, но **не даёт прироста prefill** (635 vs 634 tok/s). Узкое место GPT-OSS — MoE-слои, а не attention. Можно не включать.
 ### OOM при запуске
 
 **Симптом:** `cudaMalloc failed: out of memory` на этапе загрузки модели или создания контекста.
 
 **Причины и решения:**
-1. **`--flash-attn on`** — убрать. FA требует доп. буферы (~400 МБ), которых не хватает.
-2. **`--n-gpu-layers 999`** — убрать. Дать авто-фиту решить, сколько слоёв на GPU.
+1. **`--flash-attn on` с q4_0 KV-кешем** — перейти на `q8_0` (см. секцию выше) или убрать FA.
+2. **`--n-gpu-layers 99` (все слои)** — заменить на `auto`, дать авто-фиту выгрузить часть слоёв.
 3. **Слишком большой контекст** — уменьшить `--ctx-size`.
+4. **Много слотов** (`--parallel > 1`) — каждый слот умножает KV-кеш. Уменьшить `--parallel` или `--ctx-size`.
 
-### Модель не отвечает / пустой content
+### Multi-slot: генерация падает до нуля
 
-**Причина:** GPT-OSS — reasoning-модель. Пишет в `reasoning_content`, не в `content`.
+**Симптом:** при `--parallel 3` генерация на слотах падает до 0.14 tok/s, prefill на одном слоте отжирает весь GPU.
 
-**Решение:** читать оба поля, склеивать.
+**Причина:** 7800 XT не тянет 3 параллельных prefill/generation. Каждый слот конкурирует за compute и memory bandwidth.
+
+**Решение:** `--parallel 1`. Для multi-slot нужна карта с 24+ GB VRAM.
+
+### 503 machine_busy
+
+**Симптом:** клиенты gpumesh получают `503 machine_busy` при параллельных запросах.
+
+**Причина:** `MaxConcurrent` в `~/.gpumesh.json` меньше количества слотов llama-server.
+
+**Решение:** установить `"MaxConcurrent": 1` (равно `--parallel`).
+
+### Модель долго отвечает / reasoning
+
+GPT-OSS — думающая модель. Без `--reasoning off` генерирует 300–600 reasoning-токенов перед каждым ответом, которые клиент не видит. Ответ приходит в `reasoning_content`, `content` — пустой.
+
+**Решение:** `--reasoning off` — убирает задержку, ответ идёт сразу в `content`.
 
 ### `/v1/models` показывает путь вместо имени
 
@@ -286,6 +369,96 @@ ln -s ~/models/gpt-oss-20b-q4km/gpt-oss-20b-RotorQuant-Q4_K_M.gguf \
 # Перезапустить с --model ~/models/gpt-oss-20b.gguf
 ```
 
+
+## Prompt Caching
+
+### Проблема
+
+По умолчанию каждый запрос заново вычисляет KV-кеш для всего промпта. При 17K токенов это 26 секунд prefill, даже если 16 990 токенов совпадают с предыдущим запросом.
+
+### Решение: правка исходников
+
+В llama.cpp есть баг (коммит `ccee42642`, PR #23280), ломающий переиспользование KV-кеша для MoE-моделей. Исправление — откат двух строк в `tools/server/server-context.cpp`:
+
+```diff
+- const auto pos_min_thold = std::max(0, pos_next - n_swa - (has_new_tokens ? 0 : 1));
++ const auto pos_min_thold = std::max(0, pos_next - n_swa);
+
+- if (n_past > 0 && n_past <= slot.prompt.n_tokens()) {
++ if (n_past > 0 && n_past < slot.prompt.n_tokens()) {
+```
+
+После правки — `cmake --build build -j$(nproc)`, рестарт.
+
+### Результат
+
+| Запрос | Prefill | Токенов |
+|---|---|---|
+| Новый диалог | 26 568 ms | 16 857 |
+| Повтор в том же диалоге | **27 ms** | 1 новый, остальное кеш |
+| Ещё повтор | **68 ms** | 11 новых, остальное кеш |
+
+**95%+ токенов из кеша** при продолжении диалога. Новый диалог — полный prefill (неизбежно).
+
+### Важно
+
+Кеш требует `--cache-prompt --cache-ram 4096`. Без `--cache-ram` кеш не сохраняется. Флаг `--cache-reuse` **не работает** с GPT-OSS — будет отключён с предупреждением.
+
+## Parallel vs Single-slot
+
+### Multi-slot (parallel=3): не взлетело
+
+Теоретически 3 слота × 32K с q4_0 KV-кешем (1.15 GB) + модель (14.7 GB) = 15.85 GB — влезает в 16 GB. На практике:
+
+- prefill на одном слоте отжирает GPU, генерация на других падает до **0.14 tok/s**
+- три параллельных prefill по 17K токенов — GPU захлёбывается
+- клиенты получают 504 `machine_busy` от координатора gpumesh
+
+### Single-slot (parallel=1): стабильно
+
+Один слот × 32K, q8_0 KV-кеш (768 MB). Prefill 635 tok/s, генерация 82–94 tok/s. Без конкуренции за GPU.
+
+Для multi-slot нужна видеокарта с 24+ GB VRAM.
+
+## Flash Attention
+
+С q8_0 KV-кешем и `-ngl 24` flash attention (`--flash-attn on`) **не вызывает OOM** и **не даёт прироста** prefill для этой модели: 635 tok/s с FA vs 634 tok/s без. Узкое место — MoE-слои, а не attention. Для GPT-OSS flash attention можно не включать.
+
+## Reasoning
+
+GPT-OSS — думающая модель. Без `--reasoning off` генерирует 300–600 reasoning-токенов перед каждым ответом. Клиент ждёт десятки секунд, не видя вывода. `--reasoning off` убирает задержку — ответ идёт сразу.
+
+## Provider: MaxConcurrent
+
+Провайдер gpumesh (`~/.gpumesh.json`) должен иметь `MaxConcurrent`, равный количеству слотов llama-server. При `MaxConcurrent: 1` и `--parallel 3` — два из трёх запросов получат `503 machine_busy`.
+
+```json
+{
+  "MaxConcurrent": 1,
+  "OllamaURL": "http://localhost:8080"
+}
+```
+
+## Итоговая рабочая команда
+
+```bash
+HSA_OVERRIDE_GFX_VERSION=11.0.1 \
+LD_LIBRARY_PATH="$HOME/rocm-shim/lib:/opt/rocm/lib:$LD_LIBRARY_PATH" \
+llama.cpp/build/bin/llama-server \
+  --model ~/models/gpt-oss-20b-q4km/gpt-oss-20b-RotorQuant-Q4_K_M.gguf \
+  --ctx-size 32768 \
+  --parallel 1 \
+  --n-gpu-layers 24 \
+  --cache-type-k q8_0 \
+  --cache-type-v q8_0 \
+  --batch-size 4096 \
+  --ubatch-size 1024 \
+  --cache-prompt \
+  --cache-ram 4096 \
+  --reasoning off \
+  --host 127.0.0.1 \
+  --port 8080
+```
 ## Структура файлов после настройки
 
 ```
