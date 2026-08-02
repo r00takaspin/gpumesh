@@ -97,6 +97,8 @@ func (s *Server) handleWSProvider(w http.ResponseWriter, r *http.Request) {
 	if sess.MaxConcurrent <= 0 {
 		sess.MaxConcurrent = 1
 	}
+	log.Printf("ws: provider connected machine_id=%s session_id=%s user_id=%d max_concurrent=%d models=%d",
+		machine.ID, sessionID, key.UserID, sess.MaxConcurrent, len(reg.Models))
 
 	s.registry.Register(sess)
 
